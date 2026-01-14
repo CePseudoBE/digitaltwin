@@ -6,6 +6,8 @@ import type { DataResponse } from './types.js'
 import type { HttpMethod } from '../engine/endpoints.js'
 import type { OpenAPIDocumentable, OpenAPIComponentSpec } from '../openapi/types.js'
 import { engineEventBus } from '../engine/events.js'
+import { StorageError } from '../errors/index.js'
+import { Logger } from '../utils/logger.js'
 
 /**
  * Abstract base class for data collection components in the Digital Twin framework.
@@ -168,31 +170,44 @@ export abstract class Collector
      * ```
      */
     async run(): Promise<Buffer | void> {
-        const result = await this.collect()
+        const config = this.getConfiguration()
+        const logger = new Logger(`Collector:${config.name}`)
 
-        if (result) {
-            const config = this.getConfiguration()
-            const now = new Date()
+        try {
+            const result = await this.collect()
 
-            const url = await this.storage.save(result, config.name)
+            if (result) {
+                const now = new Date()
 
-            await this.db.save({
-                name: config.name,
-                type: config.contentType,
-                url,
-                date: now
+                const url = await this.storage.save(result, config.name)
+
+                await this.db.save({
+                    name: config.name,
+                    type: config.contentType,
+                    url,
+                    date: now
+                })
+
+                // Emit completion event for monitoring and integration
+                engineEventBus.emit('component:event', {
+                    type: 'collector:completed',
+                    componentName: config.name,
+                    timestamp: now,
+                    data: { bytesCollected: result.length }
+                })
+            }
+
+            return result
+        } catch (error) {
+            logger.error(`Collector execution failed: ${error instanceof Error ? error.message : String(error)}`, {
+                collectorName: config.name,
+                stack: error instanceof Error ? error.stack : undefined
             })
-
-            // Emit completion event for monitoring and integration
-            engineEventBus.emit('component:event', {
-                type: 'collector:completed',
-                componentName: config.name,
-                timestamp: now,
-                data: { bytesCollected: result.length }
-            })
+            throw new StorageError(
+                `Collector ${config.name} execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                { collectorName: config.name }
+            )
         }
-
-        return result
     }
 
     /**

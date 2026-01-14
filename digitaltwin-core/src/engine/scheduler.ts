@@ -168,7 +168,14 @@ class ComponentScheduler {
             if (event.type !== 'collector:completed') return
 
             this.logger.debug(`Received collector:completed event from ${event.componentName}`)
-            await this.#triggerDependentHarvesters(event.componentName)
+            try {
+                await this.#triggerDependentHarvesters(event.componentName)
+            } catch (error) {
+                this.logger.error(`Failed to trigger harvesters for ${event.componentName}: ${error instanceof Error ? error.message : String(error)}`, {
+                    componentName: event.componentName,
+                    stack: error instanceof Error ? error.stack : undefined
+                })
+            }
         })
     }
 
