@@ -22,6 +22,10 @@ import {
     HttpStatus
 } from '../utils/http_responses.js'
 import fs from 'fs/promises'
+import { safeAsync } from '../utils/safe_async.js'
+import { Logger } from '../utils/logger.js'
+
+const logger = new Logger('AssetsManager')
 
 /**
  * Result of authentication check.
@@ -494,14 +498,16 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
 
     /**
      * Cleans up temporary file after processing.
-     * Silently ignores cleanup errors.
+     * Logs cleanup errors but doesn't throw.
      *
      * @param filePath - Path to temporary file
      */
     private async cleanupTempFile(filePath: string): Promise<void> {
-        await fs.unlink(filePath).catch(() => {
-            // Ignore cleanup errors
-        })
+        await safeAsync(
+            () => fs.unlink(filePath),
+            `cleanup temp file ${filePath}`,
+            logger
+        )
     }
 
     /**

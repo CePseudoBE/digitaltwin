@@ -3,7 +3,11 @@ import type { ConnectionOptions } from 'bullmq'
 import type { StorageService } from '../storage/storage_service.js'
 import type { DatabaseAdapter } from '../database/database_adapter.js'
 import { extractAndStoreArchive } from '../utils/zip_utils.js'
+import { safeAsync, safeCleanup } from '../utils/safe_async.js'
+import { Logger } from '../utils/logger.js'
 import fs from 'fs/promises'
+
+const logger = new Logger('UploadProcessor')
 
 export interface TilesetUploadJobData {
     type: 'tileset'
@@ -88,7 +92,7 @@ export class UploadProcessor {
             // Validate tileset.json exists
             if (!extractResult.root_file) {
                 // Clean up uploaded files
-                await this.storage.deleteByPrefix(basePath).catch(() => {})
+                await safeAsync(() => this.storage.deleteByPrefix(basePath!), 'cleanup storage on invalid tileset', logger)
                 throw new Error('Invalid tileset: no tileset.json found in the ZIP archive')
             }
 
@@ -105,25 +109,28 @@ export class UploadProcessor {
             await job.updateProgress(90)
 
             // Clean up temp file
-            await fs.unlink(tempFilePath).catch(() => {})
+            await safeAsync(() => fs.unlink(tempFilePath), 'cleanup temp file after upload', logger)
             await job.updateProgress(100)
 
-            console.log(`[UploadProcessor] Tileset ${recordId} uploaded: ${extractResult.file_count} files`)
+            logger.info(`Tileset ${recordId} uploaded: ${extractResult.file_count} files`)
         } catch (error) {
             // Update record as failed (don't delete - keep for debugging)
             const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-            await this.db
-                .updateById(componentName, recordId, {
+            await safeAsync(
+                () => this.db.updateById(componentName, recordId, {
                     upload_status: 'failed',
                     upload_error: errorMessage
-                })
-                .catch(() => {})
+                }),
+                'update record status to failed',
+                logger
+            )
 
             // Clean up: uploaded files and temp file
-            if (basePath) {
-                await this.storage.deleteByPrefix(basePath).catch(() => {})
-            }
-            await fs.unlink(tempFilePath).catch(() => {})
+            const pathToClean = basePath // Capture for closure
+            await safeCleanup([
+                ...(pathToClean ? [{ operation: () => this.storage.deleteByPrefix(pathToClean), context: 'cleanup storage on upload error' }] : []),
+                { operation: () => fs.unlink(tempFilePath), context: 'cleanup temp file on upload error' }
+            ], logger)
 
             throw error
         }

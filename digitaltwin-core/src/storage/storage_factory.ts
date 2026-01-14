@@ -6,6 +6,10 @@ import { Env } from '../env/env.js'
 import { OvhS3StorageService } from './adapters/ovh_storage_service.js'
 import { LocalStorageService } from './adapters/local_storage_service.js'
 import type { StorageService } from './storage_service.js'
+import { safeAsync } from '../utils/safe_async.js'
+import { Logger } from '../utils/logger.js'
+
+const logger = new Logger('StorageFactory')
 
 export class StorageServiceFactory {
     /**
@@ -33,7 +37,7 @@ export class StorageServiceFactory {
                     region: env.OVH_REGION ?? 'gra'
                 })
                 // Configure CORS for browser access (non-blocking)
-                ovhStorage.configureCors().catch(() => {})
+                safeAsync(() => ovhStorage.configureCors(), 'configure OVH CORS', logger)
                 return ovhStorage
             }
 

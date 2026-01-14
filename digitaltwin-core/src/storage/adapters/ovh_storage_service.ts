@@ -13,7 +13,11 @@ import {
     ObjectCannedACL
 } from '@aws-sdk/client-s3'
 import { StorageService } from '../storage_service.js'
+import { safeAsync } from '../../utils/safe_async.js'
+import { Logger } from '../../utils/logger.js'
 import type { Readable } from 'stream'
+
+const logger = new Logger('OvhS3Storage')
 
 export interface OvhS3Config {
     accessKey: string
@@ -148,9 +152,9 @@ export class OvhS3StorageService extends StorageService {
         for (let i = 0; i < batches.length; i += MAX_CONCURRENT) {
             const concurrentBatches = batches.slice(i, i + MAX_CONCURRENT)
             await Promise.all(
-                concurrentBatches.map(batch =>
-                    this.#s3
-                        .send(
+                concurrentBatches.map((batch, index) =>
+                    safeAsync(
+                        () => this.#s3.send(
                             new DeleteObjectsCommand({
                                 Bucket: this.#bucket,
                                 Delete: {
@@ -158,10 +162,10 @@ export class OvhS3StorageService extends StorageService {
                                     Quiet: true // Don't return info about each deleted object
                                 }
                             })
-                        )
-                        .catch(() => {
-                            // Ignore batch delete errors - files may already be deleted
-                        })
+                        ),
+                        `delete batch ${i + index + 1}/${batches.length}`,
+                        logger
+                    )
                 )
             )
         }
