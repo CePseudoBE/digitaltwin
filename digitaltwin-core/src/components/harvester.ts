@@ -5,6 +5,8 @@ import type { DatabaseAdapter } from '../database/database_adapter.js'
 import type { StorageService } from '../storage/storage_service.js'
 import type { HttpMethod } from '../engine/endpoints.js'
 import type { OpenAPIDocumentable, OpenAPIComponentSpec } from '../openapi/types.js'
+import { StorageError } from '../errors/index.js'
+import { Logger } from '../utils/logger.js'
 
 /**
  * Result of source range parsing for harvester data retrieval.
@@ -313,62 +315,75 @@ export abstract class Harvester
      */
     async run(): Promise<boolean> {
         const config = this.getConfiguration()
+        const logger = new Logger(`Harvester:${config.name}`)
 
         if (!config.source) {
             throw new Error(`Harvester ${config.name} must specify a source component`)
         }
 
-        // Get the latest harvested date
-        const latestHarvestedRecord = await this.db.getLatestByName(config.name)
+        try {
+            // Get the latest harvested date
+            const latestHarvestedRecord = await this.db.getLatestByName(config.name)
 
-        // Calculate the starting point for harvesting
-        let latestDate: Date
-        if (!latestHarvestedRecord) {
-            // First run - get first source record and start from one second before
-            const firstSourceRecord = await this.db.getFirstByName(config.source)
-            if (!firstSourceRecord) {
+            // Calculate the starting point for harvesting
+            let latestDate: Date
+            if (!latestHarvestedRecord) {
+                // First run - get first source record and start from one second before
+                const firstSourceRecord = await this.db.getFirstByName(config.source)
+                if (!firstSourceRecord) {
+                    return false
+                }
+                latestDate = new Date(firstSourceRecord.date.getTime() - 1000)
+            } else {
+                latestDate = latestHarvestedRecord.date
+            }
+
+            // Parse source range
+            const { startDate, endDate, limit } = SourceRangeParser.parseSourceRange(latestDate, config.source_range)
+
+            // Get source data based on range
+            const sourceData = await this.getSourceData(config.source, startDate, endDate, limit)
+
+            if (!sourceData || sourceData.length === 0) {
                 return false
             }
-            latestDate = new Date(firstSourceRecord.date.getTime() - 1000)
-        } else {
-            latestDate = latestHarvestedRecord.date
+
+            // Check if we have enough data (strict mode)
+            if (limit && config.source_range_min && sourceData.length < limit) {
+                return false
+            }
+
+            // Calculate storage date
+            const storageDate = endDate || sourceData[sourceData.length - 1].date
+
+            // Prepare source data for harvesting
+            const sourceForHarvesting = limit === 1 && !endDate ? sourceData[0] : sourceData
+
+            // Get dependencies data
+            const dependenciesData = await this.getDependenciesData(
+                config.dependencies || [],
+                config.dependenciesLimit || [],
+                storageDate
+            )
+
+            // Execute harvesting
+            const result = await this.harvest(sourceForHarvesting, dependenciesData)
+
+            // Store results
+            await this.storeResults(config, result, sourceData, storageDate)
+
+            return true
+        } catch (error) {
+            logger.error(`Harvester execution failed: ${error instanceof Error ? error.message : String(error)}`, {
+                harvesterName: config.name,
+                source: config.source,
+                stack: error instanceof Error ? error.stack : undefined
+            })
+            throw new StorageError(
+                `Harvester ${config.name} execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                { harvesterName: config.name, source: config.source }
+            )
         }
-
-        // Parse source range
-        const { startDate, endDate, limit } = SourceRangeParser.parseSourceRange(latestDate, config.source_range)
-
-        // Get source data based on range
-        const sourceData = await this.getSourceData(config.source, startDate, endDate, limit)
-
-        if (!sourceData || sourceData.length === 0) {
-            return false
-        }
-
-        // Check if we have enough data (strict mode)
-        if (limit && config.source_range_min && sourceData.length < limit) {
-            return false
-        }
-
-        // Calculate storage date
-        const storageDate = endDate || sourceData[sourceData.length - 1].date
-
-        // Prepare source data for harvesting
-        const sourceForHarvesting = limit === 1 && !endDate ? sourceData[0] : sourceData
-
-        // Get dependencies data
-        const dependenciesData = await this.getDependenciesData(
-            config.dependencies || [],
-            config.dependenciesLimit || [],
-            storageDate
-        )
-
-        // Execute harvesting
-        const result = await this.harvest(sourceForHarvesting, dependenciesData)
-
-        // Store results
-        await this.storeResults(config, result, sourceData, storageDate)
-
-        return true
     }
 
     /**

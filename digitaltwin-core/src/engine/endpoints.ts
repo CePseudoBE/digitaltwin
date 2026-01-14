@@ -11,6 +11,10 @@ import type { Harvester } from '../components/harvester.js'
 import type { Handler } from '../components/handler.js'
 import type { Request, Response } from 'ultimate-express'
 import type { AssetsManager, CustomTableManager } from '../components/index.js'
+import { DigitalTwinError } from '../errors/index.js'
+import { Logger } from '../utils/logger.js'
+
+const logger = new Logger('Endpoints')
 
 /**
  * Supported HTTP methods for component endpoints.
@@ -85,9 +89,44 @@ export async function exposeEndpoints(
                         res.status(result.status)
                             .header(result.headers || {})
                             .send(result.content)
-                    } catch {
-                        // Generic error response to avoid exposing internal details
-                        res.status(500).send({ error: 'Internal server error' })
+                    } catch (error) {
+                        const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID()
+
+                        // Log the error with context
+                        logger.error(
+                            `[${requestId}] ${req.method} ${ep.path} - ${error instanceof Error ? error.message : String(error)}`,
+                            {
+                                requestId,
+                                method: req.method,
+                                path: ep.path,
+                                userId: req.headers['x-user-id'],
+                                stack: error instanceof Error ? error.stack : undefined
+                            }
+                        )
+
+                        // Handle DigitalTwinError with proper status code
+                        if (error instanceof DigitalTwinError) {
+                            res.status(error.statusCode).send({
+                                ...error.toJSON(),
+                                requestId
+                            })
+                            return
+                        }
+
+                        // Generic error response
+                        const isProduction = process.env.NODE_ENV === 'production'
+                        res.status(500).send({
+                            error: {
+                                code: 'INTERNAL_ERROR',
+                                message: isProduction
+                                    ? 'Internal server error'
+                                    : error instanceof Error
+                                      ? error.message
+                                      : String(error),
+                                requestId,
+                                timestamp: new Date().toISOString()
+                            }
+                        })
                     }
                 })
             } else {
