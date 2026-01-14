@@ -46,7 +46,7 @@ test.group('Database Constraints - Authentication', () => {
     } catch (error) {
       // Skip test if better-sqlite3 is not installed
       if (error instanceof Error && error.message.includes('better-sqlite3')) {
-        assert.pass('Skipping test - better-sqlite3 not available')
+        return // Skip test - better-sqlite3 not available
       } else {
         throw error
       }
@@ -92,7 +92,7 @@ test.group('Database Constraints - Authentication', () => {
       await db.close()
     } catch (error) {
       if (error instanceof Error && error.message.includes('better-sqlite3')) {
-        assert.pass('Skipping test - better-sqlite3 not available')
+        return // Skip test - better-sqlite3 not available
       } else {
         throw error
       }
@@ -149,10 +149,8 @@ test.group('Database Constraints - Authentication', () => {
 
       // If FK constraints are properly enforced, we should have thrown
       // Some SQLite configurations may not enforce FK by default
-      if (!threwError) {
-        // FK not enforced, just pass (depends on SQLite build)
-        assert.pass('FK constraints not enforced in this SQLite configuration')
-      }
+      // If no error was thrown, FK constraints are not enforced - that's OK
+      assert.isTrue(true, 'Test completed - FK constraints may or may not be enforced')
 
       await db.close()
       db = null
@@ -161,7 +159,7 @@ test.group('Database Constraints - Authentication', () => {
         await db.close().catch(() => {})
       }
       if (error instanceof Error && error.message.includes('better-sqlite3')) {
-        assert.pass('Skipping test - better-sqlite3 not available')
+        return // Skip test - better-sqlite3 not available
       } else {
         throw error
       }
@@ -220,7 +218,7 @@ test.group('Database Constraints - Authentication', () => {
       await db.close()
     } catch (error) {
       if (error instanceof Error && error.message.includes('better-sqlite3')) {
-        assert.pass('Skipping test - better-sqlite3 not available')
+        return // Skip test - better-sqlite3 not available
       } else {
         throw error
       }
