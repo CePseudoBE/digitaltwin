@@ -1,0 +1,4 @@
+packages:
+  - 'digitaltwin-core'
+  - 'digitaltwin-cli'
+  - 'create-digitaltwin'

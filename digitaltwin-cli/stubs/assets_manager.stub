@@ -1,0 +1,19 @@
+{{#expect name, className, endpoint, description, tags, contentType}}
+import { AssetsManager } from 'digitaltwin-core'
+
+{{#if description}}
+/**
+ * {{ description }}
+ */
+{{/if}}
+export class {{ className }} extends AssetsManager {
+  getConfiguration() {
+    return {
+      name: '{{ endpoint }}',
+      description: '{{ description }}',
+      contentType: '{{ contentType || "application/octet-stream" }}',
+      endpoint: '{{ endpoint }}',
+      tags: [{{#each tags as tag, index}}'{{ tag }}'{{#if index < tags.length - 1}}, {{/if}}{{/each}}]
+    }
+  }
+}

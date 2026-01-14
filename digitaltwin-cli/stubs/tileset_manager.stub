@@ -1,0 +1,20 @@
+{{#expect name, className, endpoint, description}}
+import { TilesetManager } from 'digitaltwin-core/components'
+import type { ComponentConfiguration } from 'digitaltwin-core/components'
+
+{{#if description}}
+/**
+ * {{ description }}
+ */
+{{/if}}
+export class {{ className }} extends TilesetManager {
+  getConfiguration(): ComponentConfiguration {
+    return {
+      name: '{{ endpoint }}',
+      description: '{{ description }}',
+      contentType: 'application/zip',
+      extension: '.zip',
+      tags: ['tileset', 'assets', 'zip']
+    }
+  }
+}

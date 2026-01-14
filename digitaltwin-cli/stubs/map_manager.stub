@@ -1,0 +1,20 @@
+{{#expect name, className, endpoint, description}}
+import { MapManager } from 'digitaltwin-core/components'
+import type { ComponentConfiguration } from 'digitaltwin-core/components'
+
+{{#if description}}
+/**
+ * {{ description }}
+ */
+{{/if}}
+export class {{ className }} extends MapManager {
+  getConfiguration(): ComponentConfiguration {
+    return {
+      name: '{{ endpoint }}',
+      description: '{{ description }}',
+      contentType: 'application/json',
+      extension: '.json',
+      tags: ['map', 'layer', 'geojson', 'assets']
+    }
+  }
+}

@@ -1,0 +1,10 @@
+src/
+tests/
+bin/
+*.ts
+!*.d.ts
+tsconfig.json
+.gitignore
+.env*
+node_modules/
+coverage/

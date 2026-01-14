@@ -1,0 +1,25 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+
+# Environment files
+.env
+.env.*
+
+# OS/Editor specific
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local data or test storage
+data/
+*.sqlite
+*.db

@@ -1,0 +1,103 @@
+{
+  "name": "digitaltwin-core",
+  "version": "0.14.1",
+  "description": "Minimalist framework to collect and handle data in a Digital Twin project",
+  "license": "MIT",
+  "author": "Axel Hoffmann",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "test": "node -r ./bin/set-test-env.cjs --import ts-node-maintained/register/esm --enable-source-maps bin/test.ts",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "check": "npm run lint && npm run format:check && npm run build",
+    "prepublishOnly": "npm run clean && npm run check && npm run build",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "digital twin",
+    "data",
+    "framework",
+    "typescript",
+    "iot",
+    "real-time"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CePseudoBE/digital-twin-core"
+  },
+  "bugs": {
+    "url": "https://github.com/CePseudoBE/digital-twin-core/issues"
+  },
+  "homepage": "https://github.com/CePseudoBE/digital-twin-core#readme",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@japa/assert": "^4.1.0",
+    "@japa/runner": "^4.3.0",
+    "@testcontainers/redis": "^11.3.1",
+    "@types/cors": "^2.8.19",
+    "@types/ioredis-mock": "^8.2.6",
+    "@types/jszip": "^3.4.0",
+    "@types/lodash": "^4.17.20",
+    "@types/multer": "^2.0.0",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "prettier": "^3.0.0",
+    "testcontainers": "^11.3.1",
+    "ts-node-maintained": "^10.9.5",
+    "typescript-eslint": "^8.0.0"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "^12.2.0",
+    "knex": "^3.0.0",
+    "mysql2": "*",
+    "pg": "*",
+    "sqlite3": "^5.1.7"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "sqlite3": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.850.0",
+    "bullmq": "^5.56.5",
+    "cors": "^2.8.5",
+    "ioredis": "^5.6.1",
+    "jszip": "^3.10.1",
+    "lodash": "^4.17.21",
+    "multer": "^2.0.2",
+    "ultimate-express": "^2.0.9",
+    "uuid": "^11.1.0"
+  }
+}

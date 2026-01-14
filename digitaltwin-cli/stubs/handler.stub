@@ -1,0 +1,27 @@
+{{#expect name, className, endpoint, description, tags, method}}
+import { Handler, servableEndpoint } from 'digitaltwin-core'
+import type { DataResponse } from 'digitaltwin-core'
+
+{{#if description}}
+/**
+ * {{ description }}
+ */
+{{/if}}
+export class {{ className }} extends Handler {
+  getConfiguration() {
+    return {
+      name: '{{ endpoint }}',
+      description: '{{ description }}',
+      contentType: 'application/json',
+      endpoint: '{{ endpoint }}',
+      tags: [{{#each tags as tag, index}}'{{ tag }}'{{#if index < tags.length - 1}}, {{/if}}{{/each}}]
+    }
+  }
+  
+  @servableEndpoint({ path: '/api/{{ endpoint }}', method: '{{ method }}' })
+  async handleRequest(): Promise<DataResponse> {
+    // TODO: Implement your endpoint logic here
+    // This method will be available at GET /api/{{ endpoint }}
+    throw new Error('Handler endpoint not implemented')
+  }
+}

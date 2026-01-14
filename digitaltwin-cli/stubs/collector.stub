@@ -1,0 +1,29 @@
+{{#expect name, className, endpoint, schedule, description, tags}}
+import { Collector } from 'digitaltwin-core'
+
+{{#if description}}
+/**
+ * {{ description }}
+ */
+{{/if}}
+export class {{ className }} extends Collector {
+  getConfiguration() {
+    return {
+      name: '{{ endpoint }}',
+      description: '{{ description }}',
+      contentType: 'application/json',
+      endpoint: 'api/{{ endpoint }}',
+      tags: [{{#if tags}}{{#each tags as tag, index}}'{{ tag }}'{{#if index < tags.length - 1}}, {{/if}}{{/each}}{{/if}}]
+    }
+  }
+  
+  async collect(): Promise<Buffer> {
+    // TODO: Implement your data collection logic here
+    // This method should return the collected data as a Buffer
+    throw new Error('Collection logic not implemented')
+  }
+  
+  getSchedule(): string {
+    return '{{ schedule || "0 */5 * * * *" }}' // Every 5 minutes by default
+  }
+}

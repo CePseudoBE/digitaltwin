@@ -1,0 +1,35 @@
+# Build outputs
+dist/
+build/
+*.d.ts
+*.js.map
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Test coverage
+coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Package manager
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Temporary files
+*.tmp
+*.temp
+
+# Documentation builds (if any)
+docs/build/

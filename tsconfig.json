@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./digitaltwin-core" },
+    { "path": "./digitaltwin-cli" },
+    { "path": "./create-digitaltwin" }
+  ]
+}

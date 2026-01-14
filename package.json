@@ -1,0 +1,28 @@
+{
+  "name": "digitaltwin",
+  "private": true,
+  "description": "Digital Twin Framework Monorepo",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "build:core": "pnpm --filter digitaltwin-core run build",
+    "build:cli": "pnpm --filter digitaltwin-cli run build",
+    "build:create": "pnpm --filter create-digitaltwin run build",
+    "clean": "pnpm -r run clean",
+    "test": "pnpm --filter digitaltwin-core run test",
+    "lint": "pnpm --filter digitaltwin-core run lint",
+    "lint:fix": "pnpm --filter digitaltwin-core run lint:fix",
+    "format": "pnpm --filter digitaltwin-core run format",
+    "format:check": "pnpm --filter digitaltwin-core run format:check",
+    "check": "pnpm --filter digitaltwin-core run check"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/fs-extra": "^11.0.4",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

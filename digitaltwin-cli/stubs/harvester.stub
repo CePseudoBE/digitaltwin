@@ -1,0 +1,32 @@
+{{#expect name, className, endpoint, description, tags, sourceCollector}}
+import { Harvester } from 'digitaltwin-core'
+import type { DataRecord } from 'digitaltwin-core'
+
+{{#if description}}
+/**
+ * {{ description }}
+ */
+{{/if}}
+export class {{ className }} extends Harvester {
+  getUserConfiguration() {
+    return {
+      name: '{{ endpoint }}',
+      description: '{{ description }}',
+      contentType: 'application/json',
+      endpoint: '{{ endpoint }}',
+      source: '{{ sourceCollector || "source-collector" }}', // TODO: Specify the collector to harvest from
+      tags: [{{#each tags as tag, index}}'{{ tag }}'{{#if index < tags.length - 1}}, {{/if}}{{/each}}]
+    }
+  }
+  
+  async harvest(
+    sourceData: DataRecord | DataRecord[],
+    dependenciesData: Record<string, DataRecord | DataRecord[] | null>
+  ): Promise<Buffer> {
+    // TODO: Implement your data harvesting/processing logic here
+    // sourceData contains the data from the source collector
+    // dependenciesData contains data from any configured dependencies
+    
+    throw new Error('Harvester logic not implemented')
+  }
+}
