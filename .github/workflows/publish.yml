@@ -1,0 +1,83 @@
+name: Publish to npm
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    # Skip CI commits and dependency updates
+    if: |
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.head_commit.message, 'chore(deps)')
+
+    permissions:
+      contents: read
+      id-token: write  # Required for Trusted Publishing (OIDC)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Publish digitaltwin-core (if version changed)
+        run: |
+          cd digitaltwin-core
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          if [ "$LOCAL_VERSION" != "$NPM_VERSION" ]; then
+            echo "Publishing $PACKAGE_NAME@$LOCAL_VERSION (npm has $NPM_VERSION)"
+            npm publish --access public --provenance
+          else
+            echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
+          fi
+
+      - name: Publish digitaltwin-cli (if version changed)
+        run: |
+          cd digitaltwin-cli
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          if [ "$LOCAL_VERSION" != "$NPM_VERSION" ]; then
+            echo "Publishing $PACKAGE_NAME@$LOCAL_VERSION (npm has $NPM_VERSION)"
+            npm publish --access public --provenance
+          else
+            echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
+          fi
+
+      - name: Publish create-digitaltwin (if version changed)
+        run: |
+          cd create-digitaltwin
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          if [ "$LOCAL_VERSION" != "$NPM_VERSION" ]; then
+            echo "Publishing $PACKAGE_NAME@$LOCAL_VERSION (npm has $NPM_VERSION)"
+            npm publish --access public --provenance
+          else
+            echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
+          fi

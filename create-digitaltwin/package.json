@@ -1,6 +1,6 @@
 {
   "name": "create-digitaltwin",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Create digital twin app within a command with templates, env etc.",
   "license": "MIT",
   "author": "Hoffmann Axel",
@@ -30,12 +30,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CePseudoBE/create-digitaltwin.git"
+    "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
+    "directory": "create-digitaltwin"
   },
   "bugs": {
-    "url": "https://github.com/CePseudoBE/create-digitaltwin/issues"
+    "url": "https://github.com/CePseudoBE/digitaltwin/issues"
   },
-  "homepage": "https://github.com/CePseudoBE/create-digitaltwin#readme",
+  "homepage": "https://github.com/CePseudoBE/digitaltwin/tree/main/create-digitaltwin#readme",
   "engines": {
     "node": ">=20.0.0"
   },

@@ -1,6 +1,6 @@
 {
   "name": "digitaltwin-cli",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "CLI tools for Digital Twin projects - generate components, manage projects",
   "license": "MIT",
   "author": "Hoffmann Axel",
@@ -30,6 +30,15 @@
     "make",
     "template"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
+    "directory": "digitaltwin-cli"
+  },
+  "bugs": {
+    "url": "https://github.com/CePseudoBE/digitaltwin/issues"
+  },
+  "homepage": "https://github.com/CePseudoBE/digitaltwin/tree/main/digitaltwin-cli#readme",
   "engines": {
     "node": ">=20.0.0"
   },

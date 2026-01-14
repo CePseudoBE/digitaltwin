@@ -16,10 +16,10 @@ Digital Twin Core is a minimalist TypeScript framework used to collect and proce
 ## Installation
 
 ```bash
-npm install
+pnpm add digitaltwin-core
 ```
 
-The project requires Node.js 18 or later.
+The project requires Node.js 20 or later.
 
 ## Building
 

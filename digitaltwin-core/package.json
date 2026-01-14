@@ -1,6 +1,6 @@
 {
   "name": "digitaltwin-core",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "Minimalist framework to collect and handle data in a Digital Twin project",
   "license": "MIT",
   "author": "Axel Hoffmann",
@@ -41,12 +41,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CePseudoBE/digital-twin-core"
+    "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
+    "directory": "digitaltwin-core"
   },
   "bugs": {
-    "url": "https://github.com/CePseudoBE/digital-twin-core/issues"
+    "url": "https://github.com/CePseudoBE/digitaltwin/issues"
   },
-  "homepage": "https://github.com/CePseudoBE/digital-twin-core#readme",
+  "homepage": "https://github.com/CePseudoBE/digitaltwin/tree/main/digitaltwin-core#readme",
   "engines": {
     "node": ">=20.0.0"
   },
