@@ -1,0 +1,16 @@
+# Source files (we publish compiled dist/)
+src/
+tests/
+
+# Config files
+tsconfig*.json
+eslint.config.js
+.prettierrc
+
+# Development
+*.spec.ts
+*.test.ts
+.gitignore
+
+# Misc
+.claude*
