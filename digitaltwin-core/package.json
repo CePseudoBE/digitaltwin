@@ -1,6 +1,6 @@
 {
   "name": "digitaltwin-core",
-  "version": "0.14.2",
+  "version": "0.14.3",
   "description": "Minimalist framework to collect and handle data in a Digital Twin project",
   "license": "MIT",
   "author": "Axel Hoffmann",
@@ -21,7 +21,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rimraf dist",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
     "test": "node -r ./bin/set-test-env.cjs --import ts-node-maintained/register/esm --enable-source-maps bin/test.ts",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
