@@ -503,11 +503,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      * @param filePath - Path to temporary file
      */
     private async cleanupTempFile(filePath: string): Promise<void> {
-        await safeAsync(
-            () => fs.unlink(filePath),
-            `cleanup temp file ${filePath}`,
-            logger
-        )
+        await safeAsync(() => fs.unlink(filePath), `cleanup temp file ${filePath}`, logger)
     }
 
     /**

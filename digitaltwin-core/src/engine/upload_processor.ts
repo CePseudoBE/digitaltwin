@@ -92,7 +92,11 @@ export class UploadProcessor {
             // Validate tileset.json exists
             if (!extractResult.root_file) {
                 // Clean up uploaded files
-                await safeAsync(() => this.storage.deleteByPrefix(basePath!), 'cleanup storage on invalid tileset', logger)
+                await safeAsync(
+                    () => this.storage.deleteByPrefix(basePath!),
+                    'cleanup storage on invalid tileset',
+                    logger
+                )
                 throw new Error('Invalid tileset: no tileset.json found in the ZIP archive')
             }
 
@@ -117,20 +121,31 @@ export class UploadProcessor {
             // Update record as failed (don't delete - keep for debugging)
             const errorMessage = error instanceof Error ? error.message : 'Unknown error'
             await safeAsync(
-                () => this.db.updateById(componentName, recordId, {
-                    upload_status: 'failed',
-                    upload_error: errorMessage
-                }),
+                () =>
+                    this.db.updateById(componentName, recordId, {
+                        upload_status: 'failed',
+                        upload_error: errorMessage
+                    }),
                 'update record status to failed',
                 logger
             )
 
             // Clean up: uploaded files and temp file
             const pathToClean = basePath // Capture for closure
-            await safeCleanup([
-                ...(pathToClean ? [{ operation: () => this.storage.deleteByPrefix(pathToClean), context: 'cleanup storage on upload error' }] : []),
-                { operation: () => fs.unlink(tempFilePath), context: 'cleanup temp file on upload error' }
-            ], logger)
+            await safeCleanup(
+                [
+                    ...(pathToClean
+                        ? [
+                              {
+                                  operation: () => this.storage.deleteByPrefix(pathToClean),
+                                  context: 'cleanup storage on upload error'
+                              }
+                          ]
+                        : []),
+                    { operation: () => fs.unlink(tempFilePath), context: 'cleanup temp file on upload error' }
+                ],
+                logger
+            )
 
             throw error
         }

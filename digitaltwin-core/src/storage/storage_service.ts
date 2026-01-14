@@ -134,9 +134,7 @@ export abstract class StorageService {
     async deleteBatch(paths: string[]): Promise<void> {
         // Default parallel implementation - subclasses can override with bulk operations
         // Individual failures are logged but don't prevent other deletions
-        await Promise.all(
-            paths.map(path => safeAsync(() => this.delete(path), `delete file ${path}`, logger))
-        )
+        await Promise.all(paths.map(path => safeAsync(() => this.delete(path), `delete file ${path}`, logger)))
     }
 
     /**

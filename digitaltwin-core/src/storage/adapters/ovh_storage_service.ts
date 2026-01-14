@@ -154,15 +154,16 @@ export class OvhS3StorageService extends StorageService {
             await Promise.all(
                 concurrentBatches.map((batch, index) =>
                     safeAsync(
-                        () => this.#s3.send(
-                            new DeleteObjectsCommand({
-                                Bucket: this.#bucket,
-                                Delete: {
-                                    Objects: batch.map(key => ({ Key: key })),
-                                    Quiet: true // Don't return info about each deleted object
-                                }
-                            })
-                        ),
+                        () =>
+                            this.#s3.send(
+                                new DeleteObjectsCommand({
+                                    Bucket: this.#bucket,
+                                    Delete: {
+                                        Objects: batch.map(key => ({ Key: key })),
+                                        Quiet: true // Don't return info about each deleted object
+                                    }
+                                })
+                            ),
                         `delete batch ${i + index + 1}/${batches.length}`,
                         logger
                     )

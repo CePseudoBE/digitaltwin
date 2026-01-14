@@ -171,10 +171,13 @@ class ComponentScheduler {
             try {
                 await this.#triggerDependentHarvesters(event.componentName)
             } catch (error) {
-                this.logger.error(`Failed to trigger harvesters for ${event.componentName}: ${error instanceof Error ? error.message : String(error)}`, {
-                    componentName: event.componentName,
-                    stack: error instanceof Error ? error.stack : undefined
-                })
+                this.logger.error(
+                    `Failed to trigger harvesters for ${event.componentName}: ${error instanceof Error ? error.message : String(error)}`,
+                    {
+                        componentName: event.componentName,
+                        stack: error instanceof Error ? error.stack : undefined
+                    }
+                )
             }
         })
     }

@@ -14,12 +14,7 @@ const logger = new Logger('ErrorHandler')
  * Express error handler middleware
  * Must be registered after all routes
  */
-export function errorHandler(
-    error: Error,
-    req: Request,
-    res: Response,
-    _next: NextFunction
-): void {
+export function errorHandler(error: Error, req: Request, res: Response, _next: NextFunction): void {
     const requestId = (req.headers['x-request-id'] as string) || randomUUID()
 
     // Log the error with context
@@ -61,9 +56,7 @@ export function errorHandler(
  * Wraps an async route handler to automatically catch errors
  * and pass them to the error handling middleware
  */
-export function asyncHandler<T>(
-    handler: (req: Request, res: Response, next: NextFunction) => Promise<T>
-) {
+export function asyncHandler<T>(handler: (req: Request, res: Response, next: NextFunction) => Promise<T>) {
     return (req: Request, res: Response, next: NextFunction): void => {
         Promise.resolve(handler(req, res, next)).catch(next)
     }

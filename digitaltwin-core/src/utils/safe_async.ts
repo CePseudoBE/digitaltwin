@@ -38,9 +38,7 @@ export async function safeAsync<T>(
  * @param operation - The async function to execute
  * @returns [result, undefined] on success, [undefined, error] on failure
  */
-export async function tryAsync<T>(
-    operation: () => Promise<T>
-): Promise<[T, undefined] | [undefined, Error]> {
+export async function tryAsync<T>(operation: () => Promise<T>): Promise<[T, undefined] | [undefined, Error]> {
     try {
         const result = await operation()
         return [result, undefined]
@@ -97,13 +95,7 @@ export async function retryAsync<T>(
         logger?: Logger
     } = {}
 ): Promise<T> {
-    const {
-        maxRetries = 3,
-        initialDelayMs = 100,
-        maxDelayMs = 5000,
-        context = 'operation',
-        logger
-    } = options
+    const { maxRetries = 3, initialDelayMs = 100, maxDelayMs = 5000, context = 'operation', logger } = options
 
     const log = logger ?? defaultLogger
     let lastError: Error | undefined
@@ -116,7 +108,9 @@ export async function retryAsync<T>(
 
             if (attempt < maxRetries) {
                 const delay = Math.min(initialDelayMs * Math.pow(2, attempt), maxDelayMs)
-                log.warn(`${context} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms: ${lastError.message}`)
+                log.warn(
+                    `${context} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms: ${lastError.message}`
+                )
                 await new Promise(resolve => setTimeout(resolve, delay))
             }
         }

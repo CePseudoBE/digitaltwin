@@ -131,15 +131,18 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 return badRequestResponse('Missing required field: ZIP file')
             }
             if (!description) {
-                if (filePath) await safeAsync(() => fs.unlink(filePath), 'cleanup temp file on validation error', logger)
+                if (filePath)
+                    await safeAsync(() => fs.unlink(filePath), 'cleanup temp file on validation error', logger)
                 return badRequestResponse('Missing required field: description')
             }
             if (!filename) {
-                if (filePath) await safeAsync(() => fs.unlink(filePath), 'cleanup temp file on validation error', logger)
+                if (filePath)
+                    await safeAsync(() => fs.unlink(filePath), 'cleanup temp file on validation error', logger)
                 return badRequestResponse('Filename could not be determined from uploaded file')
             }
             if (!filename.toLowerCase().endsWith('.zip')) {
-                if (filePath) await safeAsync(() => fs.unlink(filePath), 'cleanup temp file on validation error', logger)
+                if (filePath)
+                    await safeAsync(() => fs.unlink(filePath), 'cleanup temp file on validation error', logger)
                 return badRequestResponse('Invalid file extension. Expected: .zip')
             }
 
@@ -249,10 +252,17 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 headers: { 'Content-Type': 'application/json' }
             }
         } catch (error) {
-            await safeCleanup([
-                { operation: () => recordId !== null ? this.db.delete(String(recordId), config.name) : Promise.resolve(), context: 'delete record on async upload error' },
-                { operation: () => fs.unlink(filePath), context: 'cleanup temp file on async upload error' }
-            ], logger)
+            await safeCleanup(
+                [
+                    {
+                        operation: () =>
+                            recordId !== null ? this.db.delete(String(recordId), config.name) : Promise.resolve(),
+                        context: 'delete record on async upload error'
+                    },
+                    { operation: () => fs.unlink(filePath), context: 'cleanup temp file on async upload error' }
+                ],
+                logger
+            )
             throw error
         }
     }
@@ -290,7 +300,11 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
 
             if (!extractResult.root_file) {
                 // Clean up uploaded files
-                await safeAsync(() => this.storage.deleteByPrefix(basePath), 'cleanup storage on invalid tileset', logger)
+                await safeAsync(
+                    () => this.storage.deleteByPrefix(basePath),
+                    'cleanup storage on invalid tileset',
+                    logger
+                )
                 return badRequestResponse('Invalid tileset: no tileset.json found in the ZIP archive')
             }
 
@@ -462,11 +476,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 // Legacy format: delete individual files from file_index
                 logger.info(`Deleting ${legacyFileIndex.files.length} files (legacy format)`)
                 for (const file of legacyFileIndex.files) {
-                    await safeAsync(
-                        () => this.storage.delete(file.path),
-                        `delete legacy file ${file.path}`,
-                        logger
-                    )
+                    await safeAsync(() => this.storage.delete(file.path), `delete legacy file ${file.path}`, logger)
                 }
             } else if (asset.url) {
                 // New format: url contains basePath, use deleteByPrefix

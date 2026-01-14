@@ -93,13 +93,16 @@ export async function exposeEndpoints(
                         const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID()
 
                         // Log the error with context
-                        logger.error(`[${requestId}] ${req.method} ${ep.path} - ${error instanceof Error ? error.message : String(error)}`, {
-                            requestId,
-                            method: req.method,
-                            path: ep.path,
-                            userId: req.headers['x-user-id'],
-                            stack: error instanceof Error ? error.stack : undefined
-                        })
+                        logger.error(
+                            `[${requestId}] ${req.method} ${ep.path} - ${error instanceof Error ? error.message : String(error)}`,
+                            {
+                                requestId,
+                                method: req.method,
+                                path: ep.path,
+                                userId: req.headers['x-user-id'],
+                                stack: error instanceof Error ? error.stack : undefined
+                            }
+                        )
 
                         // Handle DigitalTwinError with proper status code
                         if (error instanceof DigitalTwinError) {
@@ -115,7 +118,11 @@ export async function exposeEndpoints(
                         res.status(500).send({
                             error: {
                                 code: 'INTERNAL_ERROR',
-                                message: isProduction ? 'Internal server error' : (error instanceof Error ? error.message : String(error)),
+                                message: isProduction
+                                    ? 'Internal server error'
+                                    : error instanceof Error
+                                      ? error.message
+                                      : String(error),
                                 requestId,
                                 timestamp: new Date().toISOString()
                             }
