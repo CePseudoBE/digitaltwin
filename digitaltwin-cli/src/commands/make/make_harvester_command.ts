@@ -4,8 +4,8 @@ import { StringUtils } from '../../utils/string_utils.js'
 import path from 'path'
 
 export class MakeHarvesterCommand extends BaseCommand {
-  static commandName = 'make:harvester'
-  static description = 'Generate a new harvester component'
+  static override commandName = 'make:harvester'
+  static override description = 'Generate a new harvester component'
 
   @args.string({ description: 'Component name' })
   declare name: string
@@ -25,7 +25,7 @@ export class MakeHarvesterCommand extends BaseCommand {
   @flags.boolean({ description: 'Show what would be generated without creating files', flagName: 'dry-run' })
   declare dryRun: boolean
 
-  async run(): Promise<void> {
+  override async run(): Promise<void> {
     try {
       await this.projectDetector.validateProject()
       const projectInfo = await this.projectDetector.getProjectInfo()

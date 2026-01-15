@@ -4,8 +4,8 @@ import { StringUtils } from '../../utils/string_utils.js'
 import path from 'path'
 
 export class MakeMapManagerCommand extends BaseCommand {
-  static commandName = 'make:map-manager'
-  static description = 'Generate a new map manager component for handling map layer data'
+  static override commandName = 'make:map-manager'
+  static override description = 'Generate a new map manager component for handling map layer data'
 
   @args.string({ description: 'Component name' })
   declare name: string
@@ -22,7 +22,7 @@ export class MakeMapManagerCommand extends BaseCommand {
   @flags.boolean({ description: 'Show what would be generated without creating files', flagName: 'dry-run' })
   declare dryRun: boolean
 
-  async run(): Promise<void> {
+  override async run(): Promise<void> {
     try {
       await this.projectDetector.validateProject()
       const projectInfo = await this.projectDetector.getProjectInfo()
