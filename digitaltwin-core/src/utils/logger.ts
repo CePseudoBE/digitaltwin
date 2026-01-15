@@ -49,11 +49,11 @@ export class Logger {
      * Logs debug information for development and troubleshooting.
      *
      * @param {string} message - Debug message
-     * @param {any} data - Optional additional data to log
+     * @param {unknown} data - Optional additional data to log
      */
-    debug(message: string, data?: any) {
+    debug(message: string, data?: unknown) {
         if (this.level <= LogLevel.DEBUG) {
-            console.log(`[${this.componentName}] DEBUG: ${message}`, data || '')
+            console.log(`[${this.componentName}] DEBUG: ${message}`, data ?? '')
         }
     }
 
@@ -61,11 +61,11 @@ export class Logger {
      * Logs informational messages about normal operation.
      *
      * @param {string} message - Information message
-     * @param {any} data - Optional additional data to log
+     * @param {unknown} data - Optional additional data to log
      */
-    info(message: string, data?: any) {
+    info(message: string, data?: unknown) {
         if (this.level <= LogLevel.INFO) {
-            console.log(`[${this.componentName}] ${message}`, data || '')
+            console.log(`[${this.componentName}] ${message}`, data ?? '')
         }
     }
 
@@ -73,11 +73,11 @@ export class Logger {
      * Logs warning messages about potential issues.
      *
      * @param {string} message - Warning message
-     * @param {any} data - Optional additional data to log
+     * @param {unknown} data - Optional additional data to log
      */
-    warn(message: string, data?: any) {
+    warn(message: string, data?: unknown) {
         if (this.level <= LogLevel.WARN) {
-            console.warn(`[${this.componentName}] WARN: ${message}`, data || '')
+            console.warn(`[${this.componentName}] WARN: ${message}`, data ?? '')
         }
     }
 
@@ -85,11 +85,11 @@ export class Logger {
      * Logs error messages about failures and exceptions.
      *
      * @param {string} message - Error message
-     * @param {any} error - Optional error object or additional data
+     * @param {Error | unknown} error - Optional error object or additional data
      */
-    error(message: string, error?: any) {
+    error(message: string, error?: Error | unknown) {
         if (this.level <= LogLevel.ERROR) {
-            console.error(`[${this.componentName}] ERROR: ${message}`, error || '')
+            console.error(`[${this.componentName}] ERROR: ${message}`, error ?? '')
         }
     }
 }

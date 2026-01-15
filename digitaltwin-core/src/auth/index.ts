@@ -4,7 +4,7 @@ export { AuthProviderFactory } from './auth_provider_factory.js'
 export { GatewayAuthProvider, JwtAuthProvider, NoAuthProvider } from './providers/index.js'
 
 // Backward-compatible API
-export { ApisixAuthParser } from './apisix_parser.js'
+export { ApisixAuthParser, type HeadersLike } from './apisix_parser.js'
 export { UserService } from './user_service.js'
 export { AuthConfig } from './auth_config.js'
 

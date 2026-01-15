@@ -1,3 +1,6 @@
+import type { Request } from 'ultimate-express'
+import type { MulterFile } from '../types/http.js'
+
 /**
  * User information extracted from Keycloak JWT via Apache APISIX headers.
  *
@@ -88,7 +91,7 @@ export interface AuthContext {
  */
 export interface AuthenticatedRequest {
     /** Original Express request object */
-    originalRequest: any
+    originalRequest: Request
     /** Authentication context (undefined if not authenticated) */
     auth?: AuthContext
     /** Request headers (including APISIX authentication headers) */
@@ -96,7 +99,7 @@ export interface AuthenticatedRequest {
     /** URL parameters */
     params?: Record<string, string>
     /** Request body */
-    body?: any
+    body?: Record<string, unknown>
     /** File upload (for multipart requests with assets) */
-    file?: any
+    file?: MulterFile
 }
