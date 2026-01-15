@@ -5,8 +5,9 @@
  * and HTTP endpoint serving capabilities within the digital twin ecosystem.
  */
 
-import type { ComponentConfiguration } from './types.js'
+import type { ComponentConfiguration, DataResponse } from './types.js'
 import type { HttpMethod } from '../engine/endpoints.js'
+import type { TypedRequest } from '../types/http.js'
 
 /**
  * Base interface for all digital twin components.
@@ -123,7 +124,7 @@ export interface Servable {
         /** URL path for this endpoint (e.g., '/api/data') */
         path: string
         /** Function to handle requests to this endpoint */
-        handler: (...args: any[]) => any
+        handler: (req: TypedRequest) => Promise<DataResponse>
         /** Optional response content type (defaults to 'application/json') */
         responseType?: string
     }>

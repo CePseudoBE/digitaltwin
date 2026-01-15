@@ -136,7 +136,7 @@ export class OvhS3StorageService extends StorageService {
      * Much faster than individual deletes - can delete up to 1000 objects per request.
      * @param paths - Array of object keys to delete
      */
-    async deleteBatch(paths: string[]): Promise<void> {
+    override async deleteBatch(paths: string[]): Promise<void> {
         if (paths.length === 0) return
 
         // S3 DeleteObjects supports max 1000 objects per request

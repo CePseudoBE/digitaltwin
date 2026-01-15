@@ -2,6 +2,7 @@ import { AssetsManager } from './assets_manager.js'
 import type { DataResponse } from './types.js'
 import type { OpenAPIComponentSpec } from '../openapi/types.js'
 import type { HttpMethod } from '../engine/endpoints.js'
+import type { TypedRequest } from '../types/http.js'
 import { extractAndStoreArchive } from '../utils/zip_utils.js'
 import { ApisixAuthParser } from '../auth/apisix_parser.js'
 import { AuthConfig } from '../auth/auth_config.js'
@@ -108,7 +109,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
      * - Files < 50MB: Synchronous extraction and upload
      * - Files >= 50MB: Queued for async processing (returns 202)
      */
-    async handleUpload(req: any): Promise<DataResponse> {
+    override async handleUpload(req: any): Promise<DataResponse> {
         try {
             if (!req?.body) {
                 return badRequestResponse('Invalid request: missing request body')
@@ -389,7 +390,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
     /**
      * List all tilesets with their public URLs.
      */
-    async retrieve(req?: any): Promise<DataResponse> {
+    override async retrieve(req?: any): Promise<DataResponse> {
         try {
             const assets = await this.getAllAssets()
             const isAdmin = req && ApisixAuthParser.isAdmin(req.headers || {})
@@ -433,7 +434,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
     /**
      * Delete tileset and all files from storage.
      */
-    async handleDelete(req: any): Promise<DataResponse> {
+    override async handleDelete(req: any): Promise<DataResponse> {
         try {
             // Authenticate user
             const userId = await this.authenticateUser(req)
@@ -496,10 +497,10 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
     /**
      * Get HTTP endpoints for this manager.
      */
-    getEndpoints(): Array<{
+    override getEndpoints(): Array<{
         method: HttpMethod
         path: string
-        handler: (...args: any[]) => any
+        handler: (req: TypedRequest) => Promise<DataResponse>
         responseType?: string
     }> {
         const config = this.getConfiguration()
@@ -546,7 +547,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
     /**
      * Generate OpenAPI specification.
      */
-    getOpenAPISpec(): OpenAPIComponentSpec {
+    override getOpenAPISpec(): OpenAPIComponentSpec {
         const config = this.getConfiguration()
         const basePath = `/${config.endpoint}`
         const tagName = config.tags?.[0] || config.name

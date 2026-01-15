@@ -1,6 +1,8 @@
 import { Handler } from './handler.js'
 import type { ComponentConfiguration, DataResponse } from './types.js'
 import type { AssetsManager } from './assets_manager.js'
+import type { HttpMethod } from '../engine/endpoints.js'
+import type { TypedRequest } from '../types/http.js'
 
 /**
  * Global assets handler that provides access to ALL assets across ALL asset managers.
@@ -120,10 +122,10 @@ export class GlobalAssetsHandler extends Handler {
     /**
      * HTTP endpoints for global assets
      */
-    getEndpoints(): Array<{
-        method: any
+    override getEndpoints(): Array<{
+        method: HttpMethod
         path: string
-        handler: (...args: any[]) => any
+        handler: (req: TypedRequest) => Promise<DataResponse>
         responseType?: string
     }> {
         return [
