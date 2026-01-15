@@ -12,6 +12,7 @@ Digital Twin Core is a minimalist TypeScript framework used to collect and proce
 - **Storage adapters** – currently local filesystem and OVH Object Storage via S3 API.
 - **Database adapter** – implemented with [Knex](https://knexjs.org/) to index metadata.
 - **Engine** – orchestrates components, schedules jobs with BullMQ and exposes endpoints via Express.
+- **Authentication** – pluggable authentication system supporting API gateway headers, JWT tokens, or no-auth mode.
 
 ## Installation
 
@@ -326,6 +327,36 @@ class WMSLayersManager extends CustomTableManager {
 - `update(id, data)` - Update existing record
 - `delete(id)` - Delete record
 
+## Authentication
+
+The framework supports multiple authentication modes:
+
+- **Gateway** (default): Uses headers from API gateways (Apache APISIX, KrakenD)
+- **JWT**: Direct JWT token validation
+- **None**: Disabled for development/testing
+
+### Gateway Mode (Default)
+
+No configuration needed. The framework reads `x-user-id` and `x-user-roles` headers set by your API gateway.
+
+### JWT Mode
+
+```bash
+export AUTH_MODE=jwt
+export JWT_SECRET=your-secret-key
+# Or for RSA: JWT_PUBLIC_KEY or JWT_PUBLIC_KEY_FILE
+```
+
+### Disable Authentication
+
+```bash
+export DIGITALTWIN_DISABLE_AUTH=true
+# Or
+export AUTH_MODE=none
+```
+
+For detailed configuration options, see [src/auth/README.md](src/auth/README.md).
+
 ## Project Scaffolding
 
 Use [create-digitaltwin](https://github.com/CePseudoBE/create-digitaltwin) to quickly bootstrap new projects:
@@ -348,6 +379,7 @@ node dt make:harvester DataProcessor --source weather-collector
 ## Folder structure
 
 - `src/` – framework sources
+    - `auth/` – authentication providers and user management
     - `components/` – base classes for collectors, harvesters, handlers and assets manager
     - `engine/` – orchestration logic
     - `storage/` – storage service abstractions and adapters
