@@ -2,11 +2,31 @@
 import { Collector } from '../components/collector.js'
 import { Harvester } from '../components/harvester.js'
 import { Worker } from 'bullmq'
+import type { Queue, Job } from 'bullmq'
 import type { QueueManager } from './queue_manager.js'
 import { Logger, LogLevel } from '../utils/logger.js'
 import { engineEventBus } from './events.js'
 import debounce from 'lodash/debounce.js'
 import type { HarvesterConfiguration } from '../components/types.js'
+
+/**
+ * Job data interface for component jobs
+ */
+interface ComponentJobData {
+    type: 'collector' | 'harvester'
+    triggeredBy: 'schedule' | 'source-event'
+    source?: string
+}
+
+/**
+ * Job result interface for component execution
+ */
+interface ComponentJobResult {
+    success: boolean
+    bytes?: number
+    result?: unknown
+    timestamp: string
+}
 
 /**
  * Worker configuration constants
@@ -52,7 +72,7 @@ class ComponentScheduler {
     private readonly multiQueue: boolean
     private readonly logger: Logger
     private readonly componentMap: Record<string, Collector | Harvester> = {}
-    private readonly debouncedTriggers: Record<string, (...args: any[]) => void> = {}
+    private readonly debouncedTriggers: Record<string, () => void> = {}
 
     /**
      * Creates a new Component Scheduler instance
@@ -298,9 +318,9 @@ class ComponentScheduler {
      * Processes a collector job
      * @private
      */
-    async #processCollectorJob(job: any): Promise<any> {
+    async #processCollectorJob(job: Job<ComponentJobData>): Promise<ComponentJobResult | undefined> {
         const comp = this.componentMap[job.name] as Collector
-        if (!comp) return
+        if (!comp) return undefined
 
         this.logger.debug(`Running collector: ${job.name}`)
 
@@ -309,7 +329,7 @@ class ComponentScheduler {
 
             return {
                 success: true,
-                bytes: result?.length || 0,
+                bytes: result?.length ?? 0,
                 timestamp: new Date().toISOString()
             }
         } catch (error) {
@@ -322,9 +342,9 @@ class ComponentScheduler {
      * Processes a harvester job
      * @private
      */
-    async #processHarvesterJob(job: any): Promise<any> {
+    async #processHarvesterJob(job: Job<ComponentJobData>): Promise<ComponentJobResult | undefined> {
         const comp = this.componentMap[job.name] as Harvester
-        if (!comp) return
+        if (!comp) return undefined
 
         this.logger.debug(`Running harvester: ${job.name} (${job.data.triggeredBy})`)
 
@@ -340,7 +360,7 @@ class ComponentScheduler {
             })
 
             return {
-                success: result,
+                success: Boolean(result),
                 timestamp: new Date().toISOString()
             }
         } catch (error) {
@@ -353,13 +373,13 @@ class ComponentScheduler {
      * Processes a priority job
      * @private
      */
-    async #processPriorityJob(job: any): Promise<any> {
+    async #processPriorityJob(job: Job<ComponentJobData>): Promise<ComponentJobResult | undefined> {
         const comp = this.componentMap[job.name]
-        if (!comp) return
+        if (!comp) return undefined
 
         this.logger.debug(`Running priority job: ${job.name}`)
         const result = await comp.run()
-        return { success: true, result }
+        return { success: true, result, timestamp: new Date().toISOString() }
     }
 
     /**
@@ -384,7 +404,7 @@ class ComponentScheduler {
      * Schedules all components in single queue
      * @private
      */
-    async #scheduleAllComponentsInSingleQueue(singleQueue: any): Promise<void> {
+    async #scheduleAllComponentsInSingleQueue(singleQueue: Queue<ComponentJobData>): Promise<void> {
         for (const comp of this.components) {
             const config = comp.getConfiguration()
             const schedule = comp.getSchedule()
@@ -414,13 +434,13 @@ class ComponentScheduler {
      * Processes a job in single-queue mode
      * @private
      */
-    async #processSingleQueueJob(job: any): Promise<any> {
+    async #processSingleQueueJob(job: Job<ComponentJobData>): Promise<ComponentJobResult | undefined> {
         const comp = this.componentMap[job.name]
-        if (!comp) return
+        if (!comp) return undefined
 
         this.logger.debug(`Running ${job.data.type}: ${job.name}`)
         const result = await comp.run()
-        return { success: true, result }
+        return { success: true, result, timestamp: new Date().toISOString() }
     }
 }
 
