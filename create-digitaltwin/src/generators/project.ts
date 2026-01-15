@@ -267,7 +267,7 @@ function generateIndexFile(answers: ProjectAnswers): string {
     const dbDisplay = database === 'postgresql' ? 'PostgreSQL' : 'SQLite'
 
     return `${dotenvImport}
-import { DigitalTwinEngine, KnexDatabaseAdapter, Env } from 'digitaltwin-core'
+import { DigitalTwinEngine, KnexDatabaseAdapter, Env, setupGracefulShutdown } from 'digitaltwin-core'
 import { ${storageClass} } from 'digitaltwin-core'
 ${exampleImports}
 
@@ -297,17 +297,13 @@ async function main(): Promise<void> {
     ${exampleComponents}
   })
 
+  // Setup graceful shutdown (handles SIGINT, SIGTERM)
+  setupGracefulShutdown(engine)
+
   // Start the engine
   await engine.start()
   const port = engine.getPort() || env.PORT || 3000
   console.log(\`[DigitalTwin] Server running on port \${port} | DB: ${dbDisplay} | Storage: ${storage === 'local' ? 'Local' : 'OVH S3'}\`)
-
-  // Graceful shutdown
-  process.on('SIGINT', async () => {
-    console.log('[DigitalTwin] Shutting down...')
-    await engine.stop()
-    process.exit(0)
-  })
 }
 
 main().catch((error: Error) => {

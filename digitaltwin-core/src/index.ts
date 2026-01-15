@@ -57,6 +57,7 @@ export * from './errors/index.js'
 // Utilities
 export { Logger, LogLevel } from './utils/logger.js'
 export { safeAsync, tryAsync, safeCleanup, retryAsync } from './utils/safe_async.js'
+export { setupGracefulShutdown, type ShutdownOptions } from './utils/graceful_shutdown.js'
 export { mapToDataRecord } from './utils/map_to_data_record.js'
 export { servableEndpoint } from './utils/servable_endpoint.js'
 export {
@@ -77,6 +78,18 @@ export type { HttpStatusCode } from './utils/http_responses.js'
 // Engine Components
 export { QueueManager } from './engine/queue_manager.js'
 export { errorHandler, asyncHandler, notFoundHandler } from './engine/error_handler.js'
+export {
+    HealthChecker,
+    createDatabaseCheck,
+    createRedisCheck,
+    createStorageCheck,
+    performHealthCheck,
+    livenessCheck,
+    type HealthCheck,
+    type HealthCheckFn,
+    type HealthStatus,
+    type ComponentCounts
+} from './engine/health.js'
 export {
     UploadProcessor,
     type TilesetUploadJobData,
