@@ -20,7 +20,16 @@ import { LogLevel } from '../utils/logger.js'
 import type { QueueConfig } from './queue_manager.js'
 import { QueueManager } from './queue_manager.js'
 import { UploadProcessor } from './upload_processor.js'
+import { engineEventBus } from './events.js'
 import { isAsyncUploadable } from '../components/async_upload.js'
+import {
+    HealthChecker,
+    createDatabaseCheck,
+    createRedisCheck,
+    createStorageCheck,
+    livenessCheck,
+    type HealthCheckFn
+} from './health.js'
 
 /**
  * Result of component validation
@@ -180,6 +189,9 @@ export class DigitalTwinEngine {
     /** uWebSockets.js TemplatedApp - has close() method to shut down all connections */
     #server?: { close(): unknown }
     #workers: Worker[] = []
+    #isShuttingDown = false
+    #shutdownTimeout = 30000
+    readonly #healthChecker = new HealthChecker()
 
     /** Get all active components (collectors and harvesters) */
     get #activeComponents(): (Collector | Harvester)[] {
@@ -321,20 +333,38 @@ export class DigitalTwinEngine {
      * @private
      */
     #setupMonitoringEndpoints(): void {
-        // Health check endpoint
+        // Register default health checks
+        this.#healthChecker.registerCheck('database', createDatabaseCheck(this.#database))
+
+        if (this.#queueManager) {
+            this.#healthChecker.registerCheck('redis', createRedisCheck(this.#queueManager))
+        }
+
+        this.#healthChecker.registerCheck('storage', createStorageCheck(this.#storage))
+
+        // Set component counts
+        this.#healthChecker.setComponentCounts({
+            collectors: this.#collectors.length,
+            harvesters: this.#harvesters.length,
+            handlers: this.#handlers.length,
+            assetsManagers: this.#assetsManagers.length
+        })
+
+        // Liveness probe - shallow check, always returns ok if process is running
+        this.#router.get('/api/health/live', (req, res) => {
+            res.status(200).json(livenessCheck())
+        })
+
+        // Readiness probe - deep check with database and redis verification
+        this.#router.get('/api/health/ready', async (req, res) => {
+            const health = await this.#healthChecker.performCheck()
+            const statusCode = health.status === 'unhealthy' ? 503 : 200
+            res.status(statusCode).json(health)
+        })
+
+        // Full health check endpoint (detailed)
         this.#router.get('/api/health', async (req, res) => {
-            const health = {
-                status: 'ok',
-                timestamp: new Date().toISOString(),
-                uptime: process.uptime(),
-                components: {
-                    collectors: this.#collectors.length,
-                    harvesters: this.#harvesters.length,
-                    handlers: this.#handlers.length,
-                    assetsManagers: this.#assetsManagers.length,
-                    customTableManagers: this.#customTableManagers.length
-                }
-            }
+            const health = await this.#healthChecker.performCheck()
             res.json(health)
         })
 
@@ -532,14 +562,70 @@ export class DigitalTwinEngine {
     }
 
     /**
-     * Stops the Digital Twin Engine gracefully
+     * Configure the shutdown timeout (in ms)
+     * @param timeout Timeout in milliseconds (default: 30000)
+     */
+    setShutdownTimeout(timeout: number): void {
+        this.#shutdownTimeout = timeout
+    }
+
+    /**
+     * Check if the engine is currently shutting down
+     * @returns true if shutdown is in progress
+     */
+    isShuttingDown(): boolean {
+        return this.#isShuttingDown
+    }
+
+    /**
+     * Register a custom health check
+     * @param name Unique name for the check
+     * @param checkFn Function that performs the check
+     *
+     * @example
+     * ```typescript
+     * engine.registerHealthCheck('external-api', async () => {
+     *     try {
+     *         const res = await fetch('https://api.example.com/health')
+     *         return { status: res.ok ? 'up' : 'down' }
+     *     } catch (error) {
+     *         return { status: 'down', error: error.message }
+     *     }
+     * })
+     * ```
+     */
+    registerHealthCheck(name: string, checkFn: HealthCheckFn): void {
+        this.#healthChecker.registerCheck(name, checkFn)
+    }
+
+    /**
+     * Remove a custom health check
+     * @param name Name of the check to remove
+     * @returns true if the check was removed, false if it didn't exist
+     */
+    removeHealthCheck(name: string): boolean {
+        return this.#healthChecker.removeCheck(name)
+    }
+
+    /**
+     * Get list of registered health check names
+     */
+    getHealthCheckNames(): string[] {
+        return this.#healthChecker.getCheckNames()
+    }
+
+    /**
+     * Stops the Digital Twin Engine with graceful shutdown
      *
      * This method:
-     * 1. Closes HTTP server
-     * 2. Stops background workers
-     * 3. Closes all queue connections
-     * 4. Closes database connections
-     * 5. Clean up resources
+     * 1. Prevents new work from being accepted
+     * 2. Removes all event listeners
+     * 3. Closes HTTP server
+     * 4. Drains queues and waits for active jobs
+     * 5. Closes all queue workers
+     * 6. Stops upload processor
+     * 7. Closes queue manager
+     * 8. Closes database connections
      *
      * @async
      * @returns {Promise<void>}
@@ -551,77 +637,139 @@ export class DigitalTwinEngine {
      * ```
      */
     async stop(): Promise<void> {
+        if (this.#isShuttingDown) {
+            if (process.env.NODE_ENV !== 'test') {
+                console.warn('[DigitalTwin] Shutdown already in progress')
+            }
+            return
+        }
+
+        this.#isShuttingDown = true
+        const startTime = Date.now()
+
+        if (process.env.NODE_ENV !== 'test') {
+            console.log('[DigitalTwin] Graceful shutdown initiated...')
+        }
+
         const errors: Error[] = []
 
-        // 1. Close HTTP server first (uWebSockets.js TemplatedApp.close() is synchronous)
+        // 1. Remove all event listeners to prevent new work
+        this.#cleanupEventListeners()
+
+        // 2. Close HTTP server (uWebSockets.js TemplatedApp.close() is synchronous)
         if (this.#server) {
             try {
                 this.#server.close()
             } catch (error) {
-                errors.push(new Error(`Server close error: ${error instanceof Error ? error.message : String(error)}`))
+                errors.push(this.#wrapError('Server close', error))
             }
             this.#server = undefined
         }
 
-        // 2. Close all workers with extended timeout and force close
-        if (this.#workers.length > 0) {
-            await Promise.all(
-                this.#workers.map(async worker => {
-                    try {
-                        await Promise.race([
-                            worker.close(),
-                            new Promise((_, reject) =>
-                                setTimeout(() => reject(new Error('Worker close timeout')), 5000)
-                            )
-                        ])
-                    } catch {
-                        // Force close if timeout or error
-                        try {
-                            await worker.disconnect()
-                        } catch (disconnectError) {
-                            errors.push(
-                                new Error(
-                                    `Worker force close error: ${disconnectError instanceof Error ? disconnectError.message : String(disconnectError)}`
-                                )
-                            )
-                        }
-                    }
-                })
-            )
+        // 3. Drain queues - wait for active jobs with timeout
+        if (this.#queueManager) {
+            try {
+                await this.#drainQueues()
+            } catch (error) {
+                errors.push(this.#wrapError('Queue drain', error))
+            }
         }
 
-        // 3. Stop upload processor worker
+        // 4. Close all workers with extended timeout and force close
+        await this.#closeWorkers(errors)
+
+        // 5. Stop upload processor worker
         if (this.#uploadProcessor) {
             try {
                 await this.#uploadProcessor.stop()
             } catch (error) {
-                errors.push(
-                    new Error(`Upload processor close error: ${error instanceof Error ? error.message : String(error)}`)
-                )
+                errors.push(this.#wrapError('Upload processor', error))
             }
         }
 
-        // 4. Close queue connections (only if we have a queue manager)
+        // 6. Close queue connections (only if we have a queue manager)
         if (this.#queueManager) {
             try {
                 await this.#queueManager.close()
             } catch (error) {
-                errors.push(
-                    new Error(`Queue manager close error: ${error instanceof Error ? error.message : String(error)}`)
-                )
+                errors.push(this.#wrapError('Queue manager', error))
             }
         }
 
-        // 5. Close database connections
+        // 7. Close database connections
         try {
             await this.#database.close()
         } catch (error) {
-            errors.push(new Error(`Database close error: ${error instanceof Error ? error.message : String(error)}`))
+            errors.push(this.#wrapError('Database', error))
         }
 
-        if (errors.length > 0 && process.env.NODE_ENV !== 'test') {
-            console.warn('[DigitalTwin] Stopped with warnings:', errors.map(e => e.message).join(', '))
+        const duration = Date.now() - startTime
+
+        if (process.env.NODE_ENV !== 'test') {
+            if (errors.length > 0) {
+                console.error(
+                    `[DigitalTwin] Shutdown completed with ${errors.length} errors in ${duration}ms:`,
+                    errors.map(e => e.message).join(', ')
+                )
+            } else {
+                console.log(`[DigitalTwin] Shutdown completed successfully in ${duration}ms`)
+            }
         }
+    }
+
+    #cleanupEventListeners(): void {
+        engineEventBus.removeAllListeners()
+    }
+
+    async #drainQueues(): Promise<void> {
+        const timeout = Math.min(this.#shutdownTimeout / 2, 15000)
+        const startTime = Date.now()
+
+        while (Date.now() - startTime < timeout) {
+            try {
+                const stats = await this.#queueManager!.getQueueStats()
+                const totalActive = Object.values(stats).reduce((sum, q) => sum + (q.active || 0), 0)
+
+                if (totalActive === 0) break
+
+                if (process.env.NODE_ENV !== 'test') {
+                    console.log(`[DigitalTwin] Waiting for ${totalActive} active jobs...`)
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000))
+            } catch {
+                await new Promise(resolve => setTimeout(resolve, 1000))
+                break
+            }
+        }
+    }
+
+    async #closeWorkers(errors: Error[]): Promise<void> {
+        const workerTimeout = Math.min(this.#shutdownTimeout / 3, 10000)
+
+        await Promise.all(
+            this.#workers.map(async worker => {
+                try {
+                    await Promise.race([
+                        worker.close(),
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('Worker close timeout')), workerTimeout)
+                        )
+                    ])
+                } catch {
+                    try {
+                        await worker.disconnect()
+                    } catch (disconnectError) {
+                        errors.push(this.#wrapError('Worker disconnect', disconnectError))
+                    }
+                }
+            })
+        )
+        this.#workers = []
+    }
+
+    #wrapError(context: string, error: unknown): Error {
+        const message = error instanceof Error ? error.message : String(error)
+        return new Error(`${context}: ${message}`)
     }
 
     /**
