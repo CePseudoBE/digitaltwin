@@ -383,7 +383,7 @@ test.group('CustomTableManager endpoints', (group) => {
             params: {}
         })
 
-        assert.equal(response.status, 400)
+        assert.equal(response.status, 422) // ValidationError returns 422 Unprocessable Entity
     })
 
     test('handleGetById should return 404 for non-existent record', async ({ assert }) => {
