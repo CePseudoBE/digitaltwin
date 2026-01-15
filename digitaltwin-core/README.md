@@ -327,6 +327,109 @@ class WMSLayersManager extends CustomTableManager {
 - `update(id, data)` - Update existing record
 - `delete(id)` - Delete record
 
+## Request Validation
+
+The framework includes VineJS integration for type-safe request validation:
+
+```typescript
+import { validate, AssetUploadSchema } from 'digitaltwin-core'
+
+// In your component
+async handleUpload(req: any) {
+  const data = await validate(AssetUploadSchema, req.body)
+  // data is now typed and validated
+}
+```
+
+Validation errors return HTTP 422 with detailed error messages:
+
+```json
+{
+  "error": "Validation failed",
+  "details": [
+    { "field": "description", "message": "The description field must be a string" }
+  ]
+}
+```
+
+## Error Handling
+
+The framework provides custom error classes for structured error handling:
+
+```typescript
+import { CollectorError, ValidationError, StorageError } from 'digitaltwin-core'
+
+// Errors include context
+throw new CollectorError('Failed to fetch data', 'weather-collector', originalError)
+
+// Validation errors return 422
+throw new ValidationError('Invalid input', details)
+```
+
+All component errors are caught and logged with context (component name, stack trace). Non-critical operations use `safeAsync` to log errors without crashing:
+
+```typescript
+import { safeAsync } from 'digitaltwin-core'
+
+// Won't throw, just logs on failure
+await safeAsync(() => cleanup(), 'cleanup temporary files', logger)
+```
+
+## Production Features
+
+### Graceful Shutdown
+
+The engine supports graceful shutdown with configurable timeout:
+
+```typescript
+const engine = new DigitalTwinEngine({ database, storage })
+
+// Configure shutdown timeout (default: 30s)
+engine.setShutdownTimeout(60000)
+
+// Check if shutting down
+if (engine.isShuttingDown()) {
+  // Don't accept new work
+}
+
+// Graceful stop
+await engine.stop()
+```
+
+### Health Checks
+
+Register custom health checks for monitoring:
+
+```typescript
+engine.registerHealthCheck('external-api', async () => {
+  const response = await fetch('https://api.example.com/health')
+  return { status: response.ok ? 'up' : 'down' }
+})
+
+// Built-in checks: database, redis (if configured)
+const names = engine.getHealthCheckNames() // ['database', 'redis', 'external-api']
+
+// Remove check
+engine.removeHealthCheck('external-api')
+```
+
+### OpenAPI Specification
+
+Generate OpenAPI 3.0 specs from your components:
+
+```typescript
+import { OpenAPIGenerator } from 'digitaltwin-core'
+
+const spec = OpenAPIGenerator.generate({
+  info: { title: 'My API', version: '1.0.0' },
+  components: [collector, assetsManager, handler]
+})
+
+// Output as JSON or YAML
+const json = OpenAPIGenerator.toJSON(spec)
+const yaml = OpenAPIGenerator.toYAML(spec)
+```
+
 ## Authentication
 
 The framework supports multiple authentication modes:
