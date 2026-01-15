@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { TilesetManager } from '../../src/components/tileset_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
-import { AuthConfig } from '../../src/auth/auth_config.js'
+import { AuthConfig, ApisixAuthParser } from '../../src/auth/index.js'
 import type { AssetsManagerConfiguration } from '../../src/components/types.js'
 import JSZip from 'jszip'
 import fs from 'fs/promises'
@@ -26,11 +26,13 @@ class TestTilesetManager extends TilesetManager {
 function ensureAuthEnabled() {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 }
 
 function restoreTestEnv() {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 }
 
 // Helper to create a test ZIP file with tileset.json
@@ -309,10 +311,11 @@ test.group('TilesetManager', (group) => {
     })
 })
 
-test.group('TilesetManager with auth disabled', (group) => {
+test.group('TilesetManager with auth disabled', group => {
     group.setup(() => {
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
         AuthConfig._resetConfig()
+        ApisixAuthParser._resetProvider()
     })
 
     group.teardown(() => {
