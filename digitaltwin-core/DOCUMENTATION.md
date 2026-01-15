@@ -1,6 +1,6 @@
 # Digital Twin Core Framework - Documentation
 
-![Version](https://img.shields.io/badge/version-0.6.1-blue)
+![Version](https://img.shields.io/badge/version-0.14.3-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue)
 ![Node.js](https://img.shields.io/badge/Node.js-18+-green)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -15,6 +15,9 @@
 - [Components](#components)
 - [Engine](#engine)
 - [Storage & Database](#storage--database)
+- [Error Handling](#error-handling)
+- [Production Readiness](#production-readiness)
+- [Security](#security)
 - [API Reference](#api-reference)
 - [Examples](#examples)
 - [Advanced Topics](#advanced-topics)
@@ -601,6 +604,8 @@ const engine = new DigitalTwinEngine({
 ### Engine Lifecycle
 
 ```typescript
+import { setupGracefulShutdown } from 'digitaltwin-core'
+
 // Validation (dry run)
 const validation = await engine.validateConfiguration()
 if (!validation.valid) {
@@ -612,11 +617,8 @@ if (!validation.valid) {
 await engine.start()
 console.log(`Engine running on port ${engine.getPort()}`)
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  await engine.stop()
-  process.exit(0)
-})
+// Setup graceful shutdown (handles SIGTERM, SIGINT)
+setupGracefulShutdown(engine)
 ```
 
 ## Storage & Database
@@ -671,6 +673,359 @@ const database = new KnexDatabaseAdapter({
     password: 'password'
   }
 }, storage)
+```
+
+## Error Handling
+
+The framework provides a comprehensive error handling system with custom error classes and utilities for safe async operations.
+
+### Custom Error Classes
+
+All framework errors extend from `DigitalTwinError`, providing consistent error handling across components:
+
+```typescript
+import {
+  DigitalTwinError,
+  CollectorError,
+  HarvesterError,
+  DatabaseError,
+  StorageError,
+  ConfigurationError,
+  ValidationError
+} from 'digitaltwin-core'
+
+// Base error with context
+throw new DigitalTwinError('Operation failed', {
+  code: 'OPERATION_FAILED',
+  context: { component: 'MyCollector', attemptNumber: 3 }
+})
+
+// Component-specific errors
+throw new CollectorError('Failed to fetch weather data', {
+  collectorName: 'weather-collector',
+  cause: originalError
+})
+
+throw new HarvesterError('Processing failed', {
+  harvesterName: 'data-processor',
+  source: 'weather-collector'
+})
+
+// Database errors
+throw new DatabaseError('Query failed', {
+  operation: 'insert',
+  table: 'weather_data'
+})
+
+// Storage errors
+throw new StorageError('File not found', {
+  operation: 'retrieve',
+  path: '/data/file.json'
+})
+
+// Validation errors
+throw new ValidationError('Invalid input', {
+  field: 'temperature',
+  expectedType: 'number',
+  receivedType: 'string'
+})
+```
+
+### Error Properties
+
+All custom errors include:
+
+- **message**: Human-readable error description
+- **code**: Machine-readable error code (e.g., `COLLECTOR_FAILED`)
+- **context**: Additional contextual information
+- **cause**: Original error (for error chaining)
+- **timestamp**: When the error occurred
+- **stack**: Full stack trace
+
+### safeAsync Utility
+
+The `safeAsync` utility provides safe execution of async operations with automatic error logging:
+
+```typescript
+import { safeAsync } from 'digitaltwin-core'
+
+// Basic usage - errors are logged but don't crash
+await safeAsync(
+  () => riskyOperation(),
+  'performing risky operation'
+)
+
+// With custom logger
+await safeAsync(
+  () => fetchData(),
+  'fetching external data',
+  customLogger
+)
+
+// In components - automatically used in run() methods
+class MyCollector extends Collector {
+  async collect(): Promise<Buffer> {
+    // Errors thrown here are caught, logged, and re-thrown
+    // with proper context by the framework
+    return await this.fetchData()
+  }
+}
+```
+
+### Error Handling in Components
+
+Components automatically wrap operations with proper error handling:
+
+```typescript
+// Collectors log errors with collector name and context
+[Collector:weather-data] ERROR: Collector execution failed: Network timeout {
+  collectorName: 'weather-data',
+  stack: '...'
+}
+
+// Harvesters include source information
+[Harvester:data-processor] ERROR: Harvester execution failed: Invalid data format {
+  harvesterName: 'data-processor',
+  source: 'weather-data',
+  stack: '...'
+}
+```
+
+## Production Readiness
+
+The framework includes features for production deployments: graceful shutdown, health checks, and proper resource cleanup.
+
+### Graceful Shutdown
+
+Use `setupGracefulShutdown()` to handle termination signals properly:
+
+```typescript
+import { DigitalTwinEngine, setupGracefulShutdown } from 'digitaltwin-core'
+
+const engine = new DigitalTwinEngine({
+  storage,
+  database,
+  collectors: [weatherCollector],
+  server: { port: 3000 }
+})
+
+await engine.start()
+
+// Setup graceful shutdown with default options
+const cleanup = setupGracefulShutdown(engine)
+
+// Or with custom options
+const cleanup = setupGracefulShutdown(engine, {
+  signals: ['SIGTERM', 'SIGINT', 'SIGUSR2'],  // Signals to handle
+  timeout: 30000,                              // Shutdown timeout in ms
+  logger: console.log,                         // Custom logger
+  onShutdown: async () => {                    // Pre-shutdown hook
+    await customCleanup()
+  }
+})
+
+// Manual cleanup (removes signal handlers)
+cleanup()
+```
+
+### Shutdown Configuration
+
+Configure shutdown behavior on the engine:
+
+```typescript
+// Set shutdown timeout (default: 30000ms)
+engine.setShutdownTimeout(60000)
+
+// Check if engine is shutting down
+if (engine.isShuttingDown()) {
+  return // Skip new work during shutdown
+}
+
+// Manual stop with proper cleanup
+await engine.stop()
+```
+
+### Health Checks
+
+The framework provides Kubernetes-style health check endpoints:
+
+#### Built-in Endpoints
+
+```typescript
+// Liveness probe - is the process alive?
+GET /api/health/live
+// Response: { "status": "up" } or { "status": "down" }
+
+// Readiness probe - is the service ready to accept traffic?
+GET /api/health/ready
+// Response includes all registered checks:
+{
+  "status": "up",
+  "checks": {
+    "database": { "status": "up" },
+    "redis": { "status": "up", "latency": 5 },
+    "custom": { "status": "up", "details": "..." }
+  }
+}
+```
+
+#### Custom Health Checks
+
+Register custom health checks for your dependencies:
+
+```typescript
+// Register a custom health check
+engine.registerHealthCheck('external-api', async () => {
+  try {
+    const response = await fetch('https://api.example.com/health', {
+      timeout: 5000
+    })
+    return {
+      status: response.ok ? 'up' : 'down',
+      responseTime: response.headers.get('x-response-time')
+    }
+  } catch (error) {
+    return {
+      status: 'down',
+      error: error.message
+    }
+  }
+})
+
+// Register database health check
+engine.registerHealthCheck('postgres', async () => {
+  const start = Date.now()
+  await database.raw('SELECT 1')
+  return {
+    status: 'up',
+    latency: Date.now() - start
+  }
+})
+
+// List registered health checks
+const checks = engine.getHealthCheckNames()
+// ['database', 'redis', 'external-api', 'postgres']
+
+// Remove a health check
+engine.removeHealthCheck('external-api')
+```
+
+#### Kubernetes Configuration
+
+Example Kubernetes deployment with health probes:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: digitaltwin
+          livenessProbe:
+            httpGet:
+              path: /api/health/live
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/health/ready
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+```
+
+## Security
+
+The framework includes security features for defense in depth, complementing your API gateway's security measures.
+
+### Path Traversal Protection
+
+The `LocalStorageService` includes protection against path traversal attacks:
+
+```typescript
+import { LocalStorageService } from 'digitaltwin-core'
+
+const storage = new LocalStorageService('/app/data')
+
+// These are blocked and throw errors:
+await storage.retrieve('../../../etc/passwd')        // ❌ Path traversal
+await storage.retrieve('folder/../../secret.txt')   // ❌ Path traversal
+await storage.delete('../important.txt')            // ❌ Path traversal
+
+// These work normally:
+await storage.retrieve('uploads/file.json')         // ✅ Valid path
+await storage.retrieve('nested/folder/data.json')   // ✅ Valid nested path
+```
+
+All storage methods are protected:
+- `retrieve(path)` - Read files
+- `delete(path)` - Delete files
+- `saveWithPath(buffer, path)` - Save with specific path
+- `getPublicUrl(path)` - Get public URL
+- `deleteByPrefix(prefix)` - Delete by prefix
+
+### SQL Injection Protection
+
+Table names are validated to prevent SQL injection:
+
+```typescript
+import { KnexDatabaseAdapter } from 'digitaltwin-core'
+
+// Valid table names (allowed):
+await db.createTable('weather_data')      // ✅ Letters and underscores
+await db.createTable('_internal_logs')    // ✅ Starts with underscore
+await db.createTable('sensors2024')       // ✅ Numbers after first char
+
+// Invalid table names (rejected):
+await db.createTable('users; DROP TABLE') // ❌ SQL injection attempt
+await db.createTable('my-table')          // ❌ Contains hyphen
+await db.createTable('123data')           // ❌ Starts with number
+await db.createTable('table name')        // ❌ Contains space
+
+// Error thrown:
+// "Invalid table name: "users; DROP TABLE". Must start with a letter
+// or underscore and contain only alphanumeric characters and underscores."
+```
+
+Table name validation is applied to all database methods automatically.
+
+### Atomic Batch Operations
+
+Batch operations use transactions to ensure atomicity:
+
+```typescript
+// All-or-nothing batch insert
+await db.saveBatch([
+  { name: 'table1', type: 'json', url: '/path1', date: new Date() },
+  { name: 'table2', type: 'json', url: '/path2', date: new Date() }
+])
+// If any insert fails, all are rolled back
+
+// All-or-nothing batch delete
+await db.deleteBatch([
+  { id: '1', name: 'table1' },
+  { id: '2', name: 'table2' }
+])
+// If any delete fails, all are rolled back
+```
+
+### Asset Metadata Updates
+
+Asset metadata updates preserve the record ID:
+
+```typescript
+// Update metadata without changing the ID
+await assetsManager.updateAssetMetadata('123', {
+  description: 'Updated description',
+  source: 'https://new-source.com',
+  is_public: false
+})
+
+// The record ID remains '123' after the update
+// (Previous versions used DELETE+INSERT which changed the ID)
 ```
 
 ## API Reference
@@ -1081,31 +1436,25 @@ class MonitoredCollector extends Collector {
 ### 5. Graceful Shutdown
 
 ```typescript
-class Application {
-  private engine: DigitalTwinEngine
-  
-  async start() {
-    this.engine = new DigitalTwinEngine(config)
-    await this.engine.start()
-    
-    // Handle shutdown signals
-    process.on('SIGTERM', () => this.shutdown())
-    process.on('SIGINT', () => this.shutdown())
-  }
-  
-  private async shutdown() {
-    console.log('Shutting down gracefully...')
-    
-    try {
-      await this.engine.stop()
-      console.log('Shutdown complete')
-      process.exit(0)
-    } catch (error) {
-      console.error('Shutdown error:', error)
-      process.exit(1)
+import { DigitalTwinEngine, setupGracefulShutdown } from 'digitaltwin-core'
+
+async function main() {
+  const engine = new DigitalTwinEngine(config)
+  await engine.start()
+
+  // Recommended: Use setupGracefulShutdown helper
+  setupGracefulShutdown(engine, {
+    timeout: 30000,
+    onShutdown: async () => {
+      // Custom cleanup before shutdown
+      await closeExternalConnections()
     }
-  }
+  })
+
+  console.log('Application started')
 }
+
+main().catch(console.error)
 ```
 
 ---
