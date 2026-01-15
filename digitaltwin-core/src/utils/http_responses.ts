@@ -6,6 +6,7 @@
  */
 
 import type { DataResponse } from '../components/types.js'
+import { DigitalTwinError } from '../errors/index.js'
 
 /**
  * HTTP status codes commonly used in the Digital Twin framework.
@@ -18,6 +19,7 @@ export const HttpStatus = {
     UNAUTHORIZED: 401,
     FORBIDDEN: 403,
     NOT_FOUND: 404,
+    UNPROCESSABLE_ENTITY: 422,
     INTERNAL_SERVER_ERROR: 500
 } as const
 
@@ -72,9 +74,12 @@ export function successResponse(data: object): DataResponse {
  * return errorResponse('Invalid input', 400)
  * ```
  */
-export function errorResponse(error: unknown, status: number = HttpStatus.INTERNAL_SERVER_ERROR): DataResponse {
+export function errorResponse(error: unknown, status?: number): DataResponse {
+    // Use statusCode from DigitalTwinError if available
+    const statusCode =
+        error instanceof DigitalTwinError ? error.statusCode : (status ?? HttpStatus.INTERNAL_SERVER_ERROR)
     const message = error instanceof Error ? error.message : String(error)
-    return jsonResponse(status, { error: message })
+    return jsonResponse(statusCode, { error: message })
 }
 
 /**
@@ -136,6 +141,32 @@ export function forbiddenResponse(message: string): DataResponse {
  */
 export function notFoundResponse(message: string = 'Resource not found'): DataResponse {
     return jsonResponse(HttpStatus.NOT_FOUND, { error: message })
+}
+
+/**
+ * Creates a validation error response (HTTP 422 Unprocessable Entity).
+ *
+ * Used when request data fails schema validation.
+ *
+ * @param message - Validation error message
+ * @param errors - Optional array of field-level validation errors
+ * @returns DataResponse with status 422
+ *
+ * @example
+ * ```typescript
+ * return validationErrorResponse('id: must be a positive number')
+ * return validationErrorResponse('Validation failed', [{ field: 'id', message: 'must be positive' }])
+ * ```
+ */
+export function validationErrorResponse(
+    message: string,
+    errors?: Array<{ field: string; message: string }>
+): DataResponse {
+    const body: { error: string; errors?: Array<{ field: string; message: string }> } = { error: message }
+    if (errors) {
+        body.errors = errors
+    }
+    return jsonResponse(HttpStatus.UNPROCESSABLE_ENTITY, body)
 }
 
 /**

@@ -6,6 +6,22 @@ import type { UserRecord } from '../auth/types.js'
 import type { OpenAPIDocumentable, OpenAPIComponentSpec } from '../openapi/types.js'
 import { UserService } from '../auth/user_service.js'
 import { ApisixAuthParser } from '../auth/apisix_parser.js'
+import { validateIdParam, validateCustomRecordCreate, validateCustomRecordUpdate } from '../validation/index.js'
+import { validateData, validateParams } from '../validation/validate.js'
+import { DigitalTwinError } from '../errors/index.js'
+
+/**
+ * Helper to create error response with proper status code for DigitalTwinError
+ */
+function createErrorResponse(error: unknown): DataResponse {
+    const statusCode = error instanceof DigitalTwinError ? error.statusCode : 500
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return {
+        status: statusCode,
+        content: JSON.stringify({ error: message }),
+        headers: { 'Content-Type': 'application/json' }
+    }
+}
 
 /**
  * Record representing a row in the custom table
@@ -982,13 +998,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 headers: { 'Content-Type': 'application/json' }
             }
         } catch (error) {
-            return {
-                status: 500,
-                content: JSON.stringify({
-                    error: error instanceof Error ? error.message : 'Unknown error'
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            }
+            return createErrorResponse(error)
         }
     }
 
@@ -1021,6 +1031,13 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 }
             }
 
+            // Validate request body (ValidationError bubbles up to global handler -> 422)
+            const validatedBody = await validateData<Record<string, unknown>>(
+                validateCustomRecordCreate,
+                req.body,
+                'Record data'
+            )
+
             // Find or create user in database
             const userRecord = await this.userService.findOrCreateUser(authUser)
 
@@ -1034,7 +1051,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
 
             // Add owner_id to the data
             const dataWithOwner = {
-                ...req.body,
+                ...validatedBody,
                 owner_id: userRecord.id
             }
 
@@ -1045,28 +1062,16 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 headers: { 'Content-Type': 'application/json' }
             }
         } catch (error) {
-            return {
-                status: 500,
-                content: JSON.stringify({
-                    error: error instanceof Error ? error.message : 'Unknown error'
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            }
+            return createErrorResponse(error)
         }
     }
 
     async handleGetById(req: any): Promise<DataResponse> {
         try {
-            const { id } = req.params || {}
-            if (!id) {
-                return {
-                    status: 400,
-                    content: JSON.stringify({ error: 'ID parameter is required' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
+            // Validate ID parameter (ValidationError bubbles up to global handler -> 422)
+            const validatedParams = await validateParams<{ id: number }>(validateIdParam, req.params || {}, 'Record ID')
 
-            const record = await this.findById(parseInt(id))
+            const record = await this.findById(validatedParams.id)
             if (!record) {
                 return {
                     status: 404,
@@ -1081,13 +1086,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 headers: { 'Content-Type': 'application/json' }
             }
         } catch (error) {
-            return {
-                status: 500,
-                content: JSON.stringify({
-                    error: error instanceof Error ? error.message : 'Unknown error'
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            }
+            return createErrorResponse(error)
         }
     }
 
@@ -1112,14 +1111,8 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 }
             }
 
-            const { id } = req.params || {}
-            if (!id) {
-                return {
-                    status: 400,
-                    content: JSON.stringify({ error: 'ID parameter is required' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
+            // Validate ID parameter (ValidationError bubbles up to global handler -> 422)
+            const validatedParams = await validateParams<{ id: number }>(validateIdParam, req.params || {}, 'Record ID')
 
             if (!req?.body) {
                 return {
@@ -1128,6 +1121,13 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                     headers: { 'Content-Type': 'application/json' }
                 }
             }
+
+            // Validate request body (ValidationError bubbles up to global handler -> 422)
+            const validatedBody = await validateData<Record<string, unknown>>(
+                validateCustomRecordUpdate,
+                req.body,
+                'Record data'
+            )
 
             // Find or create user in database
             const userRecord = await this.userService.findOrCreateUser(authUser)
@@ -1141,7 +1141,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
             }
 
             // Check if record exists and belongs to this user
-            const existingRecord = await this.findById(parseInt(id))
+            const existingRecord = await this.findById(validatedParams.id)
             if (!existingRecord) {
                 return {
                     status: 404,
@@ -1159,20 +1159,14 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 }
             }
 
-            await this.update(parseInt(id), req.body)
+            await this.update(validatedParams.id, validatedBody)
             return {
                 status: 200,
                 content: JSON.stringify({ message: 'Record updated successfully' }),
                 headers: { 'Content-Type': 'application/json' }
             }
         } catch (error) {
-            return {
-                status: 500,
-                content: JSON.stringify({
-                    error: error instanceof Error ? error.message : 'Unknown error'
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            }
+            return createErrorResponse(error)
         }
     }
 
@@ -1197,14 +1191,8 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 }
             }
 
-            const { id } = req.params || {}
-            if (!id) {
-                return {
-                    status: 400,
-                    content: JSON.stringify({ error: 'ID parameter is required' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
+            // Validate ID parameter (ValidationError bubbles up to global handler -> 422)
+            const validatedParams = await validateParams<{ id: number }>(validateIdParam, req.params || {}, 'Record ID')
 
             // Find or create user in database
             const userRecord = await this.userService.findOrCreateUser(authUser)
@@ -1218,7 +1206,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
             }
 
             // Check if record exists and belongs to this user
-            const existingRecord = await this.findById(parseInt(id))
+            const existingRecord = await this.findById(validatedParams.id)
             if (!existingRecord) {
                 return {
                     status: 404,
@@ -1236,20 +1224,14 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 }
             }
 
-            await this.delete(parseInt(id))
+            await this.delete(validatedParams.id)
             return {
                 status: 200,
                 content: JSON.stringify({ message: 'Record deleted successfully' }),
                 headers: { 'Content-Type': 'application/json' }
             }
         } catch (error) {
-            return {
-                status: 500,
-                content: JSON.stringify({
-                    error: error instanceof Error ? error.message : 'Unknown error'
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            }
+            return createErrorResponse(error)
         }
     }
 }

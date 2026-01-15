@@ -1,4 +1,15 @@
 packages:
-  - 'digitaltwin-core'
-  - 'digitaltwin-cli'
-  - 'create-digitaltwin'
+  - digitaltwin-core
+  - digitaltwin-cli
+  - create-digitaltwin
+
+ignoredBuiltDependencies:
+  - cpu-features
+  - esbuild
+  - msgpackr-extract
+  - protobufjs
+  - sqlite3
+  - ssh2
+
+onlyBuiltDependencies:
+  - better-sqlite3

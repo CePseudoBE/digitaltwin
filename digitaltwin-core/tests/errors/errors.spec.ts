@@ -20,7 +20,7 @@ test.group('Custom Error Classes', () => {
         const error = new ValidationError('Invalid input')
 
         assert.equal(error.code, 'VALIDATION_ERROR')
-        assert.equal(error.statusCode, 400)
+        assert.equal(error.statusCode, 422)
         assert.equal(error.message, 'Invalid input')
         assert.equal(error.name, 'ValidationError')
         assert.instanceOf(error.timestamp, Date)

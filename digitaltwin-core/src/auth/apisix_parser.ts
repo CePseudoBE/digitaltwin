@@ -1,18 +1,21 @@
 import type { AuthenticatedUser } from './types.js'
-import { AuthConfig } from './auth_config.js'
+import type { AuthProvider, AuthRequest } from './auth_provider.js'
+import { AuthProviderFactory } from './auth_provider_factory.js'
 
 /**
  * Parses authentication information from Apache APISIX headers set after Keycloak authentication.
  *
- * This class handles the parsing of authentication headers forwarded by Apache APISIX
- * after successful Keycloak authentication. APISIX acts as a gateway that:
- * 1. Validates JWT tokens with Keycloak
- * 2. Extracts user information from the token
- * 3. Forwards user data as HTTP headers to downstream services
+ * This class provides a static API for backward compatibility while internally using
+ * the AuthProvider system. It automatically handles:
+ * - Gateway mode (x-user-id, x-user-roles headers)
+ * - JWT mode (Authorization: Bearer token)
+ * - No-auth mode (DIGITALTWIN_DISABLE_AUTH=true)
  *
- * Authentication can be disabled via environment variables for development/testing:
- * - Set DIGITALTWIN_DISABLE_AUTH=true to bypass authentication checks
- * - Set DIGITALTWIN_ANONYMOUS_USER_ID=custom-id to use a custom anonymous user ID
+ * For new code, consider using AuthProviderFactory directly:
+ * ```typescript
+ * const authProvider = AuthProviderFactory.fromEnv()
+ * const user = authProvider.parseRequest(req)
+ * ```
  *
  * @example
  * ```typescript
@@ -26,18 +29,54 @@ import { AuthConfig } from './auth_config.js'
  * ```
  */
 export class ApisixAuthParser {
+    private static _provider: AuthProvider | null = null
+
     /**
-     * Extracts user information from APISIX headers.
+     * Get the authentication provider instance.
+     * Creates it on first use based on environment configuration.
+     */
+    private static getProvider(): AuthProvider {
+        if (!this._provider) {
+            this._provider = AuthProviderFactory.fromEnv()
+        }
+        return this._provider
+    }
+
+    /**
+     * Reset the provider instance (useful for testing).
+     * @internal
+     */
+    static _resetProvider(): void {
+        this._provider = null
+    }
+
+    /**
+     * Set a custom provider (useful for testing).
+     * @internal
+     */
+    static _setProvider(provider: AuthProvider): void {
+        this._provider = provider
+    }
+
+    /**
+     * Create a request-like object from headers for the AuthProvider.
+     */
+    private static toAuthRequest(headers: Record<string, string>): AuthRequest {
+        return { headers }
+    }
+
+    /**
+     * Extracts user information from authentication headers.
      *
-     * Parses the authentication headers forwarded by APISIX:
-     * - `x-user-id`: Keycloak user UUID (required)
-     * - `x-user-roles`: Comma-separated list of user roles (optional)
+     * Parses the authentication headers (gateway mode) or JWT token (jwt mode):
+     * - Gateway: `x-user-id` and `x-user-roles` headers
+     * - JWT: `Authorization: Bearer <token>` header
      *
      * When authentication is disabled (DIGITALTWIN_DISABLE_AUTH=true),
-     * returns a default anonymous user instead of requiring headers.
+     * returns a default anonymous user.
      *
-     * @param headers - HTTP request headers from APISIX
-     * @returns Parsed user authentication data, or null if x-user-id is missing and auth is enabled
+     * @param headers - HTTP request headers
+     * @returns Parsed user authentication data, or null if not authenticated
      *
      * @example
      * ```typescript
@@ -48,76 +87,41 @@ export class ApisixAuthParser {
      *
      * const authUser = ApisixAuthParser.parseAuthHeaders(headers)
      * // Returns: { id: '6e06a527...', roles: ['default-roles-master', 'offline_access'] }
-     *
-     * // With DIGITALTWIN_DISABLE_AUTH=true
-     * const authUser = ApisixAuthParser.parseAuthHeaders({})
-     * // Returns: { id: 'anonymous', roles: ['anonymous'] }
      * ```
      */
     static parseAuthHeaders(headers: Record<string, string>): AuthenticatedUser | null {
-        // If authentication is disabled, return anonymous user
-        if (AuthConfig.isAuthDisabled()) {
-            return AuthConfig.getAnonymousUser()
-        }
-
-        const userId = headers['x-user-id']
-        if (!userId) {
-            return null
-        }
-
-        // Parse roles from comma-separated string
-        const rolesString = headers['x-user-roles'] || ''
-        const roles = rolesString ? rolesString.split(',').map(role => role.trim()) : []
-
-        return {
-            id: userId,
-            roles: roles
-        }
+        return this.getProvider().parseRequest(this.toAuthRequest(headers))
     }
 
     /**
-     * Checks if a request has valid authentication headers.
+     * Checks if a request has valid authentication.
      *
      * Performs a quick validation to determine if the request contains
-     * the minimum required authentication information (x-user-id header).
-     * Use this for early authentication checks before parsing.
+     * valid authentication credentials (gateway headers or JWT token).
      *
-     * When authentication is disabled (DIGITALTWIN_DISABLE_AUTH=true),
-     * this always returns true to allow all requests through.
+     * When authentication is disabled, this always returns true.
      *
      * @param headers - HTTP request headers
-     * @returns true if x-user-id header is present or auth is disabled, false otherwise
+     * @returns true if authentication is valid or disabled, false otherwise
      *
      * @example
      * ```typescript
-     * // Early authentication check in handler
      * if (!ApisixAuthParser.hasValidAuth(req.headers)) {
      *   return { status: 401, content: 'Authentication required' }
      * }
-     *
-     * // Now safe to proceed with parsing
-     * const authUser = ApisixAuthParser.parseAuthHeaders(req.headers)
      * ```
      */
     static hasValidAuth(headers: Record<string, string>): boolean {
-        // If authentication is disabled, all requests are valid
-        if (AuthConfig.isAuthDisabled()) {
-            return true
-        }
-
-        return !!headers['x-user-id']
+        return this.getProvider().hasValidAuth(this.toAuthRequest(headers))
     }
 
     /**
      * Extracts just the user ID from headers.
      *
-     * Convenience method for cases where you only need the user ID
-     * without parsing the full authentication context.
-     *
-     * When authentication is disabled, returns the configured anonymous user ID.
+     * Convenience method for cases where you only need the user ID.
      *
      * @param headers - HTTP request headers
-     * @returns Keycloak user ID, anonymous user ID if auth disabled, or null if not present
+     * @returns User ID, or null if not authenticated
      *
      * @example
      * ```typescript
@@ -128,24 +132,14 @@ export class ApisixAuthParser {
      * ```
      */
     static getUserId(headers: Record<string, string>): string | null {
-        // If authentication is disabled, return anonymous user ID
-        if (AuthConfig.isAuthDisabled()) {
-            return AuthConfig.getAnonymousUserId()
-        }
-
-        return headers['x-user-id'] || null
+        return this.getProvider().getUserId(this.toAuthRequest(headers))
     }
 
     /**
      * Extracts just the user roles from headers.
      *
-     * Convenience method for cases where you only need the user roles
-     * without parsing the full authentication context.
-     *
-     * When authentication is disabled, returns the anonymous user roles.
-     *
      * @param headers - HTTP request headers
-     * @returns Array of role names, anonymous roles if auth disabled, empty array if no roles header present
+     * @returns Array of role names, empty array if not authenticated
      *
      * @example
      * ```typescript
@@ -156,22 +150,11 @@ export class ApisixAuthParser {
      * ```
      */
     static getUserRoles(headers: Record<string, string>): string[] {
-        // If authentication is disabled, return anonymous user roles
-        if (AuthConfig.isAuthDisabled()) {
-            return AuthConfig.getAnonymousUser().roles
-        }
-
-        const rolesString = headers['x-user-roles'] || ''
-        return rolesString ? rolesString.split(',').map(role => role.trim()) : []
+        return this.getProvider().getUserRoles(this.toAuthRequest(headers))
     }
 
     /**
      * Checks if a user has the admin role.
-     *
-     * Determines if the authenticated user has administrative privileges by checking
-     * if their roles include the configured admin role name (default: "admin").
-     *
-     * The admin role name can be configured via DIGITALTWIN_ADMIN_ROLE_NAME environment variable.
      *
      * @param headers - HTTP request headers
      * @returns true if user has admin role, false otherwise
@@ -179,18 +162,11 @@ export class ApisixAuthParser {
      * @example
      * ```typescript
      * if (ApisixAuthParser.isAdmin(req.headers)) {
-     *   // User has full administrative access
-     *   // Can view all assets including private assets owned by others
-     *   console.log('Admin user detected')
+     *   // Admin-only logic
      * }
-     *
-     * // With custom admin role name (DIGITALTWIN_ADMIN_ROLE_NAME=administrator)
-     * const isAdmin = ApisixAuthParser.isAdmin(req.headers)
      * ```
      */
     static isAdmin(headers: Record<string, string>): boolean {
-        const roles = this.getUserRoles(headers)
-        const adminRoleName = AuthConfig.getAdminRoleName()
-        return roles.includes(adminRoleName)
+        return this.getProvider().isAdmin(this.toAuthRequest(headers))
     }
 }
