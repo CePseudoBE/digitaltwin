@@ -99,10 +99,10 @@ test.group('Collector', () => {
         const collector = new DummyCollector()
         collector.setDependencies(db, storage)
 
-        // Le test devrait lever une exception
+        // Le test devrait lever une StorageError wrapping l'erreur originale
         await assert.rejects(async () => {
             await collector.run()
-        }, 'Mock save error')
+        }, /Mock save error/)
     })
 })
 

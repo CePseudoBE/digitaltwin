@@ -1,3 +1,8 @@
+import { safeAsync } from '../utils/safe_async.js'
+import { Logger } from '../utils/logger.js'
+
+const logger = new Logger('StorageService')
+
 /**
  * Abstract base class for storage service implementations.
  *
@@ -127,8 +132,9 @@ export abstract class StorageService {
      * ```
      */
     async deleteBatch(paths: string[]): Promise<void> {
-        // Default sequential implementation - subclasses can override with bulk operations
-        await Promise.all(paths.map(path => this.delete(path).catch(() => {})))
+        // Default parallel implementation - subclasses can override with bulk operations
+        // Individual failures are logged but don't prevent other deletions
+        await Promise.all(paths.map(path => safeAsync(() => this.delete(path), `delete file ${path}`, logger)))
     }
 
     /**

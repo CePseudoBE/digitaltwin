@@ -1,4 +1,4 @@
-import { configure, processCLIArgs, run } from '@japa/runner'
+import { configure, run } from '@japa/runner'
 import { assert } from '@japa/assert'
 import * as reporters from '@japa/runner/reporters'
 
@@ -9,8 +9,10 @@ process.env.TS_NODE_TRANSPILE_ONLY = 'true'
 // Disable authentication for tests (unless explicitly testing auth)
 process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
 
-// Prend en compte les arguments CLI classiques
-processCLIArgs(process.argv.slice(2))
+// Get file filter from CLI args (e.g., pnpm test -- tests/errors/*.spec.ts)
+// Filter out "--" separator from args
+const args = process.argv.slice(2).filter(arg => arg !== '--')
+const fileFilter = args.length > 0 ? args : []
 
 configure({
   files: ['tests/**/*.spec.ts'],
@@ -25,9 +27,7 @@ configure({
   forceExit: true,
   filters: {
     tests: process.env.TEST_NAME ? [process.env.TEST_NAME] : [],
-    tags: [],
-    groups: [],
-    files: process.argv.length > 2 ? process.argv.slice(2) : [],
+    files: fileFilter,
   },
 })
 

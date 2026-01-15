@@ -227,6 +227,24 @@ export abstract class DatabaseAdapter {
      */
     abstract countByDateRange(name: string, startDate: Date, endDate?: Date): Promise<number>
 
+    // ========== Methods for AssetsManager ==========
+
+    /**
+     * Updates asset metadata fields directly without changing the record ID.
+     * This is preferred over delete+insert for updating metadata.
+     *
+     * @param tableName - Component/table name
+     * @param id - Record ID to update
+     * @param data - Partial metadata to update (description, source, is_public)
+     * @returns The updated DataRecord
+     * @throws Error if record not found
+     */
+    abstract updateAssetMetadata(
+        tableName: string,
+        id: number,
+        data: Partial<Pick<MetadataRow, 'description' | 'source' | 'is_public'>>
+    ): Promise<DataRecord>
+
     // ========== Methods for CustomTableManager ==========
 
     /**

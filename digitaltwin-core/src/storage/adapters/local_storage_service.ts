@@ -7,8 +7,27 @@ import path from 'path'
  * Saves files in a configured folder using a timestamp as filename.
  */
 export class LocalStorageService extends StorageService {
+    readonly #normalizedBase: string
+
     constructor(private baseDir: string = 'data') {
         super()
+        this.#normalizedBase = path.resolve(this.baseDir)
+    }
+
+    /**
+     * Validates that a path does not escape the base directory (path traversal protection).
+     * @param relativePath - The relative path to validate
+     * @returns The resolved absolute path if valid
+     * @throws Error if path traversal is detected
+     */
+    #validatePath(relativePath: string): string {
+        const resolved = path.resolve(this.#normalizedBase, relativePath)
+
+        if (!resolved.startsWith(this.#normalizedBase + path.sep) && resolved !== this.#normalizedBase) {
+            throw new Error(`Invalid path: path traversal detected for "${relativePath}"`)
+        }
+
+        return resolved
     }
 
     /**
@@ -37,18 +56,20 @@ export class LocalStorageService extends StorageService {
      * Retrieves a file as buffer using its relative path.
      * @param relativePath - Filename previously returned by `save`
      * @returns File content as Buffer
+     * @throws Error if path traversal is detected
      */
     async retrieve(relativePath: string): Promise<Buffer> {
-        const filePath = path.join(this.baseDir, relativePath)
+        const filePath = this.#validatePath(relativePath)
         return fs.readFile(filePath)
     }
 
     /**
      * Deletes a stored file.
      * @param relativePath - Filename previously returned by `save`
+     * @throws Error if path traversal is detected
      */
     async delete(relativePath: string): Promise<void> {
-        const filePath = path.join(this.baseDir, relativePath)
+        const filePath = this.#validatePath(relativePath)
         await fs.rm(filePath, { force: true })
     }
 
@@ -58,9 +79,10 @@ export class LocalStorageService extends StorageService {
      * @param buffer - Content to save
      * @param relativePath - Full relative path including filename (e.g., 'tilesets/123/tileset.json')
      * @returns The same relative path that was provided
+     * @throws Error if path traversal is detected
      */
     async saveWithPath(buffer: Buffer, relativePath: string): Promise<string> {
-        const filePath = path.join(this.baseDir, relativePath)
+        const filePath = this.#validatePath(relativePath)
         const dirPath = path.dirname(filePath)
 
         await fs.mkdir(dirPath, { recursive: true })
@@ -75,8 +97,11 @@ export class LocalStorageService extends StorageService {
      * In production, use a cloud storage service (OVH, S3) for public URLs.
      * @param relativePath - The storage path of the file
      * @returns The file path (relative to baseDir)
+     * @throws Error if path traversal is detected
      */
     getPublicUrl(relativePath: string): string {
+        // Validate path to prevent traversal (even though this just returns a string)
+        this.#validatePath(relativePath)
         // For local storage, return the file path
         // In a real deployment, you'd need Express static serving or similar
         return path.join(this.baseDir, relativePath)
@@ -86,9 +111,10 @@ export class LocalStorageService extends StorageService {
      * Deletes all files under a given prefix (folder).
      * @param prefix - The folder/prefix to delete (e.g., 'tilesets/123')
      * @returns Number of files deleted
+     * @throws Error if path traversal is detected
      */
     async deleteByPrefix(prefix: string): Promise<number> {
-        const folderPath = path.join(this.baseDir, prefix)
+        const folderPath = this.#validatePath(prefix)
 
         try {
             // Check if folder exists
