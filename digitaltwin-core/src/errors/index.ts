@@ -36,11 +36,11 @@ export abstract class DigitalTwinError extends Error {
 }
 
 /**
- * Validation error - invalid input data (400)
+ * Validation error - invalid input data (422 Unprocessable Entity)
  */
 export class ValidationError extends DigitalTwinError {
     readonly code = 'VALIDATION_ERROR' as const
-    readonly statusCode = 400 as const
+    readonly statusCode = 422 as const
 }
 
 /**

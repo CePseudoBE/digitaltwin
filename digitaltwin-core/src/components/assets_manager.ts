@@ -24,6 +24,8 @@ import {
 import fs from 'fs/promises'
 import { safeAsync } from '../utils/safe_async.js'
 import { Logger } from '../utils/logger.js'
+import { validateAssetUpdate, validateIdParam, validatePagination } from '../validation/index.js'
+import { validateData, validateQuery, validateParams } from '../validation/validate.js'
 
 const logger = new Logger('AssetsManager')
 
@@ -588,13 +590,10 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
     private async fetchAssetWithAccessCheck(
         req: any
     ): Promise<{ success: true; asset: DataRecord } | { success: false; response: DataResponse }> {
-        const { id } = req.params || {}
+        // Validate ID parameter (ValidationError bubbles up to global handler -> 422)
+        const validatedParams = await validateParams<{ id: number }>(validateIdParam, req.params || {}, 'Asset ID')
 
-        if (!id) {
-            return { success: false, response: badRequestResponse('Asset ID is required') }
-        }
-
-        const asset = await this.getAssetById(id)
+        const asset = await this.getAssetById(validatedParams.id.toString())
         if (!asset) {
             return { success: false, response: textResponse(HttpStatus.NOT_FOUND, 'Asset not found') }
         }
@@ -682,23 +681,39 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      */
     async retrieve(req?: any): Promise<DataResponse> {
         try {
+            // Validate pagination parameters if present (ValidationError bubbles up to global handler -> 422)
+            let pagination: { limit?: number; offset?: number } = {}
+            if (req?.query && Object.keys(req.query).length > 0) {
+                pagination = await validateQuery<{ limit?: number; offset?: number }>(
+                    validatePagination,
+                    req.query,
+                    'Pagination'
+                )
+            }
+
             const assets = await this.getAllAssets()
             const isAdmin = req && ApisixAuthParser.isAdmin(req.headers || {})
 
             // Admin can see everything
+            let visibleAssets: DataRecord[]
             if (isAdmin) {
-                return successResponse(this.formatAssetsForResponse(assets))
+                visibleAssets = assets
+            } else {
+                // Get authenticated user ID if available
+                const authenticatedUserId = await this.getAuthenticatedUserId(req)
+
+                // Filter to visible assets only
+                visibleAssets = assets.filter(
+                    asset => asset.is_public || (authenticatedUserId !== null && asset.owner_id === authenticatedUserId)
+                )
             }
 
-            // Get authenticated user ID if available
-            const authenticatedUserId = await this.getAuthenticatedUserId(req)
+            // Apply pagination
+            const offset = pagination.offset ?? 0
+            const limit = pagination.limit ?? visibleAssets.length
+            const paginatedAssets = visibleAssets.slice(offset, offset + limit)
 
-            // Filter to visible assets only
-            const visibleAssets = assets.filter(
-                asset => asset.is_public || (authenticatedUserId !== null && asset.owner_id === authenticatedUserId)
-            )
-
-            return successResponse(this.formatAssetsForResponse(visibleAssets))
+            return successResponse(this.formatAssetsForResponse(paginatedAssets))
         } catch (error) {
             return errorResponse(error)
         }
@@ -1485,12 +1500,17 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
                 return errorResponse('Failed to retrieve user information')
             }
 
-            const { id } = req.params || {}
-            const { description, source, is_public } = req.body || {}
+            // Validate ID parameter (ValidationError bubbles up to global handler -> 422)
+            const validatedParams = await validateParams<{ id: number }>(validateIdParam, req.params || {}, 'Asset ID')
 
-            if (!id) {
-                return badRequestResponse('Asset ID is required')
-            }
+            // Validate request body (ValidationError bubbles up to global handler -> 422)
+            const validatedBody = await validateData<{ description?: string; source?: string; is_public?: boolean }>(
+                validateAssetUpdate,
+                req.body || {},
+                'Asset update'
+            )
+
+            const { description, source, is_public } = validatedBody
 
             if (!description && !source && is_public === undefined) {
                 return badRequestResponse(
@@ -1499,7 +1519,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             }
 
             // Check if asset exists
-            const asset = await this.getAssetById(id)
+            const asset = await this.getAssetById(validatedParams.id.toString())
             if (!asset) {
                 return notFoundResponse('Asset not found')
             }
@@ -1516,7 +1536,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             if (source !== undefined) updates.source = source
             if (is_public !== undefined) updates.is_public = Boolean(is_public)
 
-            await this.updateAssetMetadata(id, updates)
+            await this.updateAssetMetadata(validatedParams.id.toString(), updates)
 
             return successResponse({ message: 'Asset metadata updated successfully' })
         } catch (error) {
@@ -1618,13 +1638,11 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
                 return errorResponse('Failed to retrieve user information')
             }
 
-            const { id } = req.params || {}
-            if (!id) {
-                return badRequestResponse('Asset ID is required')
-            }
+            // Validate ID parameter (ValidationError bubbles up to global handler -> 422)
+            const validatedParams = await validateParams<{ id: number }>(validateIdParam, req.params || {}, 'Asset ID')
 
             // Check if asset exists
-            const asset = await this.getAssetById(id)
+            const asset = await this.getAssetById(validatedParams.id.toString())
             if (!asset) {
                 return notFoundResponse('Asset not found')
             }
@@ -1635,7 +1653,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
                 return ownershipError
             }
 
-            await this.deleteAssetById(id)
+            await this.deleteAssetById(validatedParams.id.toString())
             return successResponse({ message: 'Asset deleted successfully' })
         } catch (error) {
             return errorResponse(error)

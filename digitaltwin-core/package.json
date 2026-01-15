@@ -92,6 +92,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.850.0",
+    "@vinejs/vine": "^4.2.0",
     "bullmq": "^5.56.5",
     "cors": "^2.8.5",
     "ioredis": "^5.6.1",
