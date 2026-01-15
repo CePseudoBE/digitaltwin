@@ -827,23 +827,21 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             throw new Error(`Asset ${id} does not belong to component ${config.name}`)
         }
 
-        // Apply updates, keeping existing values for non-updated fields
-        const updatedMetadata: AssetMetadataRow = {
-            id: parseInt(id),
-            name: config.name,
-            type: record.contentType,
-            url: record.url,
-            date: record.date, // Keep original date
-            description: updates.description ?? record.description ?? '',
-            source: updates.source ?? record.source ?? '',
-            owner_id: record.owner_id ?? null,
-            filename: record.filename ?? '',
-            is_public: updates.is_public !== undefined ? updates.is_public : (record.is_public ?? true)
+        // Apply updates - only include fields that are being updated
+        const updateData: Partial<{ description: string; source: string; is_public: boolean }> = {}
+
+        if (updates.description !== undefined) {
+            updateData.description = updates.description
+        }
+        if (updates.source !== undefined) {
+            updateData.source = updates.source
+        }
+        if (updates.is_public !== undefined) {
+            updateData.is_public = updates.is_public
         }
 
-        // Update the record - delete and re-create with updated metadata
-        await this.db.delete(id, this.getConfiguration().name)
-        await this.db.save(updatedMetadata)
+        // Use true UPDATE to preserve the record ID
+        await this.db.updateAssetMetadata(config.name, parseInt(id), updateData)
     }
 
     /**
