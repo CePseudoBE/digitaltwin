@@ -91,12 +91,15 @@ export class UploadProcessor {
 
             // Validate tileset.json exists
             if (!extractResult.root_file) {
-                // Clean up uploaded files
-                await safeAsync(
-                    () => this.storage.deleteByPrefix(basePath!),
-                    'cleanup storage on invalid tileset',
-                    logger
-                )
+                // Clean up uploaded files (basePath is always set at this point)
+                if (basePath) {
+                    const pathToDelete = basePath
+                    await safeAsync(
+                        () => this.storage.deleteByPrefix(pathToDelete),
+                        'cleanup storage on invalid tileset',
+                        logger
+                    )
+                }
                 throw new Error('Invalid tileset: no tileset.json found in the ZIP archive')
             }
 

@@ -722,12 +722,14 @@ export class DigitalTwinEngine {
     }
 
     async #drainQueues(): Promise<void> {
+        if (!this.#queueManager) return
+
         const timeout = Math.min(this.#shutdownTimeout / 2, 15000)
         const startTime = Date.now()
 
         while (Date.now() - startTime < timeout) {
             try {
-                const stats = await this.#queueManager!.getQueueStats()
+                const stats = await this.#queueManager.getQueueStats()
                 const totalActive = Object.values(stats).reduce((sum, q) => sum + (q.active || 0), 0)
 
                 if (totalActive === 0) break

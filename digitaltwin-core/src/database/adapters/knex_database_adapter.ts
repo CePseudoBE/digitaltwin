@@ -117,7 +117,28 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
 
     // ========== Basic methods ==========
 
+    /**
+     * Validates that a table name is safe for SQL operations.
+     * Prevents SQL injection via table names.
+     * @param name - The table name to validate
+     * @throws Error if the table name is invalid
+     */
+    #validateTableName(name: string): void {
+        // Must start with letter or underscore, followed by alphanumeric or underscores
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+            throw new Error(
+                `Invalid table name: "${name}". Must start with a letter or underscore and contain only alphanumeric characters and underscores.`
+            )
+        }
+
+        // PostgreSQL max identifier length is 63, SQLite has no practical limit
+        if (name.length > 63) {
+            throw new Error(`Table name too long: "${name}". Maximum 63 characters allowed.`)
+        }
+    }
+
     async save(meta: MetadataRow): Promise<DataRecord> {
+        this.#validateTableName(meta.name)
         const insertData: any = {
             id: meta.id,
             name: meta.name,
@@ -152,24 +173,29 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     }
 
     async delete(id: string, name: string): Promise<void> {
+        this.#validateTableName(name)
         await this.#knex(name).where({ id }).delete()
     }
 
     async getById(id: string, name: string): Promise<DataRecord | undefined> {
+        this.#validateTableName(name)
         const row = await this.#knex(name).where({ id }).first()
         return row ? mapToDataRecord(row, this.#storage) : undefined
     }
 
     async getLatestByName(name: string): Promise<DataRecord | undefined> {
+        this.#validateTableName(name)
         const row = await this.#knex(name).select('*').orderBy('date', 'desc').limit(1).first()
         return row ? mapToDataRecord(row, this.#storage) : undefined
     }
 
     async doesTableExists(name: string): Promise<boolean> {
+        this.#validateTableName(name)
         return this.#knex.schema.hasTable(name)
     }
 
     async createTable(name: string): Promise<void> {
+        this.#validateTableName(name)
         const tableExists = await this.#knex.schema.hasTable(name)
 
         if (!tableExists) {
@@ -216,6 +242,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     }
 
     async createTableWithColumns(name: string, columns: Record<string, string>): Promise<void> {
+        this.#validateTableName(name)
         const tableExists = await this.#knex.schema.hasTable(name)
 
         if (!tableExists) {
@@ -293,6 +320,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
      * @returns {Promise<string[]>} Array of migration messages describing what was done
      */
     async migrateTableSchema(name: string): Promise<string[]> {
+        this.#validateTableName(name)
         const tableExists = await this.#knex.schema.hasTable(name)
         if (!tableExists) {
             return [] // Table doesn't exist, nothing to migrate
@@ -431,11 +459,13 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     // ========== Extended methods ==========
 
     async getFirstByName(name: string): Promise<DataRecord | undefined> {
+        this.#validateTableName(name)
         const row = await this.#knex(name).orderBy('date', 'asc').first()
         return row ? mapToDataRecord(row, this.#storage) : undefined
     }
 
     async getByDateRange(name: string, startDate: Date, endDate?: Date, limit?: number): Promise<DataRecord[]> {
+        this.#validateTableName(name)
         let query = this.#knex(name).select('*').where('date', '>=', startDate.toISOString())
 
         if (endDate) {
@@ -453,6 +483,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     }
 
     async getAfterDate(name: string, afterDate: Date, limit?: number): Promise<DataRecord[]> {
+        this.#validateTableName(name)
         let query = this.#knex(name).where('date', '>', afterDate.toISOString()).orderBy('date', 'asc')
 
         if (limit) {
@@ -464,11 +495,13 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     }
 
     async getLatestBefore(name: string, beforeDate: Date): Promise<DataRecord | undefined> {
+        this.#validateTableName(name)
         const row = await this.#knex(name).where('date', '<', beforeDate.toISOString()).orderBy('date', 'desc').first()
         return row ? mapToDataRecord(row, this.#storage) : undefined
     }
 
     async getLatestRecordsBefore(name: string, beforeDate: Date, limit: number): Promise<DataRecord[]> {
+        this.#validateTableName(name)
         const rows = await this.#knex(name)
             .where('date', '<', beforeDate.toISOString())
             .orderBy('date', 'desc')
@@ -478,6 +511,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     }
 
     async hasRecordsAfterDate(name: string, afterDate: Date): Promise<boolean> {
+        this.#validateTableName(name)
         const result = await this.#knex(name)
             .where('date', '>', afterDate.toISOString())
             .select(this.#knex.raw('1'))
@@ -488,6 +522,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     }
 
     async countByDateRange(name: string, startDate: Date, endDate?: Date): Promise<number> {
+        this.#validateTableName(name)
         let query = this.#knex(name).where('date', '>=', startDate.toISOString())
 
         if (endDate) {
@@ -503,6 +538,11 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     async saveBatch(metadataList: MetadataRow[]): Promise<DataRecord[]> {
         if (metadataList.length === 0) return []
 
+        // Validate all table names upfront
+        for (const meta of metadataList) {
+            this.#validateTableName(meta.name)
+        }
+
         // Group by table name for efficient batch inserts
         const groupedByTable = new Map<string, MetadataRow[]>()
 
@@ -515,45 +555,52 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
             }
         }
 
-        const results: DataRecord[] = []
+        // Use transaction for atomicity - all or nothing
+        return this.#knex.transaction(async trx => {
+            const results: DataRecord[] = []
 
-        // Process each table in a transaction for consistency
-        for (const [tableName, metas] of groupedByTable) {
-            const insertData = metas.map(meta => {
-                const data: any = {
-                    name: meta.name,
-                    type: meta.type,
-                    url: meta.url,
-                    date: meta.date.toISOString()
+            for (const [tableName, metas] of groupedByTable) {
+                const insertData = metas.map(meta => {
+                    const data: any = {
+                        name: meta.name,
+                        type: meta.type,
+                        url: meta.url,
+                        date: meta.date.toISOString()
+                    }
+
+                    // Only include ID if it's explicitly set (for updates)
+                    if (meta.id !== undefined) {
+                        data.id = meta.id
+                    }
+
+                    // Add asset-specific fields if present
+                    if ('description' in meta) data.description = meta.description
+                    if ('source' in meta) data.source = meta.source
+                    if ('owner_id' in meta) data.owner_id = meta.owner_id
+                    if ('filename' in meta) data.filename = meta.filename
+
+                    return data
+                })
+
+                await trx(tableName).insert(insertData)
+
+                // Convert to DataRecords
+                for (const meta of metas) {
+                    results.push(mapToDataRecord(meta, this.#storage))
                 }
-
-                // Only include ID if it's explicitly set (for updates)
-                if (meta.id !== undefined) {
-                    data.id = meta.id
-                }
-
-                // Add asset-specific fields if present
-                if ('description' in meta) data.description = meta.description
-                if ('source' in meta) data.source = meta.source
-                if ('owner_id' in meta) data.owner_id = meta.owner_id
-                if ('filename' in meta) data.filename = meta.filename
-
-                return data
-            })
-
-            await this.#knex(tableName).insert(insertData)
-
-            // Convert to DataRecords
-            for (const meta of metas) {
-                results.push(mapToDataRecord(meta, this.#storage))
             }
-        }
 
-        return results
+            return results
+        })
     }
 
     async deleteBatch(deleteRequests: Array<{ id: string; name: string }>): Promise<void> {
         if (deleteRequests.length === 0) return
+
+        // Validate all table names upfront
+        for (const req of deleteRequests) {
+            this.#validateTableName(req.name)
+        }
 
         // Group by table name for efficient batch deletes
         const groupedByTable = new Map<string, string[]>()
@@ -567,14 +614,21 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
             }
         }
 
-        // Process each table
-        for (const [tableName, ids] of groupedByTable) {
-            await this.#knex(tableName).whereIn('id', ids).delete()
-        }
+        // Use transaction for atomicity - all or nothing
+        await this.#knex.transaction(async trx => {
+            for (const [tableName, ids] of groupedByTable) {
+                await trx(tableName).whereIn('id', ids).delete()
+            }
+        })
     }
 
     async getByIdsBatch(requests: Array<{ id: string; name: string }>): Promise<DataRecord[]> {
         if (requests.length === 0) return []
+
+        // Validate all table names upfront
+        for (const req of requests) {
+            this.#validateTableName(req.name)
+        }
 
         const results: DataRecord[] = []
 
@@ -611,6 +665,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         records: DataRecord[]
         total: number
     }> {
+        this.#validateTableName(name)
         // Get total count efficiently
         const countResult = await this.#knex(name).count('* as count').first()
         const total = Number(countResult?.count) || 0
@@ -623,9 +678,48 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         return { records, total }
     }
 
+    async updateAssetMetadata(
+        tableName: string,
+        id: number,
+        data: Partial<{ description: string; source: string; is_public: boolean }>
+    ): Promise<DataRecord> {
+        this.#validateTableName(tableName)
+
+        const updateData: Record<string, unknown> = {}
+
+        // Only update fields that are explicitly provided
+        if (data.description !== undefined) updateData.description = data.description
+        if (data.source !== undefined) updateData.source = data.source
+        if (data.is_public !== undefined) updateData.is_public = data.is_public
+
+        if (Object.keys(updateData).length === 0) {
+            // Nothing to update, just return the existing record
+            const existing = await this.getById(String(id), tableName)
+            if (!existing) {
+                throw new Error(`Record with ID ${id} not found in table ${tableName}`)
+            }
+            return existing
+        }
+
+        const rowsAffected = await this.#knex(tableName).where('id', id).update(updateData)
+
+        if (rowsAffected === 0) {
+            throw new Error(`Record with ID ${id} not found in table ${tableName}`)
+        }
+
+        // Return the updated record
+        const updated = await this.getById(String(id), tableName)
+        if (!updated) {
+            throw new Error(`Failed to retrieve updated record ${id} from table ${tableName}`)
+        }
+
+        return updated
+    }
+
     // ========== Methods for CustomTableManager ==========
 
     async findByConditions(tableName: string, conditions: Record<string, any>): Promise<DataRecord[]> {
+        this.#validateTableName(tableName)
         let query = this.#knex(tableName).select('*')
 
         // Apply each condition
@@ -649,6 +743,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     }
 
     async updateById(tableName: string, id: number, data: Record<string, any>): Promise<void> {
+        this.#validateTableName(tableName)
         // Create a clean update object with updated_at timestamp
         const updateData: Record<string, any> = {
             ...data,
@@ -684,6 +779,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
      * This bypasses mapToDataRecord() which assumes standard table structure
      */
     async findCustomTableRecords(tableName: string, conditions: Record<string, any> = {}): Promise<any[]> {
+        this.#validateTableName(tableName)
         let query = this.#knex(tableName).select('*')
 
         // Apply each condition
@@ -707,6 +803,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
      * Get a single custom table record by ID (returns raw database row, not DataRecord)
      */
     async getCustomTableRecordById(tableName: string, id: number): Promise<any | null> {
+        this.#validateTableName(tableName)
         const row = await this.#knex(tableName).where({ id }).first()
         return row || null
     }
@@ -715,6 +812,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
      * Insert a record into a custom table (returns the new record ID)
      */
     async insertCustomTableRecord(tableName: string, data: Record<string, any>): Promise<number> {
+        this.#validateTableName(tableName)
         const now = new Date()
         const insertData = {
             ...data,
