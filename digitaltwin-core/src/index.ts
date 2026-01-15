@@ -54,6 +54,9 @@ export * from './auth/index.js'
 // Errors
 export * from './errors/index.js'
 
+// Validation
+export * from './validation/index.js'
+
 // Utilities
 export { Logger, LogLevel } from './utils/logger.js'
 export { safeAsync, tryAsync, safeCleanup, retryAsync } from './utils/safe_async.js'
