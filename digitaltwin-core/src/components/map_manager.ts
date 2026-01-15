@@ -50,7 +50,7 @@ export abstract class MapManager extends AssetsManager {
      * @param req - HTTP request with layer JSON data
      * @returns DataResponse with upload result
      */
-    async handleUpload(req: any): Promise<DataResponse> {
+    override async handleUpload(req: any): Promise<DataResponse> {
         try {
             if (!req || !req.body) {
                 return {
@@ -248,7 +248,7 @@ export abstract class MapManager extends AssetsManager {
     /**
      * Override retrieve to include layer-specific metadata in the response
      */
-    async retrieve(): Promise<DataResponse> {
+    override async retrieve(): Promise<DataResponse> {
         try {
             const assets = await this.getAllAssets()
             const config = this.getConfiguration()

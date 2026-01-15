@@ -47,6 +47,7 @@ export { KnexDatabaseAdapter, PostgreSQLConfig, SQLiteConfig } from './database/
 export * from './components/types.js'
 export * from './components/interfaces.js'
 export * from './types/data_record.js'
+export * from './types/http.js'
 
 // Authentication
 export * from './auth/index.js'
