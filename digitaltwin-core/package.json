@@ -1,6 +1,6 @@
 {
   "name": "digitaltwin-core",
-  "version": "0.14.3",
+  "version": "1.0.0",
   "description": "Minimalist framework to collect and handle data in a Digital Twin project",
   "license": "MIT",
   "author": "Axel Hoffmann",
