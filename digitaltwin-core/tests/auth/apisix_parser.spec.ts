@@ -7,6 +7,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = {
       'x-user-id': '6e06a527-a89d-4390-95cd-10ae63cfc939',
@@ -25,6 +26,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = {
       'x-user-roles': 'admin,user'
@@ -40,6 +42,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = {
       'x-user-id': '12345-67890',
@@ -58,6 +61,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = {
       'x-user-id': '12345-67890'
@@ -75,6 +79,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = {
       'x-user-id': '12345',
@@ -92,6 +97,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '12345' }
     assert.isTrue(ApisixAuthParser.hasValidAuth(headers))
@@ -102,6 +108,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-roles': 'admin' }
     assert.isFalse(ApisixAuthParser.hasValidAuth(headers))
@@ -112,6 +119,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '' }
     assert.isFalse(ApisixAuthParser.hasValidAuth(headers))
@@ -122,6 +130,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '12345-67890' }
     const result = ApisixAuthParser.getUserId(headers)
@@ -133,6 +142,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'other-header': 'value' }
     const result = ApisixAuthParser.getUserId(headers)
@@ -144,6 +154,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-roles': 'admin,user,manager' }
     const result = ApisixAuthParser.getUserRoles(headers)
@@ -155,6 +166,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '12345' }
     const result = ApisixAuthParser.getUserRoles(headers)
@@ -166,6 +178,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-roles': 'admin' }
     const result = ApisixAuthParser.getUserRoles(headers)
@@ -177,6 +190,7 @@ test.group('ApisixAuthParser', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-roles': ' admin , user , manager ' }
     const result = ApisixAuthParser.getUserRoles(headers)
@@ -189,6 +203,7 @@ test.group('ApisixAuthParser.isAdmin()', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ADMIN_ROLE_NAME
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '123', 'x-user-roles': 'user,admin,manager' }
     assert.isTrue(ApisixAuthParser.isAdmin(headers))
@@ -198,6 +213,7 @@ test.group('ApisixAuthParser.isAdmin()', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ADMIN_ROLE_NAME
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '123', 'x-user-roles': 'user,manager' }
     assert.isFalse(ApisixAuthParser.isAdmin(headers))
@@ -207,6 +223,7 @@ test.group('ApisixAuthParser.isAdmin()', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ADMIN_ROLE_NAME
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '123' }
     assert.isFalse(ApisixAuthParser.isAdmin(headers))
@@ -216,6 +233,7 @@ test.group('ApisixAuthParser.isAdmin()', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     process.env.DIGITALTWIN_ADMIN_ROLE_NAME = 'superadmin'
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '123', 'x-user-roles': 'user,superadmin' }
     assert.isTrue(ApisixAuthParser.isAdmin(headers))
@@ -226,18 +244,21 @@ test.group('ApisixAuthParser.isAdmin()', () => {
 
     delete process.env.DIGITALTWIN_ADMIN_ROLE_NAME
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
   })
 
   test('should handle Keycloak realm-style admin roles', ({ assert }) => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     process.env.DIGITALTWIN_ADMIN_ROLE_NAME = 'realm-management'
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '123', 'x-user-roles': 'default-roles-master,realm-management' }
     assert.isTrue(ApisixAuthParser.isAdmin(headers))
 
     delete process.env.DIGITALTWIN_ADMIN_ROLE_NAME
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
   })
 })
 
@@ -246,6 +267,7 @@ test.group('ApisixAuthParser with auth disabled', () => {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const result = ApisixAuthParser.parseAuthHeaders({})
 
@@ -255,12 +277,14 @@ test.group('ApisixAuthParser with auth disabled', () => {
 
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
   })
 
   test('parseAuthHeaders() should use custom anonymous user ID', ({ assert }) => {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     process.env.DIGITALTWIN_ANONYMOUS_USER_ID = 'dev-user-local'
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const result = ApisixAuthParser.parseAuthHeaders({})
 
@@ -270,23 +294,27 @@ test.group('ApisixAuthParser with auth disabled', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
   })
 
   test('hasValidAuth() should always return true when auth disabled', ({ assert }) => {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     assert.isTrue(ApisixAuthParser.hasValidAuth({}))
     assert.isTrue(ApisixAuthParser.hasValidAuth({ 'other': 'header' }))
 
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
   })
 
   test('getUserId() should return anonymous ID when auth disabled', ({ assert }) => {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     process.env.DIGITALTWIN_ANONYMOUS_USER_ID = 'test-anon'
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const result = ApisixAuthParser.getUserId({})
     assert.equal(result, 'test-anon')
@@ -294,28 +322,33 @@ test.group('ApisixAuthParser with auth disabled', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
   })
 
   test('getUserRoles() should return anonymous roles when auth disabled', ({ assert }) => {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const result = ApisixAuthParser.getUserRoles({})
     assert.deepEqual(result, ['anonymous'])
 
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
   })
 
   test('isAdmin() should return false for anonymous user', ({ assert }) => {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     // Anonymous user has role 'anonymous', not 'admin'
     assert.isFalse(ApisixAuthParser.isAdmin({}))
 
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
   })
 })
 
@@ -323,6 +356,7 @@ test.group('ApisixAuthParser edge cases', () => {
   test('should handle special characters in user ID', ({ assert }) => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': 'user@example.com' }
     const result = ApisixAuthParser.parseAuthHeaders(headers)
@@ -334,6 +368,7 @@ test.group('ApisixAuthParser edge cases', () => {
   test('should handle UUID-style user IDs', ({ assert }) => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '550e8400-e29b-41d4-a716-446655440000' }
     const result = ApisixAuthParser.parseAuthHeaders(headers)
@@ -345,6 +380,7 @@ test.group('ApisixAuthParser edge cases', () => {
   test('should handle role names with special characters', ({ assert }) => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = {
       'x-user-id': '123',
@@ -358,6 +394,7 @@ test.group('ApisixAuthParser edge cases', () => {
   test('should handle very long role lists', ({ assert }) => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const roles = Array.from({ length: 100 }, (_, i) => `role${i}`)
     const headers = {
@@ -374,6 +411,7 @@ test.group('ApisixAuthParser edge cases', () => {
   test('should handle empty string user ID as invalid', ({ assert }) => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = { 'x-user-id': '' }
     assert.isFalse(ApisixAuthParser.hasValidAuth(headers))
@@ -383,6 +421,7 @@ test.group('ApisixAuthParser edge cases', () => {
   test('should handle whitespace-only user ID', ({ assert }) => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     // Whitespace is technically a valid value (even if unusual)
     const headers = { 'x-user-id': '   ' }
@@ -392,6 +431,7 @@ test.group('ApisixAuthParser edge cases', () => {
   test('should filter empty roles from split', ({ assert }) => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     const headers = {
       'x-user-id': '123',
@@ -408,6 +448,7 @@ test.group('ApisixAuthParser edge cases', () => {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ADMIN_ROLE_NAME
     AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 
     // 'Admin' !== 'admin'
     const headers = { 'x-user-id': '123', 'x-user-roles': 'Admin,USER' }

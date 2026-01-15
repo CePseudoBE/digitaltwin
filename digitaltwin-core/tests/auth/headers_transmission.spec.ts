@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { AssetsManager } from '../../src/components/assets_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
-import { AuthConfig } from '../../src/auth/auth_config.js'
+import { AuthConfig, ApisixAuthParser } from '../../src/auth/index.js'
 import type { AssetsManagerConfiguration } from '../../src/components/types.js'
 
 class HeaderTestAssetsManager extends AssetsManager {
@@ -29,17 +29,19 @@ class HeaderTestAssetsManager extends AssetsManager {
   }
 }
 
-test.group('Headers Transmission via ultimate-express', (group) => {
-  // Some tests in this group require auth to be enabled
-  group.setup(() => {
-    delete process.env.DIGITALTWIN_DISABLE_AUTH
-    AuthConfig._resetConfig()
-  })
+test.group('Headers Transmission via ultimate-express', group => {
+    // Some tests in this group require auth to be enabled
+    group.setup(() => {
+        delete process.env.DIGITALTWIN_DISABLE_AUTH
+        AuthConfig._resetConfig()
+        ApisixAuthParser._resetProvider()
+    })
 
-  group.teardown(() => {
-    process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-    AuthConfig._resetConfig()
-  })
+    group.teardown(() => {
+        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
+        AuthConfig._resetConfig()
+        ApisixAuthParser._resetProvider()
+    })
 
   test('AssetsManager should receive all headers from request object', async ({ assert }) => {
     const db = new MockDatabaseAdapter()

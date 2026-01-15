@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { AssetsManager } from '../../src/components/assets_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
-import { AuthConfig } from '../../src/auth/auth_config.js'
+import { AuthConfig, ApisixAuthParser } from '../../src/auth/index.js'
 import type { AssetsConfiguration, DataResponse } from '../../src/components/types.js'
 import path from 'path'
 import os from 'os'
@@ -25,15 +25,17 @@ const mockStorage = new LocalStorageService(tempDir)
 
 // Helper function to ensure auth is enabled for tests
 function ensureAuthEnabled() {
-  delete process.env.DIGITALTWIN_DISABLE_AUTH
-  delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
-  AuthConfig._resetConfig()
+    delete process.env.DIGITALTWIN_DISABLE_AUTH
+    delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
+    AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 }
 
 // Helper function to restore test environment (auth disabled)
 function restoreTestEnv() {
-  process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-  AuthConfig._resetConfig()
+    process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
+    AuthConfig._resetConfig()
+    ApisixAuthParser._resetProvider()
 }
 
 test.group('AssetsManager Authentication', (group) => {
