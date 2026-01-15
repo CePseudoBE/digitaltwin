@@ -597,6 +597,33 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
         return records
     }
 
+    // ========== AssetsManager methods ==========
+
+    async updateAssetMetadata(
+        tableName: string,
+        id: number,
+        data: Partial<{ description: string; source: string; is_public: boolean }>
+    ): Promise<DataRecord> {
+        const record = this.records.get(id.toString())
+
+        if (!record || record.name !== tableName) {
+            throw new Error(`Record with ID ${id} not found in table ${tableName}`)
+        }
+
+        // Update the fields that are provided
+        if (data.description !== undefined) {
+            ;(record as any).description = data.description
+        }
+        if (data.source !== undefined) {
+            ;(record as any).source = data.source
+        }
+        if (data.is_public !== undefined) {
+            ;(record as any).is_public = data.is_public
+        }
+
+        return record
+    }
+
     // ========== CustomTableManager methods ==========
 
     async createTableWithColumns(name: string, columns: Record<string, string>): Promise<void> {
