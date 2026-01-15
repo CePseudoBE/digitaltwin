@@ -348,3 +348,571 @@ test.group('TilesetManager with auth disabled', group => {
         }
     })
 })
+
+test.group('TilesetManager.handleGetStatus', group => {
+    group.setup(() => {
+        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
+        AuthConfig._resetConfig()
+        ApisixAuthParser._resetProvider()
+    })
+
+    group.teardown(() => {
+        restoreTestEnv()
+    })
+
+    test('returns 400 when id is missing', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-status-no-id')
+        manager.setDependencies(db, storage)
+
+        const response = await manager.handleGetStatus({ params: {} })
+
+        assert.equal(response.status, 400)
+        const parsed = JSON.parse(response.content as string)
+        assert.include(parsed.error, 'required')
+    })
+
+    test('returns 404 for non-existent tileset', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-status-not-found')
+        manager.setDependencies(db, storage)
+
+        const response = await manager.handleGetStatus({ params: { id: '999' } })
+
+        assert.equal(response.status, 404)
+    })
+
+    test('returns completed status with tileset_url', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-status-completed')
+        manager.setDependencies(db, storage)
+
+        // Create a completed tileset record
+        const record = await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: 'test-tilesets/123',
+            tileset_url: 'https://example.com/test-tilesets/123/tileset.json',
+            date: new Date(),
+            description: 'Test',
+            filename: 'test.zip',
+            owner_id: 1,
+            upload_status: 'completed'
+        })
+
+        const response = await manager.handleGetStatus({ params: { id: String(record.id) } })
+
+        assert.equal(response.status, 200)
+        const parsed = JSON.parse(response.content as string)
+        assert.equal(parsed.status, 'completed')
+        assert.isDefined(parsed.tileset_url)
+    })
+
+    test('returns failed status with error message', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-status-failed')
+        manager.setDependencies(db, storage)
+
+        const record = await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: '',
+            tileset_url: '',
+            date: new Date(),
+            description: 'Test',
+            filename: 'test.zip',
+            owner_id: 1,
+            upload_status: 'failed',
+            upload_error: 'Extraction failed'
+        })
+
+        const response = await manager.handleGetStatus({ params: { id: String(record.id) } })
+
+        assert.equal(response.status, 200)
+        const parsed = JSON.parse(response.content as string)
+        assert.equal(parsed.status, 'failed')
+        assert.include(parsed.error, 'Extraction failed')
+    })
+
+    test('returns pending status with job_id', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-status-pending')
+        manager.setDependencies(db, storage)
+
+        const record = await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: '',
+            tileset_url: '',
+            date: new Date(),
+            description: 'Test',
+            filename: 'test.zip',
+            owner_id: 1,
+            upload_status: 'pending',
+            upload_job_id: 'job-456'
+        })
+
+        const response = await manager.handleGetStatus({ params: { id: String(record.id) } })
+
+        assert.equal(response.status, 200)
+        const parsed = JSON.parse(response.content as string)
+        assert.equal(parsed.status, 'pending')
+        assert.equal(parsed.job_id, 'job-456')
+    })
+})
+
+test.group('TilesetManager.handleDelete', group => {
+    group.setup(() => {
+        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
+        AuthConfig._resetConfig()
+        ApisixAuthParser._resetProvider()
+    })
+
+    group.teardown(() => {
+        restoreTestEnv()
+    })
+
+    test('returns 400 when id is missing', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-delete-no-id')
+        manager.setDependencies(db, storage)
+
+        const response = await manager.handleDelete({ params: {}, headers: {} })
+
+        assert.equal(response.status, 400)
+        const parsed = JSON.parse(response.content as string)
+        assert.include(parsed.error, 'required')
+    })
+
+    test('returns 404 for non-existent tileset', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-delete-not-found')
+        manager.setDependencies(db, storage)
+
+        const response = await manager.handleDelete({ params: { id: '999' }, headers: {} })
+
+        assert.equal(response.status, 404)
+    })
+
+    test('returns 409 when upload is in progress (pending)', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-delete-pending')
+        manager.setDependencies(db, storage)
+
+        const record = await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: '',
+            tileset_url: '',
+            date: new Date(),
+            description: 'Test',
+            filename: 'test.zip',
+            owner_id: 1,
+            upload_status: 'pending'
+        })
+
+        const response = await manager.handleDelete({ params: { id: String(record.id) }, headers: {} })
+
+        assert.equal(response.status, 409)
+        const parsed = JSON.parse(response.content as string)
+        assert.include(parsed.error, 'upload is in progress')
+    })
+
+    test('returns 409 when upload is processing', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-delete-processing')
+        manager.setDependencies(db, storage)
+
+        const record = await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: '',
+            tileset_url: '',
+            date: new Date(),
+            description: 'Test',
+            filename: 'test.zip',
+            owner_id: 1,
+            upload_status: 'processing'
+        })
+
+        const response = await manager.handleDelete({ params: { id: String(record.id) }, headers: {} })
+
+        assert.equal(response.status, 409)
+    })
+
+    test('deletes tileset using url prefix', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-delete-prefix')
+        manager.setDependencies(db, storage)
+
+        const record = await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: 'test-tilesets/123',
+            tileset_url: 'http://localhost/test-tilesets/123/tileset.json',
+            date: new Date(),
+            description: 'Test',
+            filename: 'test.zip',
+            owner_id: 1,
+            upload_status: 'completed'
+        })
+
+        const response = await manager.handleDelete({ params: { id: String(record.id) }, headers: {} })
+
+        assert.equal(response.status, 200)
+        const parsed = JSON.parse(response.content as string)
+        assert.include(parsed.message, 'deleted successfully')
+
+        // Verify record deleted
+        const found = await db.getById(String(record.id), 'test-tilesets')
+        assert.isUndefined(found)
+
+        await fs.rm('.test-delete-prefix', { recursive: true, force: true }).catch(() => {})
+    })
+
+    test('handles legacy file_index format', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-delete-legacy')
+        manager.setDependencies(db, storage)
+
+        const record = await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: '',
+            tileset_url: 'http://localhost/legacy/tileset.json',
+            date: new Date(),
+            description: 'Legacy tileset',
+            filename: 'legacy.zip',
+            owner_id: 1,
+            upload_status: 'completed',
+            file_index: {
+                files: [{ path: 'legacy/tileset.json' }, { path: 'legacy/tile.b3dm' }],
+                root_file: 'tileset.json'
+            }
+        })
+
+        const response = await manager.handleDelete({ params: { id: String(record.id) }, headers: {} })
+
+        assert.equal(response.status, 200)
+
+        await fs.rm('.test-delete-legacy', { recursive: true, force: true }).catch(() => {})
+    })
+})
+
+test.group('TilesetManager.handleDelete with auth', group => {
+    group.setup(() => {
+        ensureAuthEnabled()
+    })
+
+    group.teardown(() => {
+        restoreTestEnv()
+    })
+
+    test('returns 401 without auth', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-delete-noauth')
+        manager.setDependencies(db, storage)
+
+        const record = await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: 'test-tilesets/1',
+            tileset_url: 'https://example.com/1/tileset.json',
+            date: new Date(),
+            description: 'Test',
+            filename: 'test.zip',
+            owner_id: 1,
+            upload_status: 'completed'
+        })
+
+        const response = await manager.handleDelete({ params: { id: String(record.id) }, headers: {} })
+
+        assert.equal(response.status, 401)
+    })
+
+    test('returns 403 when user does not own tileset', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-delete-forbidden')
+        manager.setDependencies(db, storage)
+
+        // Create owner user
+        await db.getKnex()('users').insert({ keycloak_id: 'owner-1' })
+        const owner = await db.getKnex()('users').where('keycloak_id', 'owner-1').first()
+
+        // Create other user
+        await db.getKnex()('users').insert({ keycloak_id: 'other-user' })
+
+        const record = await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: 'test-tilesets/1',
+            tileset_url: 'https://example.com/1/tileset.json',
+            date: new Date(),
+            description: 'Test',
+            filename: 'test.zip',
+            owner_id: owner.id,
+            upload_status: 'completed'
+        })
+
+        const response = await manager.handleDelete({
+            params: { id: String(record.id) },
+            headers: { 'x-user-id': 'other-user', 'x-user-roles': 'user' }
+        })
+
+        assert.equal(response.status, 403)
+    })
+
+    test('allows admin to delete any tileset', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-delete-admin')
+        manager.setDependencies(db, storage)
+
+        await db.getKnex()('users').insert({ keycloak_id: 'owner-1' })
+        const owner = await db.getKnex()('users').where('keycloak_id', 'owner-1').first()
+
+        const record = await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: 'test-tilesets/1',
+            tileset_url: 'https://example.com/1/tileset.json',
+            date: new Date(),
+            description: 'Test',
+            filename: 'test.zip',
+            owner_id: owner.id,
+            upload_status: 'completed'
+        })
+
+        const response = await manager.handleDelete({
+            params: { id: String(record.id) },
+            headers: { 'x-user-id': 'admin-user', 'x-user-roles': 'admin' }
+        })
+
+        assert.equal(response.status, 200)
+
+        await fs.rm('.test-delete-admin', { recursive: true, force: true }).catch(() => {})
+    })
+})
+
+test.group('TilesetManager.retrieve filtering', group => {
+    group.setup(() => {
+        ensureAuthEnabled()
+    })
+
+    group.teardown(() => {
+        restoreTestEnv()
+    })
+
+    test('returns public tilesets for anonymous users', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-retrieve-public')
+        manager.setDependencies(db, storage)
+
+        await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: 'test-tilesets/1',
+            tileset_url: 'https://example.com/1/tileset.json',
+            date: new Date(),
+            description: 'Public tileset',
+            filename: 'public.zip',
+            owner_id: 1,
+            is_public: true
+        })
+
+        await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: 'test-tilesets/2',
+            tileset_url: 'https://example.com/2/tileset.json',
+            date: new Date(),
+            description: 'Private tileset',
+            filename: 'private.zip',
+            owner_id: 1,
+            is_public: false
+        })
+
+        const response = await manager.retrieve({ headers: {} })
+
+        assert.equal(response.status, 200)
+        const parsed = JSON.parse(response.content as string)
+        assert.lengthOf(parsed, 1)
+        assert.equal(parsed[0].description, 'Public tileset')
+    })
+
+    test('returns all tilesets for admin users', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-retrieve-admin')
+        manager.setDependencies(db, storage)
+
+        await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: 'test-tilesets/1',
+            tileset_url: 'https://example.com/1/tileset.json',
+            date: new Date(),
+            description: 'Public tileset',
+            filename: 'public.zip',
+            owner_id: 1,
+            is_public: true
+        })
+
+        await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: 'test-tilesets/2',
+            tileset_url: 'https://example.com/2/tileset.json',
+            date: new Date(),
+            description: 'Private tileset',
+            filename: 'private.zip',
+            owner_id: 1,
+            is_public: false
+        })
+
+        const response = await manager.retrieve({
+            headers: { 'x-user-id': 'admin-1', 'x-user-roles': 'admin' }
+        })
+
+        assert.equal(response.status, 200)
+        const parsed = JSON.parse(response.content as string)
+        assert.lengthOf(parsed, 2)
+    })
+
+    test('returns owned private tilesets to owner', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-retrieve-owner')
+        manager.setDependencies(db, storage)
+
+        // Create owner user
+        await db.getKnex()('users').insert({ keycloak_id: 'owner-user' })
+        const user = await db.getKnex()('users').where('keycloak_id', 'owner-user').first()
+
+        await db.save({
+            name: 'test-tilesets',
+            type: 'application/json',
+            url: 'test-tilesets/1',
+            tileset_url: 'https://example.com/1/tileset.json',
+            date: new Date(),
+            description: 'My private tileset',
+            filename: 'private.zip',
+            owner_id: user.id,
+            is_public: false
+        })
+
+        const response = await manager.retrieve({
+            headers: { 'x-user-id': 'owner-user', 'x-user-roles': 'user' }
+        })
+
+        assert.equal(response.status, 200)
+        const parsed = JSON.parse(response.content as string)
+        assert.lengthOf(parsed, 1)
+        assert.equal(parsed[0].description, 'My private tileset')
+    })
+})
+
+test.group('TilesetManager.getOpenAPISpec', () => {
+    test('returns valid OpenAPI spec', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-openapi')
+        manager.setDependencies(db, storage)
+
+        const spec = manager.getOpenAPISpec()
+
+        assert.isDefined(spec.paths)
+        assert.isDefined(spec.paths['/test-tilesets'])
+        assert.isDefined(spec.paths['/test-tilesets'].get)
+        assert.isDefined(spec.paths['/test-tilesets'].post)
+        assert.isDefined(spec.paths['/test-tilesets/{id}/status'])
+        assert.isDefined(spec.paths['/test-tilesets/{id}'])
+        assert.isDefined(spec.paths['/test-tilesets/{id}'].put)
+        assert.isDefined(spec.paths['/test-tilesets/{id}'].delete)
+    })
+
+    test('includes TilesetResponse schema', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-openapi-schema')
+        manager.setDependencies(db, storage)
+
+        const spec = manager.getOpenAPISpec()
+
+        assert.isDefined(spec.schemas)
+        assert.isDefined(spec.schemas!['TilesetResponse'])
+        assert.isDefined(spec.schemas!['TilesetResponse'].properties)
+        assert.isDefined(spec.schemas!['TilesetResponse'].properties!['tileset_url'])
+        assert.isDefined(spec.schemas!['TilesetResponse'].properties!['upload_status'])
+    })
+
+    test('includes tags', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-openapi-tags')
+        manager.setDependencies(db, storage)
+
+        const spec = manager.getOpenAPISpec()
+
+        assert.isDefined(spec.tags)
+        assert.lengthOf(spec.tags!, 1)
+        assert.equal(spec.tags![0].name, 'test-tilesets')
+        assert.isDefined(spec.tags![0].description)
+    })
+
+    test('includes 202 response for async upload', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-openapi-202')
+        manager.setDependencies(db, storage)
+
+        const spec = manager.getOpenAPISpec()
+        const postResponses = spec.paths['/test-tilesets'].post!.responses
+
+        assert.isDefined(postResponses!['202'])
+    })
+
+    test('includes 409 response for delete endpoint', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-openapi-409')
+        manager.setDependencies(db, storage)
+
+        const spec = manager.getOpenAPISpec()
+        const deleteResponses = spec.paths['/test-tilesets/{id}'].delete!.responses
+
+        assert.isDefined(deleteResponses!['409'])
+    })
+})
+
+test.group('TilesetManager.setUploadQueue', () => {
+    test('accepts upload queue', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-queue')
+        manager.setDependencies(db, storage)
+
+        // Mock queue
+        const mockQueue = {
+            add: async () => ({ id: 'job-1' })
+        } as any
+
+        // Should not throw
+        manager.setUploadQueue(mockQueue)
+        assert.isTrue(true)
+    })
+})
