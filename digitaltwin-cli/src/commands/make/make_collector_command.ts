@@ -1,19 +1,20 @@
 import { args, flags } from '@adonisjs/ace'
 import { BaseCommand } from '../base_command.js'
 import { StringUtils } from '../../utils/string_utils.js'
+import { validateComponentName, validateCronSchedule } from '../../utils/validators.js'
 import path from 'path'
 
 export class MakeCollectorCommand extends BaseCommand {
   static override commandName = 'make:collector'
   static override description = 'Generate a new collector component'
 
-  @args.string({ description: 'Component name' })
+  @args.string({ description: 'Component name (PascalCase, e.g., WeatherData)' })
   declare name: string
 
   @flags.string({ description: 'Description of the collector', flagName: 'description', alias: 'd' })
   declare componentDescription: string | undefined
 
-  @flags.string({ description: 'Cron schedule', flagName: 'schedule', alias: 's' })
+  @flags.string({ description: 'Cron schedule (e.g., "0 */5 * * * *")', flagName: 'schedule', alias: 's' })
   declare schedule: string | undefined
 
   @flags.string({ description: 'Custom endpoint name', flagName: 'endpoint' })
@@ -27,6 +28,30 @@ export class MakeCollectorCommand extends BaseCommand {
 
   override async run(): Promise<void> {
     try {
+      // Validate component name
+      const nameValidation = validateComponentName(this.name)
+      if (!nameValidation.valid) {
+        this.logger.error(nameValidation.error!)
+        if (nameValidation.suggestion) {
+          this.info(nameValidation.suggestion)
+        }
+        this.exitCode = 1
+        return
+      }
+
+      // Validate cron schedule if provided
+      if (this.schedule) {
+        const scheduleValidation = validateCronSchedule(this.schedule)
+        if (!scheduleValidation.valid) {
+          this.logger.error(scheduleValidation.error!)
+          if (scheduleValidation.suggestion) {
+            this.info(scheduleValidation.suggestion)
+          }
+          this.exitCode = 1
+          return
+        }
+      }
+
       await this.projectDetector.validateProject()
       const projectInfo = await this.projectDetector.getProjectInfo()
 
@@ -56,8 +81,9 @@ export class MakeCollectorCommand extends BaseCommand {
 
       this.success(`Generated collector: ${path.relative(process.cwd(), filePath)}`)
       this.info('Remember to add it to your DigitalTwinEngine configuration!')
-    } catch (error: any) {
-      this.logger.error(`Failed to generate collector: ${error.message}`)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error(`Failed to generate collector: ${message}`)
       this.exitCode = 1
     }
   }
