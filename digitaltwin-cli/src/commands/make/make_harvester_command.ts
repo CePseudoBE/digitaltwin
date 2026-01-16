@@ -1,13 +1,14 @@
 import { args, flags } from '@adonisjs/ace'
 import { BaseCommand } from '../base_command.js'
 import { StringUtils } from '../../utils/string_utils.js'
+import { validateComponentName } from '../../utils/validators.js'
 import path from 'path'
 
 export class MakeHarvesterCommand extends BaseCommand {
   static override commandName = 'make:harvester'
   static override description = 'Generate a new harvester component'
 
-  @args.string({ description: 'Component name' })
+  @args.string({ description: 'Component name (PascalCase, e.g., DataProcessor)' })
   declare name: string
 
   @flags.string({ description: 'Description of the harvester', flagName: 'description', alias: 'd' })
@@ -27,6 +28,17 @@ export class MakeHarvesterCommand extends BaseCommand {
 
   override async run(): Promise<void> {
     try {
+      // Validate component name
+      const nameValidation = validateComponentName(this.name)
+      if (!nameValidation.valid) {
+        this.logger.error(nameValidation.error!)
+        if (nameValidation.suggestion) {
+          this.info(nameValidation.suggestion)
+        }
+        this.exitCode = 1
+        return
+      }
+
       await this.projectDetector.validateProject()
       const projectInfo = await this.projectDetector.getProjectInfo()
 
@@ -59,8 +71,9 @@ export class MakeHarvesterCommand extends BaseCommand {
       this.success(`Generated harvester: ${path.relative(process.cwd(), filePath)}`)
       this.info(`Harvests from: ${sourceName}`)
       this.info('Remember to add it to your DigitalTwinEngine configuration!')
-    } catch (error: any) {
-      this.logger.error(`Failed to generate harvester: ${error.message}`)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error(`Failed to generate harvester: ${message}`)
       this.exitCode = 1
     }
   }

@@ -1,13 +1,14 @@
 import { args, flags } from '@adonisjs/ace'
 import { BaseCommand } from '../base_command.js'
 import { StringUtils } from '../../utils/string_utils.js'
+import { validateComponentName } from '../../utils/validators.js'
 import path from 'path'
 
 export class MakeMapManagerCommand extends BaseCommand {
   static override commandName = 'make:map-manager'
   static override description = 'Generate a new map manager component for handling map layer data'
 
-  @args.string({ description: 'Component name' })
+  @args.string({ description: 'Component name (PascalCase, e.g., CityMap)' })
   declare name: string
 
   @flags.string({ description: 'Description of the map manager', flagName: 'description', alias: 'd' })
@@ -24,6 +25,17 @@ export class MakeMapManagerCommand extends BaseCommand {
 
   override async run(): Promise<void> {
     try {
+      // Validate component name
+      const nameValidation = validateComponentName(this.name)
+      if (!nameValidation.valid) {
+        this.logger.error(nameValidation.error!)
+        if (nameValidation.suggestion) {
+          this.info(nameValidation.suggestion)
+        }
+        this.exitCode = 1
+        return
+      }
+
       await this.projectDetector.validateProject()
       const projectInfo = await this.projectDetector.getProjectInfo()
 
@@ -55,8 +67,9 @@ export class MakeMapManagerCommand extends BaseCommand {
       this.info(`Map layers will be available at GET /${endpointName}`)
       this.info(`Upload endpoint: POST /${endpointName}/upload (accepts JSON layer objects)`)
       this.info('Remember to add it to your DigitalTwinEngine configuration!')
-    } catch (error: any) {
-      this.logger.error(`Failed to generate map manager: ${error.message}`)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error(`Failed to generate map manager: ${message}`)
       this.exitCode = 1
     }
   }
