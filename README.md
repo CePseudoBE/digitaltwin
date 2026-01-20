@@ -7,8 +7,8 @@ A TypeScript framework for building Digital Twin applications with scheduled dat
 | Package | Version | Description |
 |---------|---------|-------------|
 | [digitaltwin-core](./digitaltwin-core) | 1.0.0 | Core framework for Digital Twin applications |
-| [digitaltwin-cli](./digitaltwin-cli) | 0.3.2 | CLI tools for generating components |
-| [create-digitaltwin](./create-digitaltwin) | 0.6.2 | Project scaffolding tool |
+| [digitaltwin-cli](./digitaltwin-cli) | 0.4.0 | CLI tools for generating components |
+| [create-digitaltwin](./create-digitaltwin) | 0.7.0 | Project scaffolding tool |
 
 ## Quick Start
 
