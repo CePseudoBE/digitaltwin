@@ -8,6 +8,8 @@ import { MakeAssetsManagerCommand } from './commands/make/make_assets_manager_co
 import { MakeTilesetManagerCommand } from './commands/make/make_tileset_manager_command.js'
 import { MakeMapManagerCommand } from './commands/make/make_map_manager_command.js'
 import { OpenAPIGenerateCommand } from './commands/openapi/openapi_generate_command.js'
+import { ListCommand } from './commands/list_command.js'
+import { DoctorCommand } from './commands/doctor_command.js'
 
 const kernel = Kernel.create()
 
@@ -26,12 +28,17 @@ kernel.on('help', async (command, $kernel, parsed) => {
 
 kernel.addLoader(
   new ListLoader([
+    // Project commands
+    ListCommand,
+    DoctorCommand,
+    // Make commands
     MakeCollectorCommand,
     MakeHandlerCommand,
     MakeHarvesterCommand,
     MakeAssetsManagerCommand,
     MakeTilesetManagerCommand,
     MakeMapManagerCommand,
+    // OpenAPI
     OpenAPIGenerateCommand,
   ])
 )

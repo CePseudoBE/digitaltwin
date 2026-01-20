@@ -36,6 +36,54 @@ dt make:collector WeatherCollector --description "Collects weather data"
 
 ## Commands
 
+### `list`
+
+List all components in the current Digital Twin project.
+
+```bash
+node dt list
+```
+
+**Output example:**
+```
+Components in my-project:
+
+Collectors (2):
+  - weather
+  - traffic
+
+Handlers (1):
+  - api
+
+Total: 3 component(s)
+```
+
+### `doctor`
+
+Check project health and configuration. Validates:
+- `package.json` exists and includes `digitaltwin-core`
+- `tsconfig.json` has correct module settings
+- `node_modules` are installed
+- Components directory structure
+- `.env` file presence
+
+```bash
+node dt doctor
+```
+
+**Output example:**
+```
+Running project diagnostics...
+
+package.json: Found digitaltwin-core@^1.0.0
+tsconfig.json: Configuration looks good
+node_modules: Dependencies installed
+components: Found 3 component(s)
+.env: Environment file found
+
+All checks passed!
+```
+
 ### `make:collector <name>`
 
 Generate a new collector component that collects data from external sources.
@@ -118,6 +166,31 @@ dt make:assets-manager ImageManager \
   --description "Manages JPEG image uploads"
 ```
 
+## Component Name Validation
+
+All component names are validated before generation:
+
+- **PascalCase required**: Names must start with an uppercase letter (e.g., `WeatherCollector`, not `weatherCollector`)
+- **No reserved words**: JavaScript/TypeScript keywords are rejected (e.g., `class`, `export`, `function`)
+- **Max length**: 64 characters
+- **Suggestions**: Invalid names receive suggestions for valid alternatives
+
+**Examples:**
+```bash
+# Valid names
+node dt make:collector WeatherCollector    # OK
+node dt make:handler APIHandler            # OK
+
+# Invalid names (with suggestions)
+node dt make:collector my-collector
+# Error: Component name must be in PascalCase
+# Try 'MyCollector'
+
+node dt make:handler class
+# Error: 'class' is a reserved word
+# Try 'classComponent' or 'classService'
+```
+
 ## Generated Files
 
 All components are generated in `src/components/` with the following naming convention:
@@ -154,8 +227,23 @@ npm install
 # Build the CLI
 npm run build
 
+# Run tests
+npm test
+
 # Test locally
 npm link
+```
+
+## Testing
+
+The CLI uses the [Japa](https://japa.dev/) testing framework. Tests cover:
+- Component name validation
+- HTTP method validation
+- Cron schedule validation
+- Content type validation
+
+```bash
+npm test
 ```
 
 ## Related Projects

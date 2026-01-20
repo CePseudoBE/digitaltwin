@@ -1,13 +1,14 @@
 import { args, flags } from '@adonisjs/ace'
 import { BaseCommand } from '../base_command.js'
 import { StringUtils } from '../../utils/string_utils.js'
+import { validateComponentName } from '../../utils/validators.js'
 import path from 'path'
 
 export class MakeTilesetManagerCommand extends BaseCommand {
-  static commandName = 'make:tileset-manager'
-  static description = 'Generate a new tileset manager component for handling ZIP tileset files'
+  static override commandName = 'make:tileset-manager'
+  static override description = 'Generate a new tileset manager component for handling ZIP tileset files'
 
-  @args.string({ description: 'Component name' })
+  @args.string({ description: 'Component name (PascalCase, e.g., BuildingTiles)' })
   declare name: string
 
   @flags.string({ description: 'Description of the tileset manager', flagName: 'description', alias: 'd' })
@@ -22,8 +23,19 @@ export class MakeTilesetManagerCommand extends BaseCommand {
   @flags.boolean({ description: 'Show what would be generated without creating files', flagName: 'dry-run' })
   declare dryRun: boolean
 
-  async run(): Promise<void> {
+  override async run(): Promise<void> {
     try {
+      // Validate component name
+      const nameValidation = validateComponentName(this.name)
+      if (!nameValidation.valid) {
+        this.logger.error(nameValidation.error!)
+        if (nameValidation.suggestion) {
+          this.info(nameValidation.suggestion)
+        }
+        this.exitCode = 1
+        return
+      }
+
       await this.projectDetector.validateProject()
       const projectInfo = await this.projectDetector.getProjectInfo()
 
@@ -55,8 +67,9 @@ export class MakeTilesetManagerCommand extends BaseCommand {
       this.info(`Tileset ZIP files will be available at GET /${endpointName}`)
       this.info(`Upload endpoint: POST /${endpointName}/upload (accepts .zip files)`)
       this.info('Remember to add it to your DigitalTwinEngine configuration!')
-    } catch (error: any) {
-      this.logger.error(`Failed to generate tileset manager: ${error.message}`)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error(`Failed to generate tileset manager: ${message}`)
       this.exitCode = 1
     }
   }

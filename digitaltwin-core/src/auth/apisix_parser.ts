@@ -3,6 +3,11 @@ import type { AuthProvider, AuthRequest } from './auth_provider.js'
 import { AuthProviderFactory } from './auth_provider_factory.js'
 
 /**
+ * Headers type that accepts both Express IncomingHttpHeaders and Record<string, string>
+ */
+export type HeadersLike = Record<string, string | string[] | undefined>
+
+/**
  * Parses authentication information from Apache APISIX headers set after Keycloak authentication.
  *
  * This class provides a static API for backward compatibility while internally using
@@ -60,9 +65,18 @@ export class ApisixAuthParser {
 
     /**
      * Create a request-like object from headers for the AuthProvider.
+     * Normalizes headers by taking only the first value for array headers.
      */
-    private static toAuthRequest(headers: Record<string, string>): AuthRequest {
-        return { headers }
+    private static toAuthRequest(headers: HeadersLike): AuthRequest {
+        const normalizedHeaders: Record<string, string> = {}
+        for (const [key, value] of Object.entries(headers)) {
+            if (typeof value === 'string') {
+                normalizedHeaders[key] = value
+            } else if (Array.isArray(value) && value.length > 0) {
+                normalizedHeaders[key] = value[0]
+            }
+        }
+        return { headers: normalizedHeaders }
     }
 
     /**
@@ -89,7 +103,7 @@ export class ApisixAuthParser {
      * // Returns: { id: '6e06a527...', roles: ['default-roles-master', 'offline_access'] }
      * ```
      */
-    static parseAuthHeaders(headers: Record<string, string>): AuthenticatedUser | null {
+    static parseAuthHeaders(headers: HeadersLike): AuthenticatedUser | null {
         return this.getProvider().parseRequest(this.toAuthRequest(headers))
     }
 
@@ -111,7 +125,7 @@ export class ApisixAuthParser {
      * }
      * ```
      */
-    static hasValidAuth(headers: Record<string, string>): boolean {
+    static hasValidAuth(headers: HeadersLike): boolean {
         return this.getProvider().hasValidAuth(this.toAuthRequest(headers))
     }
 
@@ -131,7 +145,7 @@ export class ApisixAuthParser {
      * }
      * ```
      */
-    static getUserId(headers: Record<string, string>): string | null {
+    static getUserId(headers: HeadersLike): string | null {
         return this.getProvider().getUserId(this.toAuthRequest(headers))
     }
 
@@ -149,7 +163,7 @@ export class ApisixAuthParser {
      * }
      * ```
      */
-    static getUserRoles(headers: Record<string, string>): string[] {
+    static getUserRoles(headers: HeadersLike): string[] {
         return this.getProvider().getUserRoles(this.toAuthRequest(headers))
     }
 
@@ -166,7 +180,7 @@ export class ApisixAuthParser {
      * }
      * ```
      */
-    static isAdmin(headers: Record<string, string>): boolean {
+    static isAdmin(headers: HeadersLike): boolean {
         return this.getProvider().isAdmin(this.toAuthRequest(headers))
     }
 }

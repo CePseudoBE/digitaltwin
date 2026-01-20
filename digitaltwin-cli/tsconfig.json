@@ -2,16 +2,16 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "allowJs": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "composite": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "tests/**/*", "bin/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -22,8 +22,8 @@ import fs from 'fs/promises'
  * ```
  */
 export class OpenAPIGenerateCommand extends BaseCommand {
-    static commandName = 'openapi:generate'
-    static description = 'Generate OpenAPI specification from components'
+    static override commandName = 'openapi:generate'
+    static override description = 'Generate OpenAPI specification from components'
 
     @flags.string({
         description: 'Output file path',
@@ -73,7 +73,7 @@ export class OpenAPIGenerateCommand extends BaseCommand {
     })
     declare dryRun: boolean
 
-    async run(): Promise<void> {
+    override async run(): Promise<void> {
         try {
             await this.projectDetector.validateProject()
             const projectInfo = await this.projectDetector.getProjectInfo()

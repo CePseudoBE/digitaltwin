@@ -39,9 +39,21 @@ importers:
         specifier: ^2.4.2
         version: 2.4.2
     devDependencies:
+      '@japa/assert':
+        specifier: ^4.1.0
+        version: 4.2.0(@japa/runner@4.5.0)
+      '@japa/runner':
+        specifier: ^4.3.0
+        version: 4.5.0
+      '@types/fs-extra':
+        specifier: ^11.0.4
+        version: 11.0.4
       '@types/prompts':
         specifier: ^2.4.9
         version: 2.4.9
+      ts-node-maintained:
+        specifier: ^10.9.5
+        version: 10.9.6(@types/node@24.10.8)(typescript@5.9.3)
 
   digitaltwin-cli:
     dependencies:
@@ -54,6 +66,19 @@ importers:
       tempura:
         specifier: ^0.4.1
         version: 0.4.1
+    devDependencies:
+      '@japa/assert':
+        specifier: ^4.1.0
+        version: 4.2.0(@japa/runner@4.5.0)
+      '@japa/runner':
+        specifier: ^4.3.0
+        version: 4.5.0
+      '@types/fs-extra':
+        specifier: ^11.0.4
+        version: 11.0.4
+      ts-node-maintained:
+        specifier: ^10.9.5
+        version: 10.9.6(@types/node@24.10.8)(typescript@5.9.3)
 
   digitaltwin-core:
     dependencies:

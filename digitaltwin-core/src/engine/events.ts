@@ -34,7 +34,7 @@ export interface ComponentEvent {
     timestamp: Date
 
     /** Optional additional data related to the event */
-    data?: any
+    data?: Record<string, unknown>
 }
 
 /**
@@ -68,7 +68,7 @@ export class EngineEventBus extends EventEmitter {
      * @param data - The component event data
      * @returns True if the event had listeners, false otherwise
      */
-    emit(event: string, data: ComponentEvent): boolean {
+    override emit(event: string, data: ComponentEvent): boolean {
         return super.emit(event, data)
     }
 
@@ -79,7 +79,7 @@ export class EngineEventBus extends EventEmitter {
      * @param listener - Function to call when the event is emitted
      * @returns This event bus instance for method chaining
      */
-    on(event: string, listener: (data: ComponentEvent) => void): this {
+    override on(event: string, listener: (data: ComponentEvent) => void): this {
         return super.on(event, listener)
     }
 }
