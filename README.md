@@ -6,9 +6,9 @@ A TypeScript framework for building Digital Twin applications with scheduled dat
 
 | Package | Version | Description |
 |---------|---------|-------------|
-| [digitaltwin-core](./digitaltwin-core) | 0.14.1 | Core framework for Digital Twin applications |
-| [digitaltwin-cli](./digitaltwin-cli) | 0.3.1 | CLI tools for generating components |
-| [create-digitaltwin](./create-digitaltwin) | 0.6.1 | Project scaffolding tool |
+| [digitaltwin-core](./digitaltwin-core) | 1.0.0 | Core framework for Digital Twin applications |
+| [digitaltwin-cli](./digitaltwin-cli) | 0.3.2 | CLI tools for generating components |
+| [create-digitaltwin](./create-digitaltwin) | 0.6.2 | Project scaffolding tool |
 
 ## Quick Start
 
@@ -22,18 +22,20 @@ pnpm add digitaltwin-core
 
 ## Development
 
+This project supports both **npm** and **pnpm** as package managers.
+
 ```bash
 # Install dependencies
-pnpm install
+npm install    # or: pnpm install
 
 # Build all packages
-pnpm build
+npm run build  # or: pnpm build
 
 # Run tests
-pnpm test
+npm test       # or: pnpm test
 
 # Lint
-pnpm lint
+npm run lint   # or: pnpm lint
 ```
 
 ## Architecture
