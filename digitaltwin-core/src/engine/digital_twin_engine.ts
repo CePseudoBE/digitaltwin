@@ -32,6 +32,89 @@ import {
 } from './health.js'
 
 /**
+ * Union type for all component types that can be registered with the engine
+ */
+export type AnyComponent = Collector | Harvester | Handler | AssetsManager | CustomTableManager
+
+/**
+ * Type guard to check if a component is a Collector
+ */
+export function isCollector(component: AnyComponent): component is Collector {
+    return (
+        typeof component === 'object' &&
+        component !== null &&
+        'collect' in component &&
+        typeof (component as Collector).collect === 'function' &&
+        'getSchedule' in component &&
+        typeof (component as Collector).getSchedule === 'function' &&
+        'setDependencies' in component &&
+        typeof (component as Collector).setDependencies === 'function'
+    )
+}
+
+/**
+ * Type guard to check if a component is a Harvester
+ */
+export function isHarvester(component: AnyComponent): component is Harvester {
+    return (
+        typeof component === 'object' &&
+        component !== null &&
+        'harvest' in component &&
+        typeof (component as Harvester).harvest === 'function' &&
+        'getUserConfiguration' in component &&
+        typeof (component as Harvester).getUserConfiguration === 'function' &&
+        'setDependencies' in component &&
+        typeof (component as Harvester).setDependencies === 'function'
+    )
+}
+
+/**
+ * Type guard to check if a component is a Handler
+ */
+export function isHandler(component: AnyComponent): component is Handler {
+    return (
+        typeof component === 'object' &&
+        component !== null &&
+        'getEndpoints' in component &&
+        typeof (component as Handler).getEndpoints === 'function' &&
+        !('uploadAsset' in component) &&
+        !('harvest' in component) &&
+        !('collect' in component) &&
+        !('initializeTable' in component)
+    )
+}
+
+/**
+ * Type guard to check if a component is an AssetsManager
+ */
+export function isAssetsManager(component: AnyComponent): component is AssetsManager {
+    return (
+        typeof component === 'object' &&
+        component !== null &&
+        'uploadAsset' in component &&
+        typeof (component as AssetsManager).uploadAsset === 'function' &&
+        'getAllAssets' in component &&
+        typeof (component as AssetsManager).getAllAssets === 'function'
+    )
+}
+
+/**
+ * Type guard to check if a component is a CustomTableManager
+ */
+export function isCustomTableManager(component: AnyComponent): component is CustomTableManager {
+    return (
+        typeof component === 'object' &&
+        component !== null &&
+        'initializeTable' in component &&
+        typeof (component as CustomTableManager).initializeTable === 'function' &&
+        'create' in component &&
+        typeof (component as CustomTableManager).create === 'function' &&
+        'findAll' in component &&
+        typeof (component as CustomTableManager).findAll === 'function'
+    )
+}
+
+/**
  * Result of component validation
  */
 export interface ComponentValidationResult {
@@ -174,22 +257,23 @@ export interface EngineOptions {
  * ```
  */
 export class DigitalTwinEngine {
-    readonly #collectors: Collector[]
-    readonly #harvesters: Harvester[]
-    readonly #handlers: Handler[]
-    readonly #assetsManagers: AssetsManager[]
-    readonly #customTableManagers: CustomTableManager[]
+    #collectors: Collector[]
+    #harvesters: Harvester[]
+    #handlers: Handler[]
+    #assetsManagers: AssetsManager[]
+    #customTableManagers: CustomTableManager[]
     readonly #storage: StorageService
     readonly #database: DatabaseAdapter
     readonly #app: ReturnType<typeof express>
     readonly #router: ExpressRouter
     readonly #options: EngineOptions
-    readonly #queueManager: QueueManager | null
+    #queueManager: QueueManager | null
     readonly #uploadProcessor: UploadProcessor | null
     /** uWebSockets.js TemplatedApp - has close() method to shut down all connections */
     #server?: { close(): unknown }
     #workers: Worker[] = []
     #isShuttingDown = false
+    #isStarted = false
     #shutdownTimeout = 30000
     readonly #healthChecker = new HealthChecker()
 
@@ -414,6 +498,14 @@ export class DigitalTwinEngine {
             return
         }
 
+        // Mark as started to prevent component registration
+        this.#isStarted = true
+
+        // Recreate queue manager if we have new components registered after construction
+        if (!this.#queueManager && (this.#collectors.length > 0 || this.#harvesters.length > 0 || this.#assetsManagers.length > 0)) {
+            this.#queueManager = this.#createQueueManager()
+        }
+
         // Normal startup - initialize user management tables first
         const userService = new UserService(this.#database)
         await userService.initializeTables()
@@ -612,6 +704,190 @@ export class DigitalTwinEngine {
      */
     getHealthCheckNames(): string[] {
         return this.#healthChecker.getCheckNames()
+    }
+
+    // ============================================================================
+    // Component Registration Methods
+    // ============================================================================
+
+    /**
+     * Register a component with the engine using automatic type detection.
+     *
+     * The engine automatically detects the component type (Collector, Harvester,
+     * Handler, AssetsManager, or CustomTableManager) and registers it appropriately.
+     *
+     * This method supports fluent chaining for convenient registration.
+     *
+     * @param {AnyComponent} component - The component to register
+     * @returns {this} The engine instance for method chaining
+     * @throws {Error} If called after the engine has started
+     * @throws {Error} If the component type cannot be determined
+     *
+     * @example
+     * ```typescript
+     * const engine = new DigitalTwinEngine({ storage, database })
+     *   .register(new WeatherCollector())
+     *   .register(new DataHarvester())
+     *   .register(new ApiHandler())
+     *
+     * await engine.start()
+     * ```
+     */
+    register(component: AnyComponent): this {
+        if (this.#isStarted) {
+            throw new Error('Cannot register components after the engine has started')
+        }
+
+        if (isCollector(component)) {
+            this.#collectors.push(component)
+        } else if (isHarvester(component)) {
+            this.#harvesters.push(component)
+        } else if (isAssetsManager(component)) {
+            this.#assetsManagers.push(component)
+        } else if (isCustomTableManager(component)) {
+            this.#customTableManagers.push(component)
+        } else if (isHandler(component)) {
+            this.#handlers.push(component)
+        } else {
+            throw new Error('Unknown component type: could not determine component type from provided instance')
+        }
+
+        return this
+    }
+
+    /**
+     * Register multiple components at once.
+     *
+     * Each component's type is automatically detected and registered appropriately.
+     *
+     * @param {AnyComponent[]} components - Array of components to register
+     * @returns {this} The engine instance for method chaining
+     * @throws {Error} If called after the engine has started
+     * @throws {Error} If any component type cannot be determined
+     *
+     * @example
+     * ```typescript
+     * const engine = new DigitalTwinEngine({ storage, database })
+     *   .registerAll([
+     *     new WeatherCollector(),
+     *     new DataHarvester(),
+     *     new ApiHandler()
+     *   ])
+     *
+     * await engine.start()
+     * ```
+     */
+    registerAll(components: AnyComponent[]): this {
+        for (const component of components) {
+            this.register(component)
+        }
+        return this
+    }
+
+    /**
+     * Register a Collector component.
+     *
+     * @param {Collector} collector - The collector to register
+     * @returns {this} The engine instance for method chaining
+     * @throws {Error} If called after the engine has started
+     *
+     * @example
+     * ```typescript
+     * const engine = new DigitalTwinEngine({ storage, database })
+     *   .registerCollector(new WeatherCollector())
+     *   .registerCollector(new TrafficCollector())
+     * ```
+     */
+    registerCollector(collector: Collector): this {
+        if (this.#isStarted) {
+            throw new Error('Cannot register components after the engine has started')
+        }
+        this.#collectors.push(collector)
+        return this
+    }
+
+    /**
+     * Register a Harvester component.
+     *
+     * @param {Harvester} harvester - The harvester to register
+     * @returns {this} The engine instance for method chaining
+     * @throws {Error} If called after the engine has started
+     *
+     * @example
+     * ```typescript
+     * const engine = new DigitalTwinEngine({ storage, database })
+     *   .registerHarvester(new DataHarvester())
+     * ```
+     */
+    registerHarvester(harvester: Harvester): this {
+        if (this.#isStarted) {
+            throw new Error('Cannot register components after the engine has started')
+        }
+        this.#harvesters.push(harvester)
+        return this
+    }
+
+    /**
+     * Register a Handler component.
+     *
+     * @param {Handler} handler - The handler to register
+     * @returns {this} The engine instance for method chaining
+     * @throws {Error} If called after the engine has started
+     *
+     * @example
+     * ```typescript
+     * const engine = new DigitalTwinEngine({ storage, database })
+     *   .registerHandler(new ApiHandler())
+     * ```
+     */
+    registerHandler(handler: Handler): this {
+        if (this.#isStarted) {
+            throw new Error('Cannot register components after the engine has started')
+        }
+        this.#handlers.push(handler)
+        return this
+    }
+
+    /**
+     * Register an AssetsManager component.
+     *
+     * @param {AssetsManager} assetsManager - The assets manager to register
+     * @returns {this} The engine instance for method chaining
+     * @throws {Error} If called after the engine has started
+     *
+     * @example
+     * ```typescript
+     * const engine = new DigitalTwinEngine({ storage, database })
+     *   .registerAssetsManager(new ImageManager())
+     * ```
+     */
+    registerAssetsManager(assetsManager: AssetsManager): this {
+        if (this.#isStarted) {
+            throw new Error('Cannot register components after the engine has started')
+        }
+        this.#assetsManagers.push(assetsManager)
+        return this
+    }
+
+    /**
+     * Register a CustomTableManager component.
+     *
+     * @param {CustomTableManager} customTableManager - The custom table manager to register
+     * @returns {this} The engine instance for method chaining
+     * @throws {Error} If called after the engine has started
+     *
+     * @example
+     * ```typescript
+     * const engine = new DigitalTwinEngine({ storage, database })
+     *   .registerCustomTableManager(new WMSLayersManager())
+     * ```
+     */
+    registerCustomTableManager(customTableManager: CustomTableManager): this {
+        if (this.#isStarted) {
+            throw new Error('Cannot register components after the engine has started')
+        }
+        this.#customTableManagers.push(customTableManager)
+        return this
     }
 
     /**

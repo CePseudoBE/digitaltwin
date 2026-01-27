@@ -17,7 +17,15 @@
  */
 
 // Core Engine
-export { DigitalTwinEngine } from './engine/digital_twin_engine.js'
+export {
+    DigitalTwinEngine,
+    type AnyComponent,
+    isCollector,
+    isHarvester,
+    isHandler,
+    isAssetsManager,
+    isCustomTableManager
+} from './engine/digital_twin_engine.js'
 
 // Base Components
 export { Collector } from './components/collector.js'
@@ -108,3 +116,6 @@ export * from './engine/endpoints.js'
 export * from './openapi/index.js'
 
 export { Env } from './env/env.js'
+
+// Component Loader
+export { loadComponents, type LoadedComponents, type LoadComponentsOptions } from './loader/index.js'

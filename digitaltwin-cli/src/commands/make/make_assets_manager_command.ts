@@ -1,6 +1,7 @@
 import { args, flags } from '@adonisjs/ace'
 import { BaseCommand } from '../base_command.js'
 import { StringUtils } from '../../utils/string_utils.js'
+import { BarrelUpdater } from '../../utils/barrel_updater.js'
 import path from 'path'
 
 export class MakeAssetsManagerCommand extends BaseCommand {
@@ -24,6 +25,9 @@ export class MakeAssetsManagerCommand extends BaseCommand {
 
   @flags.boolean({ description: 'Show what would be generated without creating files', flagName: 'dry-run' })
   declare dryRun: boolean
+
+  @flags.boolean({ description: 'Skip barrel file update', flagName: 'no-barrel' })
+  declare noBarrel: boolean
 
   override async run(): Promise<void> {
     try {
@@ -61,7 +65,13 @@ export class MakeAssetsManagerCommand extends BaseCommand {
       this.info(`Content type: ${mimeType}`)
       this.info(`Assets will be available at GET /${endpointName}`)
       this.info(`Upload endpoint: POST /${endpointName}/upload`)
-      this.info('Remember to add it to your DigitalTwinEngine configuration!')
+
+      // Update barrel file unless --no-barrel is specified
+      if (!this.noBarrel) {
+        const updater = new BarrelUpdater()
+        await updater.updateBarrel(componentsDir)
+        this.info('Updated components barrel file (index.ts)')
+      }
     } catch (error: any) {
       this.logger.error(`Failed to generate assets manager: ${error.message}`)
       this.exitCode = 1
