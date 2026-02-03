@@ -79,6 +79,26 @@ export {
 } from './utils/http_responses.js'
 export type { HttpStatusCode } from './utils/http_responses.js'
 
+// Component Types and Guards (for dynamic registration)
+export {
+    type AnyComponent,
+    type ComponentTypeName,
+    type SchedulableComponent,
+    type ActiveComponent,
+    type ComponentTypeMap,
+    type LoadedComponents,
+    isCollector,
+    isHarvester,
+    isHandler,
+    isAssetsManager,
+    isCustomTableManager,
+    isActiveComponent,
+    detectComponentType
+} from './engine/component_types.js'
+
+// Component Loader (auto-discovery)
+export { loadComponents, type LoadComponentsOptions, type LoadComponentsResult } from './loader/index.js'
+
 // Engine Components
 export { QueueManager } from './engine/queue_manager.js'
 export { errorHandler, asyncHandler, notFoundHandler } from './engine/error_handler.js'
