@@ -5,7 +5,7 @@ import type { AssetsManager } from '../components/assets_manager.js'
 import type { CustomTableManager } from '../components/custom_table_manager.js'
 import type { StorageService } from '../storage/storage_service.js'
 import type { DatabaseAdapter } from '../database/database_adapter.js'
-import type { Router as ExpressRouter } from 'ultimate-express'
+import type { Router as ExpressRouter, RequestHandler } from 'ultimate-express'
 import express from 'ultimate-express'
 import multer from 'multer'
 import type { ConnectionOptions, Worker } from 'bullmq'
@@ -527,20 +527,19 @@ export class DigitalTwinEngine {
         // Enable with DIGITALTWIN_ENABLE_COMPRESSION=true for standalone deployments without a gateway
         const enableCompression = process.env.DIGITALTWIN_ENABLE_COMPRESSION === 'true'
         if (enableCompression) {
-            this.#app.use(
-                compression({
-                    filter: (req, res) => {
-                        // Don't compress binary streams
-                        if (req.headers['accept']?.includes('application/octet-stream')) {
-                            return false
-                        }
-                        // Use default filter for other content types
-                        return compression.filter(req, res)
-                    },
-                    level: 6, // Balance between speed and compression ratio
-                    threshold: 1024 // Only compress responses larger than 1KB
-                })
-            )
+            const compressionMiddleware = compression({
+                filter: (req, res) => {
+                    // Don't compress binary streams
+                    if (req.headers['accept']?.includes('application/octet-stream')) {
+                        return false
+                    }
+                    // Use default filter for other content types
+                    return compression.filter(req, res)
+                },
+                level: 6, // Balance between speed and compression ratio
+                threshold: 1024 // Only compress responses larger than 1KB
+            })
+            this.#app.use(compressionMiddleware as unknown as RequestHandler)
         }
 
         // Enable CORS for cross-origin requests from frontend applications
