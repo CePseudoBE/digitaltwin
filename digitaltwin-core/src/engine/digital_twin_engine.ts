@@ -523,21 +523,25 @@ export class DigitalTwinEngine {
         // Ensure temporary upload directory exists
         await this.#ensureTempUploadDir()
 
-        // Enable HTTP compression for JSON responses (reduces bandwidth by 60-80%)
-        this.#app.use(
-            compression({
-                filter: (req, res) => {
-                    // Don't compress binary streams
-                    if (req.headers['accept']?.includes('application/octet-stream')) {
-                        return false
-                    }
-                    // Use default filter for other content types
-                    return compression.filter(req, res)
-                },
-                level: 6, // Balance between speed and compression ratio
-                threshold: 1024 // Only compress responses larger than 1KB
-            })
-        )
+        // HTTP compression - disabled by default as API gateways (APISIX, Kong, etc.) typically handle this
+        // Enable with DIGITALTWIN_ENABLE_COMPRESSION=true for standalone deployments without a gateway
+        const enableCompression = process.env.DIGITALTWIN_ENABLE_COMPRESSION === 'true'
+        if (enableCompression) {
+            this.#app.use(
+                compression({
+                    filter: (req, res) => {
+                        // Don't compress binary streams
+                        if (req.headers['accept']?.includes('application/octet-stream')) {
+                            return false
+                        }
+                        // Use default filter for other content types
+                        return compression.filter(req, res)
+                    },
+                    level: 6, // Balance between speed and compression ratio
+                    threshold: 1024 // Only compress responses larger than 1KB
+                })
+            )
+        }
 
         // Enable CORS for cross-origin requests from frontend applications
         this.#app.use(
