@@ -221,7 +221,7 @@ async function scanDirectory(
                 }
             }
         }
-    } catch (error) {
+    } catch {
         // Directory doesn't exist or can't be read - return empty array
     }
 
