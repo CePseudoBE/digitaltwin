@@ -183,7 +183,13 @@ export abstract class DatabaseAdapter {
      * @param order - Sort order by date ('asc' or 'desc'), default: 'asc'
      * @returns Array of DataRecords matching the criteria
      */
-    abstract getByDateRange(name: string, startDate: Date, endDate?: Date, limit?: number, order?: 'asc' | 'desc'): Promise<DataRecord[]>
+    abstract getByDateRange(
+        name: string,
+        startDate: Date,
+        endDate?: Date,
+        limit?: number,
+        order?: 'asc' | 'desc'
+    ): Promise<DataRecord[]>
 
     /**
      * Get records after a specific date for a given component.

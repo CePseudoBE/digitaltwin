@@ -15,22 +15,12 @@ import type { CustomTableManager } from '../components/custom_table_manager.js'
  * String literal union of all component type names.
  * Used for discriminated unions and type narrowing.
  */
-export type ComponentTypeName =
-    | 'collector'
-    | 'harvester'
-    | 'handler'
-    | 'assets_manager'
-    | 'custom_table_manager'
+export type ComponentTypeName = 'collector' | 'harvester' | 'handler' | 'assets_manager' | 'custom_table_manager'
 
 /**
  * Union type of all component class instances that can be registered.
  */
-export type AnyComponent =
-    | Collector
-    | Harvester
-    | Handler
-    | AssetsManager
-    | CustomTableManager
+export type AnyComponent = Collector | Harvester | Handler | AssetsManager | CustomTableManager
 
 /**
  * Union type of components that can be scheduled (have run() and getSchedule()).

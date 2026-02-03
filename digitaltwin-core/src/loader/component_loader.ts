@@ -128,10 +128,7 @@ function matchesExcludePattern(filename: string, patterns: string[]): boolean {
 /**
  * Determine component type from filename based on patterns.
  */
-function getComponentTypeFromFilename(
-    filename: string,
-    patterns: ResolvedPatterns
-): keyof LoadedComponents | null {
+function getComponentTypeFromFilename(filename: string, patterns: ResolvedPatterns): keyof LoadedComponents | null {
     const baseName = path.basename(filename)
 
     // Remove extension for matching
@@ -144,7 +141,11 @@ function getComponentTypeFromFilename(
     if (nameWithoutExt.endsWith(patterns.customTableManagers)) return 'customTableManagers'
 
     // Also check for *_manager pattern for tileset/map managers
-    if (nameWithoutExt.endsWith('_manager') || nameWithoutExt.endsWith('_tileset_manager') || nameWithoutExt.endsWith('_map_manager')) {
+    if (
+        nameWithoutExt.endsWith('_manager') ||
+        nameWithoutExt.endsWith('_tileset_manager') ||
+        nameWithoutExt.endsWith('_map_manager')
+    ) {
         return 'assetsManagers'
     }
 
