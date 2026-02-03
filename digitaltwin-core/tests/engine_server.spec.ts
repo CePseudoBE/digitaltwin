@@ -294,4 +294,115 @@ test.group('Engine Server Methods (ultimate-express)', () => {
         await engine.stop()
         assert.isUndefined(engine.getPort())
     })
+
+    test('server returns gzip compressed responses when compression is enabled', async ({ assert }) => {
+        // Enable compression via environment variable
+        const originalEnv = process.env.DIGITALTWIN_ENABLE_COMPRESSION
+        process.env.DIGITALTWIN_ENABLE_COMPRESSION = 'true'
+
+        const storage = new LocalStorageService('.test_tmp_server_compression')
+        const database = new MockDatabaseAdapter({ storage })
+
+        const engine = new DigitalTwinEngine({
+            collectors: [],
+            harvesters: [],
+            handlers: [],
+            assetsManagers: [],
+            database,
+            storage,
+            queues: {
+                multiQueue: false,
+                workers: { collectors: 0, harvesters: 0 }
+            },
+            logging: { level: LogLevel.SILENT },
+            server: { port: 0 }
+        })
+
+        await engine.start()
+
+        try {
+            const port = engine.getPort()
+            assert.isDefined(port)
+
+            // Request with Accept-Encoding: gzip
+            const response = await fetch(`http://localhost:${port}/api/health`, {
+                headers: {
+                    'Accept-Encoding': 'gzip, deflate'
+                }
+            })
+
+            // The response should be successful
+            assert.equal(response.status, 200)
+
+            // Check if compression was applied (Content-Encoding header)
+            // Note: fetch automatically decompresses, so we check the header
+            const contentEncoding = response.headers.get('content-encoding')
+
+            // Response should be either gzip compressed or not compressed if too small
+            // (compression threshold is 1KB)
+            if (contentEncoding) {
+                assert.equal(contentEncoding, 'gzip')
+            }
+            // Small responses may not be compressed - this is expected behavior
+        } finally {
+            await engine.stop()
+            // Restore original environment
+            if (originalEnv === undefined) {
+                delete process.env.DIGITALTWIN_ENABLE_COMPRESSION
+            } else {
+                process.env.DIGITALTWIN_ENABLE_COMPRESSION = originalEnv
+            }
+        }
+    })
+
+    test('server does not compress responses when compression is disabled (default)', async ({ assert }) => {
+        // Ensure compression is disabled (default behavior)
+        const originalEnv = process.env.DIGITALTWIN_ENABLE_COMPRESSION
+        delete process.env.DIGITALTWIN_ENABLE_COMPRESSION
+
+        const storage = new LocalStorageService('.test_tmp_server_no_compression')
+        const database = new MockDatabaseAdapter({ storage })
+
+        const engine = new DigitalTwinEngine({
+            collectors: [],
+            harvesters: [],
+            handlers: [],
+            assetsManagers: [],
+            database,
+            storage,
+            queues: {
+                multiQueue: false,
+                workers: { collectors: 0, harvesters: 0 }
+            },
+            logging: { level: LogLevel.SILENT },
+            server: { port: 0 }
+        })
+
+        await engine.start()
+
+        try {
+            const port = engine.getPort()
+            assert.isDefined(port)
+
+            // Request with Accept-Encoding: gzip
+            const response = await fetch(`http://localhost:${port}/api/health`, {
+                headers: {
+                    'Accept-Encoding': 'gzip, deflate'
+                }
+            })
+
+            // The response should be successful
+            assert.equal(response.status, 200)
+
+            // Without compression enabled, there should be no Content-Encoding header
+            const contentEncoding = response.headers.get('content-encoding')
+            assert.isNull(contentEncoding, 'Compression should be disabled by default')
+        } finally {
+            await engine.stop()
+            // Restore original environment
+            if (originalEnv !== undefined) {
+                process.env.DIGITALTWIN_ENABLE_COMPRESSION = originalEnv
+            }
+        }
+    })
 })

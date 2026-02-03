@@ -5,14 +5,26 @@ import type { AssetsManager } from '../components/assets_manager.js'
 import type { CustomTableManager } from '../components/custom_table_manager.js'
 import type { StorageService } from '../storage/storage_service.js'
 import type { DatabaseAdapter } from '../database/database_adapter.js'
-import type { Router as ExpressRouter } from 'ultimate-express'
+import type { Router as ExpressRouter, RequestHandler } from 'ultimate-express'
 import express from 'ultimate-express'
 import multer from 'multer'
 import type { ConnectionOptions, Worker } from 'bullmq'
 import fs from 'fs/promises'
 import cors from 'cors'
+import compression from 'compression'
 
 import { initializeComponents, initializeAssetsManagers } from './initializer.js'
+import {
+    type AnyComponent,
+    type ComponentTypeName,
+    type LoadedComponents,
+    detectComponentType,
+    isCollector,
+    isHarvester,
+    isHandler,
+    isAssetsManager,
+    isCustomTableManager
+} from './component_types.js'
 import { UserService } from '../auth/user_service.js'
 import { exposeEndpoints } from './endpoints.js'
 import { scheduleComponents } from './scheduler.js'
@@ -193,19 +205,51 @@ export class DigitalTwinEngine {
     #shutdownTimeout = 30000
     readonly #healthChecker = new HealthChecker()
 
+    // Mutable arrays for dynamically registered components
+    readonly #dynamicCollectors: Collector[] = []
+    readonly #dynamicHarvesters: Harvester[] = []
+    readonly #dynamicHandlers: Handler[] = []
+    readonly #dynamicAssetsManagers: AssetsManager[] = []
+    readonly #dynamicCustomTableManagers: CustomTableManager[] = []
+
+    /** Get all collectors (from constructor + register()) */
+    get #allCollectors(): Collector[] {
+        return [...this.#collectors, ...this.#dynamicCollectors]
+    }
+
+    /** Get all harvesters (from constructor + register()) */
+    get #allHarvesters(): Harvester[] {
+        return [...this.#harvesters, ...this.#dynamicHarvesters]
+    }
+
+    /** Get all handlers (from constructor + register()) */
+    get #allHandlers(): Handler[] {
+        return [...this.#handlers, ...this.#dynamicHandlers]
+    }
+
+    /** Get all assets managers (from constructor + register()) */
+    get #allAssetsManagers(): AssetsManager[] {
+        return [...this.#assetsManagers, ...this.#dynamicAssetsManagers]
+    }
+
+    /** Get all custom table managers (from constructor + register()) */
+    get #allCustomTableManagers(): CustomTableManager[] {
+        return [...this.#customTableManagers, ...this.#dynamicCustomTableManagers]
+    }
+
     /** Get all active components (collectors and harvesters) */
     get #activeComponents(): (Collector | Harvester)[] {
-        return [...this.#collectors, ...this.#harvesters]
+        return [...this.#allCollectors, ...this.#allHarvesters]
     }
 
     /** Get all components (collectors + harvesters + handlers + assetsManagers + customTableManagers) */
     get #allComponents(): (Collector | Harvester | Handler | AssetsManager | CustomTableManager)[] {
         return [
-            ...this.#collectors,
-            ...this.#harvesters,
-            ...this.#handlers,
-            ...this.#assetsManagers,
-            ...this.#customTableManagers
+            ...this.#allCollectors,
+            ...this.#allHarvesters,
+            ...this.#allHandlers,
+            ...this.#allAssetsManagers,
+            ...this.#allCustomTableManagers
         ]
     }
 
@@ -286,6 +330,8 @@ export class DigitalTwinEngine {
 
     #createQueueManager(): QueueManager | null {
         // Create queue manager if we have collectors, harvesters, OR assets managers that may need async uploads
+        // Note: At construction time, only constructor-provided components are available
+        // Dynamic components registered via register() will be handled at start() time
         const hasActiveComponents = this.#collectors.length > 0 || this.#harvesters.length > 0
         const hasAssetsManagers = this.#assetsManagers.length > 0
 
@@ -342,12 +388,12 @@ export class DigitalTwinEngine {
 
         this.#healthChecker.registerCheck('storage', createStorageCheck(this.#storage))
 
-        // Set component counts
+        // Set component counts (includes both constructor and dynamically registered components)
         this.#healthChecker.setComponentCounts({
-            collectors: this.#collectors.length,
-            harvesters: this.#harvesters.length,
-            handlers: this.#handlers.length,
-            assetsManagers: this.#assetsManagers.length
+            collectors: this.#allCollectors.length,
+            harvesters: this.#allHarvesters.length,
+            handlers: this.#allHandlers.length,
+            assetsManagers: this.#allAssetsManagers.length
         })
 
         // Liveness probe - shallow check, always returns ok if process is running
@@ -443,8 +489,7 @@ export class DigitalTwinEngine {
 
         // Inject upload queue to components that support async uploads
         if (this.#queueManager) {
-            const allManagers = [...this.#assetsManagers]
-            for (const manager of allManagers) {
+            for (const manager of this.#allAssetsManagers) {
                 if (isAsyncUploadable(manager)) {
                     manager.setUploadQueue(this.#queueManager.uploadQueue)
                 }
@@ -477,6 +522,25 @@ export class DigitalTwinEngine {
 
         // Ensure temporary upload directory exists
         await this.#ensureTempUploadDir()
+
+        // HTTP compression - disabled by default as API gateways (APISIX, Kong, etc.) typically handle this
+        // Enable with DIGITALTWIN_ENABLE_COMPRESSION=true for standalone deployments without a gateway
+        const enableCompression = process.env.DIGITALTWIN_ENABLE_COMPRESSION === 'true'
+        if (enableCompression) {
+            const compressionMiddleware = compression({
+                filter: (req, res) => {
+                    // Don't compress binary streams
+                    if (req.headers['accept']?.includes('application/octet-stream')) {
+                        return false
+                    }
+                    // Use default filter for other content types
+                    return compression.filter(req, res)
+                },
+                level: 6, // Balance between speed and compression ratio
+                threshold: 1024 // Only compress responses larger than 1KB
+            })
+            this.#app.use(compressionMiddleware as unknown as RequestHandler)
+        }
 
         // Enable CORS for cross-origin requests from frontend applications
         this.#app.use(
@@ -559,6 +623,170 @@ export class DigitalTwinEngine {
         // Use type assertion to access the port property
         const app = this.#app as unknown as { port?: number }
         return app.port ?? this.#options.server?.port
+    }
+
+    /**
+     * Registers a single component with automatic type detection.
+     *
+     * The engine automatically detects the component type based on its class
+     * and adds it to the appropriate internal collection.
+     *
+     * @param component - Component instance to register
+     * @returns The engine instance for method chaining
+     * @throws Error if component type cannot be determined or is already registered
+     *
+     * @example
+     * ```typescript
+     * const engine = new DigitalTwinEngine({ storage, database })
+     *
+     * engine
+     *   .register(new WeatherCollector())
+     *   .register(new TrafficAnalysisHarvester())
+     *   .register(new ApiHandler())
+     *   .register(new GLTFAssetsManager())
+     *
+     * await engine.start()
+     * ```
+     */
+    register(component: AnyComponent): this {
+        const type = detectComponentType(component)
+        const config = component.getConfiguration()
+
+        // Check for duplicate registration
+        if (this.#isComponentRegistered(config.name, type)) {
+            throw new Error(
+                `Component "${config.name}" of type "${type}" is already registered. ` +
+                    'Each component must have a unique name within its type.'
+            )
+        }
+
+        switch (type) {
+            case 'collector':
+                if (isCollector(component)) {
+                    this.#dynamicCollectors.push(component)
+                }
+                break
+            case 'harvester':
+                if (isHarvester(component)) {
+                    this.#dynamicHarvesters.push(component)
+                }
+                break
+            case 'handler':
+                if (isHandler(component)) {
+                    this.#dynamicHandlers.push(component)
+                }
+                break
+            case 'assets_manager':
+                if (isAssetsManager(component)) {
+                    this.#dynamicAssetsManagers.push(component)
+                }
+                break
+            case 'custom_table_manager':
+                if (isCustomTableManager(component)) {
+                    this.#dynamicCustomTableManagers.push(component)
+                }
+                break
+        }
+
+        return this
+    }
+
+    /**
+     * Registers multiple components at once with automatic type detection.
+     *
+     * Useful for registering all components from a module or when loading
+     * components dynamically.
+     *
+     * @param components - Array of component instances to register
+     * @returns The engine instance for method chaining
+     * @throws Error if any component type cannot be determined or is duplicate
+     *
+     * @example
+     * ```typescript
+     * const engine = new DigitalTwinEngine({ storage, database })
+     *
+     * engine.registerAll([
+     *   new WeatherCollector(),
+     *   new TrafficCollector(),
+     *   new AnalysisHarvester(),
+     *   new ApiHandler()
+     * ])
+     *
+     * await engine.start()
+     * ```
+     */
+    registerAll(components: AnyComponent[]): this {
+        for (const component of components) {
+            this.register(component)
+        }
+        return this
+    }
+
+    /**
+     * Registers components with explicit type specification.
+     *
+     * Provides full type safety at compile time. Use this method when you
+     * have pre-sorted components from auto-discovery or want explicit control.
+     *
+     * @param components - Object with typed component arrays
+     * @returns The engine instance for method chaining
+     *
+     * @example
+     * ```typescript
+     * const loaded = await loadComponents('./src/components')
+     *
+     * engine.registerComponents({
+     *   collectors: loaded.collectors,
+     *   harvesters: loaded.harvesters,
+     *   handlers: loaded.handlers,
+     *   assetsManagers: loaded.assetsManagers,
+     *   customTableManagers: loaded.customTableManagers
+     * })
+     * ```
+     */
+    registerComponents(components: Partial<LoadedComponents>): this {
+        if (components.collectors) {
+            this.#dynamicCollectors.push(...components.collectors)
+        }
+        if (components.harvesters) {
+            this.#dynamicHarvesters.push(...components.harvesters)
+        }
+        if (components.handlers) {
+            this.#dynamicHandlers.push(...components.handlers)
+        }
+        if (components.assetsManagers) {
+            this.#dynamicAssetsManagers.push(...components.assetsManagers)
+        }
+        if (components.customTableManagers) {
+            this.#dynamicCustomTableManagers.push(...components.customTableManagers)
+        }
+        return this
+    }
+
+    /**
+     * Checks if a component with the given name is already registered.
+     */
+    #isComponentRegistered(name: string, type: ComponentTypeName): boolean {
+        const allComponents = this.#getAllComponentsOfType(type)
+        return allComponents.some(c => c.getConfiguration().name === name)
+    }
+
+    /**
+     * Gets all components of a specific type (both from constructor and register()).
+     */
+    #getAllComponentsOfType(type: ComponentTypeName): AnyComponent[] {
+        switch (type) {
+            case 'collector':
+                return this.#allCollectors
+            case 'harvester':
+                return this.#allHarvesters
+            case 'handler':
+                return this.#allHandlers
+            case 'assets_manager':
+                return this.#allAssetsManagers
+            case 'custom_table_manager':
+                return this.#allCustomTableManagers
+        }
     }
 
     /**
@@ -794,28 +1022,28 @@ export class DigitalTwinEngine {
         const componentResults: ComponentValidationResult[] = []
         const engineErrors: string[] = []
 
-        // Validate collectors
-        for (const collector of this.#collectors) {
+        // Validate collectors (includes dynamically registered)
+        for (const collector of this.#allCollectors) {
             componentResults.push(await this.#validateComponent(collector, 'collector'))
         }
 
-        // Validate harvesters
-        for (const harvester of this.#harvesters) {
+        // Validate harvesters (includes dynamically registered)
+        for (const harvester of this.#allHarvesters) {
             componentResults.push(await this.#validateComponent(harvester, 'harvester'))
         }
 
-        // Validate handlers
-        for (const handler of this.#handlers) {
+        // Validate handlers (includes dynamically registered)
+        for (const handler of this.#allHandlers) {
             componentResults.push(await this.#validateComponent(handler, 'handler'))
         }
 
-        // Validate assets managers
-        for (const assetsManager of this.#assetsManagers) {
+        // Validate assets managers (includes dynamically registered)
+        for (const assetsManager of this.#allAssetsManagers) {
             componentResults.push(await this.#validateComponent(assetsManager, 'assets_manager'))
         }
 
-        // Validate store managers
-        for (const customTableManager of this.#customTableManagers) {
+        // Validate custom table managers (includes dynamically registered)
+        for (const customTableManager of this.#allCustomTableManagers) {
             componentResults.push(await this.#validateComponent(customTableManager, 'custom_table_manager'))
         }
 
@@ -880,26 +1108,26 @@ export class DigitalTwinEngine {
     async testComponents(): Promise<ComponentValidationResult[]> {
         const results: ComponentValidationResult[] = []
 
-        // Test collectors
-        for (const collector of this.#collectors) {
+        // Test collectors (includes dynamically registered)
+        for (const collector of this.#allCollectors) {
             const result = await this.#testCollector(collector)
             results.push(result)
         }
 
-        // Test harvesters
-        for (const harvester of this.#harvesters) {
+        // Test harvesters (includes dynamically registered)
+        for (const harvester of this.#allHarvesters) {
             const result = await this.#testHarvester(harvester)
             results.push(result)
         }
 
-        // Test handlers
-        for (const handler of this.#handlers) {
+        // Test handlers (includes dynamically registered)
+        for (const handler of this.#allHandlers) {
             const result = await this.#testHandler(handler)
             results.push(result)
         }
 
-        // Test assets managers
-        for (const assetsManager of this.#assetsManagers) {
+        // Test assets managers (includes dynamically registered)
+        for (const assetsManager of this.#allAssetsManagers) {
             const result = await this.#testAssetsManager(assetsManager)
             results.push(result)
         }

@@ -779,13 +779,10 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      */
     async getAllAssets(): Promise<DataRecord[]> {
         const config = this.getConfiguration()
-        // Get all assets and sort by date descending (newest first)
+        // Get all assets sorted by date descending (newest first) using SQL ORDER BY
         const veryOldDate = new Date('1970-01-01')
         const farFutureDate = new Date('2099-12-31')
-        const assets = await this.db.getByDateRange(config.name, veryOldDate, farFutureDate, 1000) // Max 1000 assets
-
-        // Sort by date descending (newest first) since getByDateRange returns ascending
-        return assets.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        return this.db.getByDateRange(config.name, veryOldDate, farFutureDate, 1000, 'desc')
     }
 
     /**

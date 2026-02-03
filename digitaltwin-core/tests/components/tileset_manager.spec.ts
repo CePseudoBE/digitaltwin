@@ -899,20 +899,41 @@ test.group('TilesetManager.getOpenAPISpec', () => {
     })
 })
 
+// Test subclass to verify uploadQueue is set
+class TestTilesetManagerWithQueueAccess extends TilesetManager {
+    getConfiguration(): AssetsManagerConfiguration {
+        return {
+            name: 'test-tilesets-queue',
+            description: 'Test tileset manager for queue testing',
+            contentType: 'application/json',
+            extension: '.zip',
+            endpoint: 'test-tilesets-queue'
+        }
+    }
+
+    hasUploadQueue(): boolean {
+        return this.uploadQueue !== null
+    }
+}
+
 test.group('TilesetManager.setUploadQueue', () => {
-    test('accepts upload queue', async ({ assert }) => {
-        const manager = new TestTilesetManager()
+    test('stores upload queue for async processing', async ({ assert }) => {
+        const manager = new TestTilesetManagerWithQueueAccess()
         const db = new MockDatabaseAdapter()
         const storage = new LocalStorageService('.test-queue')
         manager.setDependencies(db, storage)
+
+        // Initially no queue
+        assert.isFalse(manager.hasUploadQueue(), 'Queue should be null initially')
 
         // Mock queue
         const mockQueue = {
             add: async () => ({ id: 'job-1' })
         } as any
 
-        // Should not throw
         manager.setUploadQueue(mockQueue)
-        assert.isTrue(true)
+
+        // Queue should now be set
+        assert.isTrue(manager.hasUploadQueue(), 'Queue should be set after setUploadQueue')
     })
 })
