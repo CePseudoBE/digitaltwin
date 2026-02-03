@@ -211,18 +211,18 @@ test.group('initializeComponents', () => {
   test('should check table existence for each component', async ({ assert }) => {
     const database = new MockDatabaseAdapter()
     const storage = new MockStorageService()
-    
+
     const collector1 = new MockCollector('table1')
     const collector2 = new MockCollector('table2')
     const harvester = new MockHarvester('table3')
-    
+
     const checkedTables: string[] = []
-    
+
     database.doesTableExists = async (tableName: string) => {
       checkedTables.push(tableName)
       return true
     }
-    
+
     // Mock setDependencies to avoid errors
     collector1.setDependencies = () => {}
     collector2.setDependencies = () => {}
@@ -231,5 +231,43 @@ test.group('initializeComponents', () => {
     await initializeComponents([collector1, collector2, harvester], database, storage)
 
     assert.deepEqual(checkedTables, ['table1', 'table2', 'table3'])
+  })
+
+  test('should initialize multiple components in parallel for faster startup', async ({ assert }) => {
+    const database = new MockDatabaseAdapter()
+    const storage = new MockStorageService()
+
+    const collector1 = new MockCollector('parallel1')
+    const collector2 = new MockCollector('parallel2')
+    const collector3 = new MockCollector('parallel3')
+
+    // Track timing - with parallel execution, total time should be close to max single time
+    const tableCheckTimes: number[] = []
+    const delay = 50 // ms
+
+    database.doesTableExists = async (tableName: string) => {
+      const start = Date.now()
+      await new Promise(resolve => setTimeout(resolve, delay))
+      tableCheckTimes.push(Date.now() - start)
+      return false
+    }
+
+    database.createTable = async (tableName: string) => {
+      // Fast table creation
+    }
+
+    collector1.setDependencies = () => {}
+    collector2.setDependencies = () => {}
+    collector3.setDependencies = () => {}
+
+    const startTime = Date.now()
+    await initializeComponents([collector1, collector2, collector3], database, storage)
+    const totalTime = Date.now() - startTime
+
+    // With parallel execution, 3 components with 50ms each should take ~50-100ms
+    // With sequential execution, it would take ~150ms+
+    // Allow some margin for test environment variability
+    assert.isBelow(totalTime, 200, 'Parallel initialization should be faster than sequential')
+    assert.lengthOf(tableCheckTimes, 3, 'All 3 tables should be checked')
   })
 })

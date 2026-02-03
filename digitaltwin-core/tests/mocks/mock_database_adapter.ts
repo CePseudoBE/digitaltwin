@@ -414,15 +414,12 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
         name: string,
         startDate: Date,
         endDate?: Date,
-        limit?: number
+        limit?: number,
+        order: 'asc' | 'desc' = 'asc'
     ): Promise<DataRecord[]> {
         if (this.shouldThrow.getByDateRange) {
             throw new Error('Mock getByDateRange error')
         }
-
-
-        // DEBUG: Log de tous les records disponibles
-        const allRecordsForName = Array.from(this.records.values()).filter(r => r.name === name)
 
         let matchingRecords = Array.from(this.records.values())
             .filter(record => {
@@ -443,7 +440,10 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
                 return afterStart && beforeEnd
             })
-            .sort((a, b) => a.date.getTime() - b.date.getTime())
+            .sort((a, b) => order === 'asc'
+                ? a.date.getTime() - b.date.getTime()
+                : b.date.getTime() - a.date.getTime()
+            )
 
         if (limit) {
             matchingRecords = matchingRecords.slice(0, limit)

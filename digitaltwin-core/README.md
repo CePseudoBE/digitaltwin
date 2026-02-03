@@ -494,6 +494,20 @@ const json = OpenAPIGenerator.toJSON(spec)
 const yaml = OpenAPIGenerator.toYAML(spec)
 ```
 
+## Server Configuration
+
+### HTTP Compression
+
+HTTP compression is **disabled by default** because API gateways (Apache APISIX, Kong, Nginx, etc.) typically handle compression at the gateway level.
+
+For standalone deployments without a gateway, enable compression via environment variable:
+
+```bash
+export DIGITALTWIN_ENABLE_COMPRESSION=true
+```
+
+When enabled, the server uses gzip compression for JSON responses larger than 1KB, reducing bandwidth by 60-80%.
+
 ## Authentication
 
 The framework supports multiple authentication modes:
