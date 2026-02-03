@@ -464,7 +464,13 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         return row ? mapToDataRecord(row, this.#storage) : undefined
     }
 
-    async getByDateRange(name: string, startDate: Date, endDate?: Date, limit?: number, order: 'asc' | 'desc' = 'asc'): Promise<DataRecord[]> {
+    async getByDateRange(
+        name: string,
+        startDate: Date,
+        endDate?: Date,
+        limit?: number,
+        order: 'asc' | 'desc' = 'asc'
+    ): Promise<DataRecord[]> {
         this.#validateTableName(name)
         let query = this.#knex(name).select('*').where('date', '>=', startDate.toISOString())
 

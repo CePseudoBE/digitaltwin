@@ -43,11 +43,7 @@ export async function initializeComponents(
     autoMigration: boolean = true
 ): Promise<void> {
     // Create all tables in parallel for faster startup
-    await Promise.all(
-        components.map(comp =>
-            ensureTableExists(database, comp.getConfiguration().name, autoMigration)
-        )
-    )
+    await Promise.all(components.map(comp => ensureTableExists(database, comp.getConfiguration().name, autoMigration)))
 
     // Inject dependencies (synchronous, fast)
     for (const comp of components) {
@@ -86,9 +82,7 @@ export async function initializeAssetsManagers(
 ): Promise<void> {
     // Create all tables in parallel for faster startup
     await Promise.all(
-        assetsManagers.map(manager =>
-            ensureTableExists(database, manager.getConfiguration().name, autoMigration)
-        )
+        assetsManagers.map(manager => ensureTableExists(database, manager.getConfiguration().name, autoMigration))
     )
 
     // Inject dependencies (synchronous, fast)
