@@ -243,13 +243,16 @@ test.group('Collector configuration', () => {
         assert.isTrue(parts.length >= 5)
     })
 
-    test('setDependencies should accept db and storage', ({ assert }) => {
+    test('setDependencies should enable collector to run successfully', async ({ assert }) => {
         const storage = new LocalStorageService('.test_deps')
         const db = new MockDatabaseAdapter({ storage })
         const collector = new DummyCollector()
 
-        // Should not throw
         collector.setDependencies(db, storage)
-        assert.isTrue(true)
+
+        // Verify dependencies are correctly set by performing an operation
+        const result = await collector.run()
+        assert.instanceOf(result, Buffer)
+        assert.isTrue(collector.collected)
     })
 })

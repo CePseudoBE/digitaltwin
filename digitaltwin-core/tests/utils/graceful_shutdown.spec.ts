@@ -86,7 +86,7 @@ test.group('setupGracefulShutdown', () => {
         assert.equal(process.listenerCount('SIGTERM'), originalCount)
     })
 
-    test('uses custom logger when provided', ({ assert }) => {
+    test('uses custom logger when provided', async ({ assert }) => {
         const db = new MockDatabaseAdapter()
         const storage = new MockStorageService()
         const engine = new DigitalTwinEngine({ database: db, storage })
@@ -94,30 +94,45 @@ test.group('setupGracefulShutdown', () => {
         const logs: string[] = []
         const customLogger = (msg: string) => logs.push(msg)
 
+        // Capture original listener count to verify cleanup
+        const originalCount = process.listenerCount('SIGTERM')
+
         const cleanup = setupGracefulShutdown(engine, {
             logger: customLogger
         })
 
-        // Logger is called during shutdown, not during setup
-        // So we just verify it was accepted without error
+        // Verify setup occurred (handlers registered)
+        assert.equal(process.listenerCount('SIGTERM'), originalCount + 1)
         assert.isFunction(cleanup)
 
         cleanup()
+
+        // Verify cleanup worked (handlers removed)
+        assert.equal(process.listenerCount('SIGTERM'), originalCount)
     })
 
-    test('accepts timeout option', ({ assert }) => {
+    test('accepts timeout option and sets up handlers correctly', ({ assert }) => {
         const db = new MockDatabaseAdapter()
         const storage = new MockStorageService()
         const engine = new DigitalTwinEngine({ database: db, storage })
 
-        // Should not throw with custom timeout
+        const originalSIGTERM = process.listenerCount('SIGTERM')
+        const originalSIGINT = process.listenerCount('SIGINT')
+
         const cleanup = setupGracefulShutdown(engine, {
             timeout: 60000
         })
 
+        // Verify handlers were registered (proves options object was processed)
+        assert.equal(process.listenerCount('SIGTERM'), originalSIGTERM + 1)
+        assert.equal(process.listenerCount('SIGINT'), originalSIGINT + 1)
         assert.isFunction(cleanup)
 
         cleanup()
+
+        // Verify cleanup
+        assert.equal(process.listenerCount('SIGTERM'), originalSIGTERM)
+        assert.equal(process.listenerCount('SIGINT'), originalSIGINT)
     })
 
     test('accepts onShutdown callback option', ({ assert }) => {
