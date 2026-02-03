@@ -42,9 +42,15 @@ export async function initializeComponents(
     storage: StorageService,
     autoMigration: boolean = true
 ): Promise<void> {
+    // Create all tables in parallel for faster startup
+    await Promise.all(
+        components.map(comp =>
+            ensureTableExists(database, comp.getConfiguration().name, autoMigration)
+        )
+    )
+
+    // Inject dependencies (synchronous, fast)
     for (const comp of components) {
-        const config = comp.getConfiguration()
-        await ensureTableExists(database, config.name, autoMigration)
         comp.setDependencies(database, storage)
     }
 }
@@ -78,9 +84,15 @@ export async function initializeAssetsManagers(
     storage: StorageService,
     autoMigration: boolean = true
 ): Promise<void> {
+    // Create all tables in parallel for faster startup
+    await Promise.all(
+        assetsManagers.map(manager =>
+            ensureTableExists(database, manager.getConfiguration().name, autoMigration)
+        )
+    )
+
+    // Inject dependencies (synchronous, fast)
     for (const manager of assetsManagers) {
-        const config = manager.getConfiguration()
-        await ensureTableExists(database, config.name, autoMigration)
         manager.setDependencies(database, storage)
     }
 }

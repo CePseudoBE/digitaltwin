@@ -11,6 +11,7 @@ import multer from 'multer'
 import type { ConnectionOptions, Worker } from 'bullmq'
 import fs from 'fs/promises'
 import cors from 'cors'
+import compression from 'compression'
 
 import { initializeComponents, initializeAssetsManagers } from './initializer.js'
 import {
@@ -521,6 +522,22 @@ export class DigitalTwinEngine {
 
         // Ensure temporary upload directory exists
         await this.#ensureTempUploadDir()
+
+        // Enable HTTP compression for JSON responses (reduces bandwidth by 60-80%)
+        this.#app.use(
+            compression({
+                filter: (req, res) => {
+                    // Don't compress binary streams
+                    if (req.headers['accept']?.includes('application/octet-stream')) {
+                        return false
+                    }
+                    // Use default filter for other content types
+                    return compression.filter(req, res)
+                },
+                level: 6, // Balance between speed and compression ratio
+                threshold: 1024 // Only compress responses larger than 1KB
+            })
+        )
 
         // Enable CORS for cross-origin requests from frontend applications
         this.#app.use(
