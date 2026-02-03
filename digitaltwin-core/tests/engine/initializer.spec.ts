@@ -144,14 +144,24 @@ test.group('initializeComponents', () => {
     assert.equal(tablesCreatedCount, 2, 'Should create 2 missing tables')
   })
 
-  test('should handle empty components array', async ({ assert }) => {
+  test('should handle empty components array without throwing', async ({ assert }) => {
     const database = new MockDatabaseAdapter()
     const storage = new MockStorageService()
-    
-    // Should not throw any errors
-    await initializeComponents([], database, storage)
-    
-    assert.isTrue(true) // Test passes if no exception is thrown
+
+    // Track if any table operations were called
+    let tableCheckCount = 0
+    database.doesTableExists = async () => {
+      tableCheckCount++
+      return true
+    }
+
+    // Should complete without throwing
+    await assert.doesNotReject(
+      async () => initializeComponents([], database, storage)
+    )
+
+    // No table checks should have been performed for empty array
+    assert.equal(tableCheckCount, 0, 'No table checks should occur for empty components')
   })
 
   test('should handle mixed collector and harvester components', async ({ assert }) => {
