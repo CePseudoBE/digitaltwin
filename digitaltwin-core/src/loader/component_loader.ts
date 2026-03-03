@@ -57,6 +57,12 @@ export interface LoadComponentsOptions {
      * @default false
      */
     verbose?: boolean
+
+    /**
+     * Custom logger function for verbose output.
+     * When provided, verbose messages are sent to this function instead of console.log.
+     */
+    logger?: (message: string) => void
 }
 
 /**
@@ -114,11 +120,14 @@ const DEFAULT_EXCLUDE = ['*.spec.*', '*.test.*', 'index.*', '*.d.ts']
  * Check if a filename matches an exclusion pattern.
  */
 function matchesExcludePattern(filename: string, patterns: string[]): boolean {
+    const nameWithoutExt = filename.replace(/\.[^.]+$/, '')
+
     for (const pattern of patterns) {
         // Convert glob pattern to regex
         const regexPattern = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*')
         const regex = new RegExp(`^${regexPattern}$`, 'i')
-        if (regex.test(filename)) {
+        // Match against full filename and name without extension
+        if (regex.test(filename) || regex.test(nameWithoutExt)) {
             return true
         }
     }
@@ -185,6 +194,7 @@ async function scanDirectory(
         exclude: string[]
         recursive: boolean
         patterns: ResolvedPatterns
+        log?: (message: string) => void
     }
 ): Promise<Array<{ path: string; type: keyof LoadedComponents }>> {
     const results: Array<{ path: string; type: keyof LoadedComponents }> = []
@@ -212,6 +222,7 @@ async function scanDirectory(
 
                 // Check exclusions
                 if (matchesExcludePattern(entry.name, options.exclude)) {
+                    options.log?.(`[loadComponents] Excluding ${entry.name}`)
                     continue
                 }
 
@@ -308,6 +319,7 @@ export async function loadComponents(
     const exclude = options.exclude ?? DEFAULT_EXCLUDE
     const recursive = options.recursive ?? true
     const verbose = options.verbose ?? false
+    const log = options.logger ?? console.log
 
     const result: LoadComponentsResult = {
         collectors: [],
@@ -336,18 +348,25 @@ export async function loadComponents(
         await fs.access(absoluteDir)
     } catch {
         if (verbose) {
-            console.warn(`[loadComponents] Directory not found: ${absoluteDir}`)
+            log(`[loadComponents] Directory not found: ${absoluteDir}`)
         }
         return result
     }
 
+    if (verbose) {
+        log(`[loadComponents] Loading components from ${absoluteDir}`)
+    }
+
     // Scan for component files
-    const files = await scanDirectory(absoluteDir, { extensions, exclude, recursive, patterns })
+    const files = await scanDirectory(absoluteDir, {
+        extensions, exclude, recursive, patterns,
+        log: verbose ? log : undefined
+    })
 
     result.scannedFiles = files.map(f => f.path)
 
     if (verbose) {
-        console.log(`[loadComponents] Found ${files.length} potential component files`)
+        log(`[loadComponents] Found ${files.length} potential component files`)
     }
 
     // Load each component file
@@ -429,7 +448,7 @@ export async function loadComponents(
 
             if (verbose) {
                 const config = instance.getConfiguration()
-                console.log(`[loadComponents] Loaded: ${config.name} (${expectedType})`)
+                log(`[loadComponents] Loaded: ${config.name} (${expectedType})`)
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
@@ -440,13 +459,13 @@ export async function loadComponents(
             result.summary.errors++
 
             if (verbose) {
-                console.error(`[loadComponents] Error loading ${filePath}:`, errorMessage)
+                log(`[loadComponents] Error loading ${filePath}: ${errorMessage}`)
             }
         }
     }
 
     if (verbose) {
-        console.log(`[loadComponents] Summary:`, result.summary)
+        log(`[loadComponents] Loaded components: ${result.summary.total} total`)
     }
 
     return result
