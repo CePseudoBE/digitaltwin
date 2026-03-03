@@ -145,42 +145,8 @@ export interface AssetsConfiguration extends ComponentConfiguration {
     endpoint: string
 }
 
-/**
- * Standard HTTP response structure for component endpoints.
- *
- * All component handlers return this structure to provide consistent
- * API responses across the digital twin system.
- *
- * @interface DataResponse
- *
- * @example
- * ```typescript
- * // Success response with JSON data
- * const response: DataResponse = {
- *   status: 200,
- *   content: JSON.stringify({ data: 'value' }),
- *   headers: { 'Content-Type': 'application/json' }
- * }
- *
- * // Binary response for file download
- * const fileResponse: DataResponse = {
- *   status: 200,
- *   content: fileBuffer,
- *   headers: {
- *     'Content-Type': 'application/octet-stream',
- *     'Content-Disposition': 'attachment; filename="data.bin"'
- *   }
- * }
- * ```
- */
-export interface DataResponse {
-    /** HTTP status code (200, 400, 401, 404, 500, etc.) */
-    status: number
-    /** Response body (Buffer for binary, string for text/JSON) */
-    content: Buffer | string
-    /** Optional HTTP headers to include in response */
-    headers?: Record<string, string>
-}
+// Re-exported from @digitaltwin/shared for backward compatibility
+export type { DataResponse } from '@digitaltwin/shared'
 
 /**
  * Configuration for CustomTableManager components.

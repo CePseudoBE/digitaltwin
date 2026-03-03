@@ -1,4 +1,4 @@
-// Re-exported from @digitaltwin/shared for backward compatibility
+// Validation schemas
 export {
     paginationSchema,
     idParamSchema,
@@ -16,4 +16,7 @@ export {
     validateCustomRecordCreate,
     validateCustomRecordUpdate,
     validateDateRangeQuery
-} from '@digitaltwin/shared'
+} from './schemas.js'
+
+// Validation helpers
+export { validateData, safeValidate, validateQuery, validateParams, vine } from './validate.js'

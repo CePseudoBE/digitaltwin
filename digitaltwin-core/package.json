@@ -95,6 +95,7 @@
     }
   },
   "dependencies": {
+    "@digitaltwin/shared": "workspace:*",
     "@aws-sdk/client-s3": "^3.981.0",
     "@vinejs/vine": "^4.2.0",
     "bullmq": "^5.56.5",
