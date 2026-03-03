@@ -90,6 +90,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.981.0
         version: 3.981.0
+      '@digitaltwin/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
       '@vinejs/vine':
         specifier: ^4.2.0
         version: 4.2.0
@@ -187,6 +190,25 @@ importers:
       typescript-eslint:
         specifier: ^8.0.0
         version: 8.53.0(eslint@9.39.2)(typescript@5.9.3)
+
+  packages/shared:
+    dependencies:
+      '@vinejs/vine':
+        specifier: ^4.2.0
+        version: 4.2.0
+    devDependencies:
+      '@japa/assert':
+        specifier: ^4.1.0
+        version: 4.2.0(@japa/runner@4.5.0)
+      '@japa/runner':
+        specifier: ^4.3.0
+        version: 4.5.0
+      ts-node-maintained:
+        specifier: ^10.9.5
+        version: 10.9.6(@types/node@24.10.8)(typescript@5.9.3)
+      ultimate-express:
+        specifier: ^2.0.9
+        version: 2.0.15
 
 packages:
 

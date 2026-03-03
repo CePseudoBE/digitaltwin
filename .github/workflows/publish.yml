@@ -43,6 +43,20 @@ jobs:
       - name: Build all packages
         run: pnpm build
 
+      - name: Publish @digitaltwin/shared (if version changed)
+        run: |
+          cd packages/shared
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          if [ "$LOCAL_VERSION" != "$NPM_VERSION" ]; then
+            echo "Publishing $PACKAGE_NAME@$LOCAL_VERSION (npm has $NPM_VERSION)"
+            npm publish --access public --provenance
+          else
+            echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
+          fi
+
       - name: Publish digitaltwin-core (if version changed)
         run: |
           cd digitaltwin-core
