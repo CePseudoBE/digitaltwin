@@ -66,6 +66,70 @@ const engine = new DigitalTwinEngine({ storage, database });
 engine.start();
 ```
 
+## Developer Experience
+
+### Auto-Discovery
+
+The framework provides automatic component discovery to reduce boilerplate:
+
+```typescript
+import { DigitalTwinEngine, loadComponents } from 'digitaltwin-core'
+
+// Before: manual imports for each component
+// import { WeatherCollector } from './components/weather_collector.js'
+// import { SensorCollector } from './components/sensor_collector.js'
+// ...
+
+// After: automatic discovery
+const result = await loadComponents('./dist/components')
+
+const engine = new DigitalTwinEngine({ storage, database })
+engine.registerComponents(result)
+await engine.start()
+```
+
+The loader discovers components based on file naming conventions:
+- `*_collector.js` → Collectors
+- `*_harvester.js` → Harvesters
+- `*_handler.js` → Handlers
+- `*_assets_manager.js` → Assets Managers
+- `*_custom_table.js` → Custom Table Managers
+
+### Loading Options
+
+```typescript
+const result = await loadComponents('./dist/components', {
+  recursive: true,        // Scan subdirectories (default)
+  verbose: true,          // Log discovered components
+  extensions: ['.js'],    // File extensions
+  exclude: ['*.test.*']   // Exclusion patterns
+})
+
+// Result includes metadata
+console.log(result.summary)
+// { total: 5, collectors: 2, harvesters: 1, handlers: 2, errors: 0 }
+
+// Check for loading errors
+if (result.errors.length > 0) {
+  console.warn('Some components failed to load:', result.errors)
+}
+```
+
+### Type Guards
+
+Runtime type detection utilities:
+
+```typescript
+import { isCollector, isHandler, detectComponentType } from 'digitaltwin-core'
+
+if (isCollector(component)) {
+  // TypeScript narrowing works here
+  await component.collect()
+}
+
+const type = detectComponentType(component) // 'collector' | 'handler' | ...
+```
+
 ## Components
 
 ### Collectors
@@ -430,6 +494,20 @@ const json = OpenAPIGenerator.toJSON(spec)
 const yaml = OpenAPIGenerator.toYAML(spec)
 ```
 
+## Server Configuration
+
+### HTTP Compression
+
+HTTP compression is **disabled by default** because API gateways (Apache APISIX, Kong, Nginx, etc.) typically handle compression at the gateway level.
+
+For standalone deployments without a gateway, enable compression via environment variable:
+
+```bash
+export DIGITALTWIN_ENABLE_COMPRESSION=true
+```
+
+When enabled, the server uses gzip compression for JSON responses larger than 1KB, reducing bandwidth by 60-80%.
+
 ## Authentication
 
 The framework supports multiple authentication modes:
@@ -484,10 +562,14 @@ node dt make:harvester DataProcessor --source weather-collector
 - `src/` – framework sources
     - `auth/` – authentication providers and user management
     - `components/` – base classes for collectors, harvesters, handlers and assets manager
-    - `engine/` – orchestration logic
+    - `engine/` – orchestration logic (includes component type guards)
+    - `loader/` – component auto-discovery utilities
     - `storage/` – storage service abstractions and adapters
     - `database/` – metadata database adapter
     - `env/` – environment configuration helper
+    - `errors/` – custom error classes
+    - `validation/` – request validation with VineJS
+    - `utils/` – utility functions (graceful shutdown, HTTP responses, etc.)
 - `tests/` – unit tests
 
 ---

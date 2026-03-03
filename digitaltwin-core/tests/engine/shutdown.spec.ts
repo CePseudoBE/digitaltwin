@@ -41,7 +41,7 @@ test.group('Graceful Shutdown', () => {
         assert.isBelow(duration, 50)
     })
 
-    test('setShutdownTimeout configures timeout', ({ assert }) => {
+    test('setShutdownTimeout accepts valid timeout values', ({ assert }) => {
         const db = new MockDatabaseAdapter()
         const storage = new MockStorageService()
 
@@ -50,9 +50,20 @@ test.group('Graceful Shutdown', () => {
             storage: storage
         })
 
-        // Should not throw
+        // Verify method exists and accepts various valid timeout values
+        assert.isFunction(engine.setShutdownTimeout)
+
+        // Should accept standard timeout
         engine.setShutdownTimeout(60000)
-        assert.isTrue(true)
+
+        // Should accept minimum reasonable timeout
+        engine.setShutdownTimeout(1000)
+
+        // Should accept longer timeout
+        engine.setShutdownTimeout(120000)
+
+        // Engine should still be functional after setting timeout
+        assert.isFalse(engine.isShuttingDown())
     })
 
     test('stop() cleans up resources without errors', async ({ assert }) => {

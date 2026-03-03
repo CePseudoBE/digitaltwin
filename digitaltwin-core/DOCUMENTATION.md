@@ -595,10 +595,37 @@ const engine = new DigitalTwinEngine({
     level: LogLevel.INFO,
     format: 'json'
   },
-  
+
   // Development mode
   dryRun: false
 })
+```
+
+### HTTP Compression
+
+HTTP compression is **disabled by default** because API gateways (Apache APISIX, Kong, Nginx, etc.) typically handle compression at the gateway level.
+
+For standalone deployments without a gateway, enable compression via environment variable:
+
+```bash
+export DIGITALTWIN_ENABLE_COMPRESSION=true
+```
+
+When enabled, the server uses gzip compression with:
+- **Level 6** compression (balance between speed and ratio)
+- **1KB threshold** (only compress responses larger than 1KB)
+- **Binary exclusion** (binary streams like `application/octet-stream` are not compressed)
+
+```typescript
+// Example: standalone deployment with compression
+process.env.DIGITALTWIN_ENABLE_COMPRESSION = 'true'
+
+const engine = new DigitalTwinEngine({
+  storage,
+  database,
+  server: { port: 3000 }
+})
+```
 ```
 
 ### Engine Lifecycle

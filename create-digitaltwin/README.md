@@ -47,6 +47,8 @@ create-digitaltwin my-digital-twin
 
 ## Usage
 
+### Interactive Mode (Default)
+
 ```bash
 create-digitaltwin [project-name]
 ```
@@ -56,11 +58,49 @@ The CLI will guide you through configuration options:
 > **Note:** You can use `npm init digitaltwin` as a shorthand for `npx create-digitaltwin` thanks to npm's init command aliasing.
 
 - **Project Name**: Name for your Digital Twin application
-- **Database**: SQLite (file-based) or PostgreSQL (production-ready)  
+- **Database**: SQLite (file-based) or PostgreSQL (production-ready)
 - **Storage**: Local filesystem or OVH Object Storage (S3-compatible)
 - **Redis**: Enable for distributed queue management
 - **Docker**: Include Docker configuration files
 - **Examples**: Include sample IoT components
+
+### Non-Interactive Mode
+
+Use the `--yes` flag to skip prompts and use defaults or CLI options:
+
+```bash
+# Create with all defaults
+npx create-digitaltwin my-app --yes
+
+# Create with PostgreSQL and Redis
+npx create-digitaltwin my-app --yes --database postgresql --redis
+
+# Create with Docker, no examples, skip install
+npx create-digitaltwin my-app --yes --docker --no-examples --skip-install
+
+# Full example with all options
+npx create-digitaltwin my-app --yes \
+  --database postgresql \
+  --storage local \
+  --storage-path ./data \
+  --redis \
+  --docker \
+  --examples
+```
+
+### CLI Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-y, --yes` | Skip prompts, use defaults | `false` |
+| `--database <type>` | Database: `sqlite` or `postgresql` | `sqlite` |
+| `--storage <type>` | Storage: `local` or `ovh` | `local` |
+| `--storage-path <path>` | Local storage directory | `./uploads` |
+| `--redis` | Enable Redis for queues | `true` |
+| `--docker` | Include Docker files | `false` |
+| `--examples` | Include example components | `true` |
+| `--no-examples` | Skip example components | - |
+| `--skip-install` | Skip npm install | `false` |
 
 ## Generated Project Structure
 
@@ -131,8 +171,20 @@ npm run dev my-test-project
 
 - `npm run build` - Compile TypeScript to JavaScript
 - `npm run dev` - Run in development mode with tsx
+- `npm test` - Run tests with Japa
 - `npm start` - Run compiled CLI
 - `npm run prepare` - Pre-publish build hook
+
+## Testing
+
+The CLI uses the [Japa](https://japa.dev/) testing framework. Tests cover:
+- Project generation with various configurations
+- Non-interactive mode with CLI options
+- Input validation
+
+```bash
+npm test
+```
 
 ## Digital Twin Architecture
 

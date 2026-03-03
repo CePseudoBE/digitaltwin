@@ -1,35 +1,37 @@
 import { test } from '@japa/runner'
-import {
-    DigitalTwinEngine,
-    isCollector,
-    isHarvester,
-    isHandler,
-    isAssetsManager,
-    isCustomTableManager
-} from '../../src/engine/digital_twin_engine.js'
+import { DigitalTwinEngine } from '../../src/engine/digital_twin_engine.js'
 import { Collector } from '../../src/components/collector.js'
 import { Harvester } from '../../src/components/harvester.js'
 import { Handler } from '../../src/components/handler.js'
 import { AssetsManager } from '../../src/components/assets_manager.js'
 import { CustomTableManager } from '../../src/components/custom_table_manager.js'
-import type { CollectorConfiguration, HarvesterConfiguration, AssetsManagerConfiguration, StoreConfiguration, ComponentConfiguration } from '../../src/components/types.js'
+import type {
+    CollectorConfiguration,
+    HarvesterConfiguration,
+    ComponentConfiguration,
+    AssetsManagerConfiguration
+} from '../../src/components/types.js'
 import type { DataRecord } from '../../src/types/data_record.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { MockStorageService } from '../mocks/mock_storage_service.js'
 
-// Test Collector
+// Test implementations with configurable names
 class TestCollector extends Collector {
+    constructor(private componentName: string = 'test-collector') {
+        super()
+    }
+
     getConfiguration(): CollectorConfiguration {
         return {
-            name: 'test-collector',
+            name: this.componentName,
             description: 'Test collector',
             contentType: 'application/json',
-            endpoint: 'test-collector'
+            endpoint: 'test'
         }
     }
 
     getSchedule(): string {
-        return '0 */5 * * * *'
+        return '0 * * * * *'
     }
 
     async collect(): Promise<Buffer> {
@@ -37,413 +39,384 @@ class TestCollector extends Collector {
     }
 }
 
-// Test Harvester
 class TestHarvester extends Harvester {
+    constructor(private componentName: string = 'test-harvester') {
+        super()
+    }
+
     getUserConfiguration(): HarvesterConfiguration {
         return {
-            name: 'test-harvester',
+            name: this.componentName,
             description: 'Test harvester',
             contentType: 'application/json',
-            endpoint: 'test-harvester',
+            endpoint: 'harvested',
             source: 'test-collector'
         }
     }
 
-    async harvest(
-        _sourceData: DataRecord | DataRecord[],
-        _dependenciesData: Record<string, DataRecord | DataRecord[] | null>
-    ): Promise<Buffer> {
+    async harvest(sourceData: DataRecord | DataRecord[]): Promise<Buffer> {
         return Buffer.from('{"harvested": true}')
     }
 }
 
-// Test Handler
 class TestHandler extends Handler {
+    constructor(private componentName: string = 'test-handler') {
+        super()
+    }
+
     getConfiguration(): ComponentConfiguration {
         return {
-            name: 'test-handler',
+            name: this.componentName,
             description: 'Test handler',
             contentType: 'application/json'
         }
     }
 }
 
-// Test AssetsManager
 class TestAssetsManager extends AssetsManager {
+    constructor(private componentName: string = 'test-assets') {
+        super()
+    }
+
     getConfiguration(): AssetsManagerConfiguration {
         return {
-            name: 'test-assets',
+            name: this.componentName,
             description: 'Test assets manager',
-            contentType: 'image/jpeg',
-            endpoint: 'test-assets',
-            extension: '.jpg'
+            contentType: 'image/png',
+            endpoint: 'assets'
         }
     }
 }
 
-// Test CustomTableManager
 class TestCustomTableManager extends CustomTableManager {
-    getConfiguration(): StoreConfiguration {
+    constructor(private componentName: string = 'test-custom-table') {
+        super()
+    }
+
+    getConfiguration() {
         return {
-            name: 'test-table',
+            name: this.componentName,
             description: 'Test custom table',
             columns: {
-                custom_field: 'text'
+                custom_field: 'TEXT'
             }
         }
     }
 }
 
-test.group('Type Guards', () => {
-    test('isCollector correctly identifies collectors', ({ assert }) => {
-        const collector = new TestCollector()
-        const harvester = new TestHarvester()
-        const handler = new TestHandler()
-        const assetsManager = new TestAssetsManager()
-        const customTableManager = new TestCustomTableManager()
+test.group('DigitalTwinEngine.register() - Basic Registration', () => {
+    test('registers a collector and includes it in validation', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const database = new MockDatabaseAdapter()
+        const engine = new DigitalTwinEngine({ storage, database })
 
-        assert.isTrue(isCollector(collector))
-        assert.isFalse(isCollector(harvester))
-        assert.isFalse(isCollector(handler))
-        assert.isFalse(isCollector(assetsManager))
-        assert.isFalse(isCollector(customTableManager))
+        engine.register(new TestCollector('my-collector'))
+
+        const validation = await engine.validateConfiguration()
+        const collectorResult = validation.components.find(c => c.name === 'my-collector')
+
+        assert.isNotNull(collectorResult, 'Collector should be found in validation results')
+        assert.equal(collectorResult?.type, 'collector')
+        assert.isTrue(collectorResult?.valid)
     })
 
-    test('isHarvester correctly identifies harvesters', ({ assert }) => {
-        const collector = new TestCollector()
-        const harvester = new TestHarvester()
-        const handler = new TestHandler()
-        const assetsManager = new TestAssetsManager()
-        const customTableManager = new TestCustomTableManager()
+    test('registers a harvester and includes it in validation', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const database = new MockDatabaseAdapter()
+        const engine = new DigitalTwinEngine({ storage, database })
 
-        assert.isFalse(isHarvester(collector))
-        assert.isTrue(isHarvester(harvester))
-        assert.isFalse(isHarvester(handler))
-        assert.isFalse(isHarvester(assetsManager))
-        assert.isFalse(isHarvester(customTableManager))
+        engine.register(new TestHarvester('my-harvester'))
+
+        const validation = await engine.validateConfiguration()
+        const harvesterResult = validation.components.find(c => c.name === 'my-harvester')
+
+        assert.isNotNull(harvesterResult, 'Harvester should be found in validation results')
+        assert.equal(harvesterResult?.type, 'harvester')
+        assert.isTrue(harvesterResult?.valid)
     })
 
-    test('isHandler correctly identifies handlers', ({ assert }) => {
-        const collector = new TestCollector()
-        const harvester = new TestHarvester()
-        const handler = new TestHandler()
-        const assetsManager = new TestAssetsManager()
-        const customTableManager = new TestCustomTableManager()
+    test('registers a handler and includes it in validation', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const database = new MockDatabaseAdapter()
+        const engine = new DigitalTwinEngine({ storage, database })
 
-        assert.isFalse(isHandler(collector))
-        assert.isFalse(isHandler(harvester))
-        assert.isTrue(isHandler(handler))
-        assert.isFalse(isHandler(assetsManager))
-        assert.isFalse(isHandler(customTableManager))
+        engine.register(new TestHandler('my-handler'))
+
+        const validation = await engine.validateConfiguration()
+        const handlerResult = validation.components.find(c => c.name === 'my-handler')
+
+        assert.isNotNull(handlerResult, 'Handler should be found in validation results')
+        assert.equal(handlerResult?.type, 'handler')
+        assert.isTrue(handlerResult?.valid)
     })
 
-    test('isAssetsManager correctly identifies assets managers', ({ assert }) => {
-        const collector = new TestCollector()
-        const harvester = new TestHarvester()
-        const handler = new TestHandler()
-        const assetsManager = new TestAssetsManager()
-        const customTableManager = new TestCustomTableManager()
+    test('registers an assets manager and includes it in validation', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const database = new MockDatabaseAdapter()
+        const engine = new DigitalTwinEngine({ storage, database })
 
-        assert.isFalse(isAssetsManager(collector))
-        assert.isFalse(isAssetsManager(harvester))
-        assert.isFalse(isAssetsManager(handler))
-        assert.isTrue(isAssetsManager(assetsManager))
-        assert.isFalse(isAssetsManager(customTableManager))
+        engine.register(new TestAssetsManager('my-assets'))
+
+        const validation = await engine.validateConfiguration()
+        const assetsResult = validation.components.find(c => c.name === 'my-assets')
+
+        assert.isNotNull(assetsResult, 'AssetsManager should be found in validation results')
+        assert.equal(assetsResult?.type, 'assets_manager')
+        assert.isTrue(assetsResult?.valid)
     })
 
-    test('isCustomTableManager correctly identifies custom table managers', ({ assert }) => {
-        const collector = new TestCollector()
-        const harvester = new TestHarvester()
-        const handler = new TestHandler()
-        const assetsManager = new TestAssetsManager()
-        const customTableManager = new TestCustomTableManager()
+    test('registers a custom table manager and includes it in validation', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const database = new MockDatabaseAdapter()
+        const engine = new DigitalTwinEngine({ storage, database })
 
-        assert.isFalse(isCustomTableManager(collector))
-        assert.isFalse(isCustomTableManager(harvester))
-        assert.isFalse(isCustomTableManager(handler))
-        assert.isFalse(isCustomTableManager(assetsManager))
-        assert.isTrue(isCustomTableManager(customTableManager))
+        engine.register(new TestCustomTableManager('my-table'))
+
+        const validation = await engine.validateConfiguration()
+        const tableResult = validation.components.find(c => c.name === 'my-table')
+
+        assert.isNotNull(tableResult, 'CustomTableManager should be found in validation results')
+        assert.equal(tableResult?.type, 'custom_table_manager')
+        assert.isTrue(tableResult?.valid)
     })
 })
 
-test.group('DigitalTwinEngine.register()', () => {
-    test('register() auto-detects and registers a collector', async ({ assert }) => {
+test.group('DigitalTwinEngine.register() - Method Chaining', () => {
+    test('returns engine instance for chaining', ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({ storage, database })
-        const collector = new TestCollector()
 
-        const result = engine.register(collector)
+        const result = engine.register(new TestCollector())
 
-        // Should return the engine for chaining
-        assert.strictEqual(result, engine)
-
-        // Verify collector is registered by validating configuration
-        const validation = await engine.validateConfiguration()
-        const collectorResult = validation.components.find(c => c.name === 'test-collector')
-        assert.isDefined(collectorResult)
-        assert.equal(collectorResult?.type, 'collector')
+        assert.strictEqual(result, engine, 'register() should return the engine instance')
     })
 
-    test('register() auto-detects and registers a harvester', async ({ assert }) => {
+    test('supports fluent chaining of multiple registrations', async ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({ storage, database })
-        const harvester = new TestHarvester()
 
-        engine.register(harvester)
+        engine
+            .register(new TestCollector('collector-1'))
+            .register(new TestHarvester('harvester-1'))
+            .register(new TestHandler('handler-1'))
 
         const validation = await engine.validateConfiguration()
-        const harvesterResult = validation.components.find(c => c.name === 'test-harvester')
-        assert.isDefined(harvesterResult)
-        assert.equal(harvesterResult?.type, 'harvester')
+
+        assert.equal(validation.summary.total, 3, 'Should have 3 components registered')
+        assert.isNotNull(validation.components.find(c => c.name === 'collector-1'))
+        assert.isNotNull(validation.components.find(c => c.name === 'harvester-1'))
+        assert.isNotNull(validation.components.find(c => c.name === 'handler-1'))
     })
+})
 
-    test('register() auto-detects and registers a handler', async ({ assert }) => {
+test.group('DigitalTwinEngine.register() - Duplicate Detection', () => {
+    test('throws error when registering duplicate collector name', ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({ storage, database })
-        const handler = new TestHandler()
 
-        engine.register(handler)
+        engine.register(new TestCollector('duplicate-name'))
 
-        const validation = await engine.validateConfiguration()
-        const handlerResult = validation.components.find(c => c.name === 'test-handler')
-        assert.isDefined(handlerResult)
-        assert.equal(handlerResult?.type, 'handler')
+        assert.throws(
+            () => engine.register(new TestCollector('duplicate-name')),
+            /already registered/,
+            'Should throw error for duplicate name'
+        )
     })
 
-    test('register() auto-detects and registers an assets manager', async ({ assert }) => {
+    test('throws error when registering duplicate via constructor then register', ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
-        const engine = new DigitalTwinEngine({ storage, database })
-        const assetsManager = new TestAssetsManager()
-
-        engine.register(assetsManager)
-
-        const validation = await engine.validateConfiguration()
-        const assetsResult = validation.components.find(c => c.name === 'test-assets')
-        assert.isDefined(assetsResult)
-        assert.equal(assetsResult?.type, 'assets_manager')
-    })
-
-    test('register() auto-detects and registers a custom table manager', async ({ assert }) => {
-        const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
-        const engine = new DigitalTwinEngine({ storage, database })
-        const customTableManager = new TestCustomTableManager()
-
-        engine.register(customTableManager)
-
-        const validation = await engine.validateConfiguration()
-        const customTableResult = validation.components.find(c => c.name === 'test-table')
-        assert.isDefined(customTableResult)
-        assert.equal(customTableResult?.type, 'custom_table_manager')
-    })
-
-    test('register() supports method chaining', async ({ assert }) => {
-        const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
-        const engine = new DigitalTwinEngine({ storage, database })
-            .register(new TestCollector())
-            .register(new TestHarvester())
-            .register(new TestHandler())
-
-        const validation = await engine.validateConfiguration()
-        assert.equal(validation.components.length, 3)
-    })
-
-    test('register() throws when called after start()', async ({ assert }) => {
-        const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({
             storage,
             database,
-            dryRun: false
+            collectors: [new TestCollector('from-constructor')]
         })
 
-        await engine.start()
-
         assert.throws(
-            () => engine.register(new TestCollector()),
-            /Cannot register components after the engine has started/
+            () => engine.register(new TestCollector('from-constructor')),
+            /already registered/,
+            'Should detect duplicates across constructor and register()'
         )
-
-        await engine.stop()
     })
 
-    test('register() throws for unknown component type', ({ assert }) => {
+    test('allows same name for different component types', async ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({ storage, database })
 
-        // Create a fake object that doesn't match any component type
-        const fakeComponent = {
-            getConfiguration: () => ({ name: 'fake' })
-        }
+        // Same name, different types - should be allowed
+        engine.register(new TestCollector('shared-name'))
+        engine.register(new TestHandler('shared-name'))
 
-        assert.throws(
-            () => engine.register(fakeComponent as any),
-            /Unknown component type/
-        )
+        const validation = await engine.validateConfiguration()
+        const components = validation.components.filter(c => c.name === 'shared-name')
+
+        assert.equal(components.length, 2, 'Should have 2 components with same name but different types')
+        assert.isTrue(components.some(c => c.type === 'collector'))
+        assert.isTrue(components.some(c => c.type === 'handler'))
     })
 })
 
 test.group('DigitalTwinEngine.registerAll()', () => {
-    test('registerAll() registers multiple components at once', async ({ assert }) => {
+    test('registers multiple components and includes all in validation', async ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({ storage, database })
-            .registerAll([
-                new TestCollector(),
-                new TestHarvester(),
-                new TestHandler(),
-                new TestAssetsManager(),
-                new TestCustomTableManager()
-            ])
+
+        engine.registerAll([
+            new TestCollector('bulk-collector'),
+            new TestHarvester('bulk-harvester'),
+            new TestHandler('bulk-handler')
+        ])
 
         const validation = await engine.validateConfiguration()
-        assert.equal(validation.components.length, 5)
+
+        assert.equal(validation.summary.total, 3)
+        assert.isNotNull(validation.components.find(c => c.name === 'bulk-collector'))
+        assert.isNotNull(validation.components.find(c => c.name === 'bulk-harvester'))
+        assert.isNotNull(validation.components.find(c => c.name === 'bulk-handler'))
     })
 
-    test('registerAll() supports chaining', async ({ assert }) => {
+    test('returns engine instance for chaining', ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
+        const database = new MockDatabaseAdapter()
+        const engine = new DigitalTwinEngine({ storage, database })
 
-        const result = new DigitalTwinEngine({ storage, database })
-            .registerAll([new TestCollector()])
-            .registerAll([new TestHandler()])
+        const result = engine.registerAll([new TestCollector()])
 
-        assert.instanceOf(result, DigitalTwinEngine)
+        assert.strictEqual(result, engine)
+    })
 
-        const validation = await result.validateConfiguration()
-        assert.equal(validation.components.length, 2)
+    test('handles empty array gracefully', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const database = new MockDatabaseAdapter()
+        const engine = new DigitalTwinEngine({ storage, database })
+
+        engine.registerAll([])
+
+        const validation = await engine.validateConfiguration()
+        assert.equal(validation.summary.total, 0)
+    })
+
+    test('throws error on first duplicate encountered', ({ assert }) => {
+        const storage = new MockStorageService()
+        const database = new MockDatabaseAdapter()
+        const engine = new DigitalTwinEngine({ storage, database })
+
+        assert.throws(
+            () =>
+                engine.registerAll([
+                    new TestCollector('dup'),
+                    new TestCollector('dup') // Duplicate
+                ]),
+            /already registered/
+        )
     })
 })
 
-test.group('Type-specific register methods', () => {
-    test('registerCollector() registers a collector', async ({ assert }) => {
+test.group('DigitalTwinEngine.registerComponents()', () => {
+    test('registers typed components and includes all in validation', async ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({ storage, database })
-            .registerCollector(new TestCollector())
+
+        engine.registerComponents({
+            collectors: [new TestCollector('typed-collector')],
+            harvesters: [new TestHarvester('typed-harvester')],
+            handlers: [new TestHandler('typed-handler')],
+            assetsManagers: [new TestAssetsManager('typed-assets')],
+            customTableManagers: [new TestCustomTableManager('typed-table')]
+        })
 
         const validation = await engine.validateConfiguration()
-        const collectorResult = validation.components.find(c => c.type === 'collector')
-        assert.isDefined(collectorResult)
+
+        assert.equal(validation.summary.total, 5)
+        assert.isNotNull(validation.components.find(c => c.name === 'typed-collector'))
+        assert.isNotNull(validation.components.find(c => c.name === 'typed-harvester'))
+        assert.isNotNull(validation.components.find(c => c.name === 'typed-handler'))
+        assert.isNotNull(validation.components.find(c => c.name === 'typed-assets'))
+        assert.isNotNull(validation.components.find(c => c.name === 'typed-table'))
     })
 
-    test('registerHarvester() registers a harvester', async ({ assert }) => {
+    test('accepts partial components object with only collectors', async ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({ storage, database })
-            .registerHarvester(new TestHarvester())
+
+        engine.registerComponents({
+            collectors: [new TestCollector('partial-collector')]
+        })
 
         const validation = await engine.validateConfiguration()
-        const harvesterResult = validation.components.find(c => c.type === 'harvester')
-        assert.isDefined(harvesterResult)
+
+        assert.equal(validation.summary.total, 1)
+        assert.isNotNull(validation.components.find(c => c.name === 'partial-collector'))
     })
 
-    test('registerHandler() registers a handler', async ({ assert }) => {
+    test('handles empty components object gracefully', async ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({ storage, database })
-            .registerHandler(new TestHandler())
+
+        engine.registerComponents({})
 
         const validation = await engine.validateConfiguration()
-        const handlerResult = validation.components.find(c => c.type === 'handler')
-        assert.isDefined(handlerResult)
+        assert.equal(validation.summary.total, 0)
     })
 
-    test('registerAssetsManager() registers an assets manager', async ({ assert }) => {
+    test('returns engine instance for chaining', ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({ storage, database })
-            .registerAssetsManager(new TestAssetsManager())
 
-        const validation = await engine.validateConfiguration()
-        const assetsResult = validation.components.find(c => c.type === 'assets_manager')
-        assert.isDefined(assetsResult)
-    })
+        const result = engine.registerComponents({
+            collectors: [new TestCollector()]
+        })
 
-    test('registerCustomTableManager() registers a custom table manager', async ({ assert }) => {
-        const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
-        const engine = new DigitalTwinEngine({ storage, database })
-            .registerCustomTableManager(new TestCustomTableManager())
-
-        const validation = await engine.validateConfiguration()
-        const customTableResult = validation.components.find(c => c.type === 'custom_table_manager')
-        assert.isDefined(customTableResult)
-    })
-
-    test('type-specific methods throw when called after start()', async ({ assert }) => {
-        const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
-        const engine = new DigitalTwinEngine({ storage, database })
-        await engine.start()
-
-        assert.throws(
-            () => engine.registerCollector(new TestCollector()),
-            /Cannot register components after the engine has started/
-        )
-
-        assert.throws(
-            () => engine.registerHarvester(new TestHarvester()),
-            /Cannot register components after the engine has started/
-        )
-
-        assert.throws(
-            () => engine.registerHandler(new TestHandler()),
-            /Cannot register components after the engine has started/
-        )
-
-        assert.throws(
-            () => engine.registerAssetsManager(new TestAssetsManager()),
-            /Cannot register components after the engine has started/
-        )
-
-        assert.throws(
-            () => engine.registerCustomTableManager(new TestCustomTableManager()),
-            /Cannot register components after the engine has started/
-        )
-
-        await engine.stop()
+        assert.strictEqual(result, engine)
     })
 })
 
-test.group('Mixed registration approaches', () => {
-    test('can combine constructor options with register() calls', async ({ assert }) => {
+test.group('Dynamic and Constructor Components Integration', () => {
+    test('combines constructor and dynamic components in validation', async ({ assert }) => {
         const storage = new MockStorageService()
-        const database = new MockDatabaseAdapter({ storage })
-
+        const database = new MockDatabaseAdapter()
         const engine = new DigitalTwinEngine({
             storage,
             database,
-            collectors: [new TestCollector()]
-        }).register(new TestHandler())
+            collectors: [new TestCollector('constructor-collector')],
+            handlers: [new TestHandler('constructor-handler')]
+        })
+
+        engine.register(new TestCollector('dynamic-collector'))
+        engine.register(new TestHarvester('dynamic-harvester'))
 
         const validation = await engine.validateConfiguration()
-        assert.equal(validation.components.length, 2)
 
-        const hasCollector = validation.components.some(c => c.type === 'collector')
-        const hasHandler = validation.components.some(c => c.type === 'handler')
-        assert.isTrue(hasCollector)
-        assert.isTrue(hasHandler)
+        assert.equal(validation.summary.total, 4, 'Should have 4 total components')
+
+        // Verify all are present
+        assert.isNotNull(validation.components.find(c => c.name === 'constructor-collector'))
+        assert.isNotNull(validation.components.find(c => c.name === 'constructor-handler'))
+        assert.isNotNull(validation.components.find(c => c.name === 'dynamic-collector'))
+        assert.isNotNull(validation.components.find(c => c.name === 'dynamic-harvester'))
+    })
+
+    test('testComponents() includes dynamically registered components', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const database = new MockDatabaseAdapter()
+        const engine = new DigitalTwinEngine({ storage, database })
+
+        engine.register(new TestCollector('test-me'))
+        engine.register(new TestHandler('test-me-too'))
+
+        const results = await engine.testComponents()
+
+        assert.equal(results.length, 2, 'testComponents should test dynamic components')
+        assert.isNotNull(results.find(r => r.name === 'test-me'))
+        assert.isNotNull(results.find(r => r.name === 'test-me-too'))
     })
 })

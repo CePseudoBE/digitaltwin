@@ -262,6 +262,24 @@ test.group('KnexDatabaseAdapter - Extended Queries', group => {
         assert.lengthOf(records, 2)
     })
 
+    test('getByDateRange with order desc returns newest first', async ({ assert }) => {
+        const records = await db.getByDateRange('test_queries', new Date('2024-01-01'), new Date('2024-06-01'), undefined, 'desc')
+
+        assert.lengthOf(records, 5)
+        // Should be in descending order (newest first)
+        assert.equal(records[0].url, '/file5.txt') // May 1
+        assert.equal(records[4].url, '/file1.txt') // Jan 15
+    })
+
+    test('getByDateRange with order asc returns oldest first (default)', async ({ assert }) => {
+        const records = await db.getByDateRange('test_queries', new Date('2024-01-01'), new Date('2024-06-01'), undefined, 'asc')
+
+        assert.lengthOf(records, 5)
+        // Should be in ascending order (oldest first)
+        assert.equal(records[0].url, '/file1.txt') // Jan 15
+        assert.equal(records[4].url, '/file5.txt') // May 1
+    })
+
     test('getAfterDate returns records after date', async ({ assert }) => {
         const records = await db.getAfterDate('test_queries', new Date('2024-04-01'))
 

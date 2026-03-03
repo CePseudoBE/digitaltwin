@@ -1,6 +1,6 @@
 {
   "name": "digitaltwin-cli",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "CLI tools for Digital Twin projects - generate components, manage projects",
   "license": "MIT",
   "author": "Hoffmann Axel",
@@ -20,6 +20,7 @@
     "build": "tsc",
     "dev": "tsx src/bin.ts",
     "clean": "rimraf dist",
+    "test": "node --import ts-node-maintained/register/esm bin/test.ts",
     "prepare": "npm run build"
   },
   "keywords": [
@@ -47,5 +48,10 @@
     "tempura": "^0.4.1",
     "fs-extra": "^11.3.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@japa/runner": "^4.3.0",
+    "@japa/assert": "^4.1.0",
+    "ts-node-maintained": "^10.9.5",
+    "@types/fs-extra": "^11.0.4"
+  }
 }

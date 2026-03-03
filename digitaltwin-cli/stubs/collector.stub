@@ -12,7 +12,7 @@ export class {{ className }} extends Collector {
       name: '{{ endpoint }}',
       description: '{{ description }}',
       contentType: 'application/json',
-      endpoint: 'api/{{ endpoint }}',
+      endpoint: '{{ endpoint }}',
       tags: [{{#if tags}}{{#each tags as tag, index}}'{{ tag }}'{{#if index < tags.length - 1}}, {{/if}}{{/each}}{{/if}}]
     }
   }

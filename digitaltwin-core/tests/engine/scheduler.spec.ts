@@ -108,7 +108,11 @@ test.group('Scheduler with Redis container', (group) => {
     const workers = await scheduleComponents([collector, harvester], queueManager, true)
 
     assert.equal(workers.length, 3)
-    assert.isTrue(workers.every((w) => true))
+    // Verify each worker has the required methods
+    assert.isTrue(
+      workers.every((w) => typeof w.close === 'function'),
+      'All workers should have a close method'
+    )
 
     for (const worker of workers) {
       await worker.close()

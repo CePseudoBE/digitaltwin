@@ -1,6 +1,6 @@
 {
   "name": "digitaltwin-core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Minimalist framework to collect and handle data in a Digital Twin project",
   "license": "MIT",
   "author": "Axel Hoffmann",
@@ -59,13 +59,11 @@
     "@japa/runner": "^4.3.0",
     "@testcontainers/redis": "^11.3.1",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.19",
-    "@types/ioredis-mock": "^8.2.6",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/jszip": "^3.4.0",
     "@types/lodash": "^4.17.20",
     "@types/multer": "^2.0.0",
-    "@types/uuid": "^10.0.0",
     "better-sqlite3": "^12.6.0",
     "c8": "^10.1.3",
     "eslint": "^9.0.0",
@@ -97,16 +95,16 @@
     }
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.850.0",
+    "@aws-sdk/client-s3": "^3.981.0",
     "@vinejs/vine": "^4.2.0",
     "bullmq": "^5.56.5",
+    "compression": "^1.7.5",
     "cors": "^2.8.5",
     "ioredis": "^5.6.1",
     "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
-    "lodash": "^4.17.21",
+    "lodash": "^4.17.23",
     "multer": "^2.0.2",
-    "ultimate-express": "^2.0.9",
-    "uuid": "^11.1.0"
+    "ultimate-express": "^2.0.9"
   }
 }

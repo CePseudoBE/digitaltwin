@@ -8,13 +8,13 @@ import type { DataRecord } from 'digitaltwin-core'
  */
 {{/if}}
 export class {{ className }} extends Harvester {
-  getUserConfiguration() {
+  getConfiguration() {
     return {
       name: '{{ endpoint }}',
       description: '{{ description }}',
       contentType: 'application/json',
       endpoint: '{{ endpoint }}',
-      source: '{{ sourceCollector || "source-collector" }}', // TODO: Specify the collector to harvest from
+      source: '{{ sourceCollector }}',
       tags: [{{#each tags as tag, index}}'{{ tag }}'{{#if index < tags.length - 1}}, {{/if}}{{/each}}]
     }
   }

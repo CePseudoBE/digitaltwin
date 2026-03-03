@@ -1,75 +1,122 @@
-import { readdir } from 'fs/promises'
-import { join, extname, basename } from 'path'
-import { pathToFileURL } from 'url'
+/**
+ * @fileoverview Component auto-discovery and loading utilities
+ *
+ * Provides functions to automatically discover and load Digital Twin components
+ * from a directory based on file naming conventions.
+ */
 
-import type { Collector } from '../components/collector.js'
-import type { Harvester } from '../components/harvester.js'
-import type { Handler } from '../components/handler.js'
-import type { AssetsManager } from '../components/assets_manager.js'
-import type { CustomTableManager } from '../components/custom_table_manager.js'
+import { pathToFileURL } from 'node:url'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import type { LoadedComponents, AnyComponent } from '../engine/component_types.js'
 import {
     isCollector,
     isHarvester,
     isHandler,
     isAssetsManager,
     isCustomTableManager
-} from '../engine/digital_twin_engine.js'
+} from '../engine/component_types.js'
 
 /**
- * Result of loading components from a directory
- */
-export interface LoadedComponents {
-    /** Array of Collector instances */
-    collectors: Collector[]
-    /** Array of Harvester instances */
-    harvesters: Harvester[]
-    /** Array of Handler instances */
-    handlers: Handler[]
-    /** Array of AssetsManager instances */
-    assetsManagers: AssetsManager[]
-    /** Array of CustomTableManager instances */
-    customTableManagers: CustomTableManager[]
-}
-
-/**
- * Options for the component loader
+ * Options for component auto-discovery
  */
 export interface LoadComponentsOptions {
     /**
-     * Patterns to exclude from loading.
-     * Supports glob-like patterns with * wildcard.
-     * @example ['test_*', '*_backup']
+     * File patterns to match by suffix.
+     * Keys are component types, values are file suffixes (without extension).
+     * @default Standard naming conventions
+     */
+    patterns?: {
+        collectors?: string
+        harvesters?: string
+        handlers?: string
+        assetsManagers?: string
+        customTableManagers?: string
+    }
+
+    /**
+     * File extensions to scan for.
+     * @default ['.js', '.mjs']
+     */
+    extensions?: string[]
+
+    /**
+     * Whether to scan subdirectories recursively.
+     * @default true
+     */
+    recursive?: boolean
+
+    /**
+     * Patterns to exclude (glob-like patterns applied to file names).
+     * @default ['*.spec.*', '*.test.*', 'index.*']
      */
     exclude?: string[]
 
     /**
-     * Enable verbose logging
+     * Enable verbose logging during discovery.
      * @default false
      */
     verbose?: boolean
-
-    /**
-     * Custom logger function
-     * @default console.log
-     */
-    logger?: (message: string) => void
-
-    /**
-     * File extensions to consider
-     * @default ['.js', '.ts']
-     */
-    extensions?: string[]
 }
 
 /**
- * Check if a filename matches any exclude pattern
+ * Result of component loading operation
+ */
+export interface LoadComponentsResult extends LoadedComponents {
+    /** Files that were scanned */
+    scannedFiles: string[]
+
+    /** Errors encountered during loading */
+    errors: Array<{
+        file: string
+        error: string
+    }>
+
+    /** Summary statistics */
+    summary: {
+        total: number
+        collectors: number
+        harvesters: number
+        handlers: number
+        assetsManagers: number
+        customTableManagers: number
+        errors: number
+    }
+}
+
+/**
+ * Resolved patterns with all fields required
+ */
+interface ResolvedPatterns {
+    collectors: string
+    harvesters: string
+    handlers: string
+    assetsManagers: string
+    customTableManagers: string
+}
+
+/**
+ * Default file patterns for component detection based on naming conventions
+ */
+const DEFAULT_PATTERNS: ResolvedPatterns = {
+    collectors: '_collector',
+    harvesters: '_harvester',
+    handlers: '_handler',
+    assetsManagers: '_assets_manager',
+    customTableManagers: '_custom_table'
+}
+
+const DEFAULT_EXTENSIONS = ['.js', '.mjs']
+
+const DEFAULT_EXCLUDE = ['*.spec.*', '*.test.*', 'index.*', '*.d.ts']
+
+/**
+ * Check if a filename matches an exclusion pattern.
  */
 function matchesExcludePattern(filename: string, patterns: string[]): boolean {
     for (const pattern of patterns) {
         // Convert glob pattern to regex
-        const regexPattern = pattern
-            .replace(/\*/g, '.*')
-            .replace(/\?/g, '.')
+        const regexPattern = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*')
         const regex = new RegExp(`^${regexPattern}$`, 'i')
         if (regex.test(filename)) {
             return true
@@ -79,237 +126,328 @@ function matchesExcludePattern(filename: string, patterns: string[]): boolean {
 }
 
 /**
- * Check if an export is a class constructor
+ * Determine component type from filename based on patterns.
  */
-function isClass(value: unknown): value is new () => unknown {
-    return typeof value === 'function' && /^\s*class\s+/.test(value.toString())
+function getComponentTypeFromFilename(filename: string, patterns: ResolvedPatterns): keyof LoadedComponents | null {
+    const baseName = path.basename(filename)
+
+    // Remove extension for matching
+    const nameWithoutExt = baseName.replace(/\.[^.]+$/, '')
+
+    if (nameWithoutExt.endsWith(patterns.collectors)) return 'collectors'
+    if (nameWithoutExt.endsWith(patterns.harvesters)) return 'harvesters'
+    if (nameWithoutExt.endsWith(patterns.handlers)) return 'handlers'
+    if (nameWithoutExt.endsWith(patterns.assetsManagers)) return 'assetsManagers'
+    if (nameWithoutExt.endsWith(patterns.customTableManagers)) return 'customTableManagers'
+
+    // Also check for *_manager pattern for tileset/map managers
+    if (
+        nameWithoutExt.endsWith('_manager') ||
+        nameWithoutExt.endsWith('_tileset_manager') ||
+        nameWithoutExt.endsWith('_map_manager')
+    ) {
+        return 'assetsManagers'
+    }
+
+    return null
 }
 
 /**
- * Type alias for any component type
+ * Check if a value is a class constructor.
  */
-type AnyLoadedComponent = Collector | Harvester | Handler | AssetsManager | CustomTableManager
+function isClassConstructor(value: unknown): value is new (...args: any[]) => any {
+    return typeof value === 'function' && value.prototype && value.prototype.constructor === value
+}
 
 /**
- * Try to instantiate a component from an exported class
+ * Check if an instance is a valid Digital Twin component.
  */
-function tryInstantiateComponent(
-    exportValue: unknown,
-    logger: (msg: string) => void,
-    verbose: boolean
-): AnyLoadedComponent | null {
-    // Must be a class
-    if (!isClass(exportValue)) {
-        return null
+function isValidComponent(instance: unknown): instance is AnyComponent {
+    if (!instance || typeof instance !== 'object') return false
+    if (typeof (instance as any).getConfiguration !== 'function') return false
+
+    return (
+        isCollector(instance as AnyComponent) ||
+        isHarvester(instance as AnyComponent) ||
+        isHandler(instance as AnyComponent) ||
+        isAssetsManager(instance as AnyComponent) ||
+        isCustomTableManager(instance as AnyComponent)
+    )
+}
+
+/**
+ * Recursively scan a directory for component files.
+ */
+async function scanDirectory(
+    dir: string,
+    options: {
+        extensions: string[]
+        exclude: string[]
+        recursive: boolean
+        patterns: ResolvedPatterns
     }
+): Promise<Array<{ path: string; type: keyof LoadedComponents }>> {
+    const results: Array<{ path: string; type: keyof LoadedComponents }> = []
 
     try {
-        // Try to instantiate
-        const instance = new exportValue() as AnyLoadedComponent
+        const entries = await fs.readdir(dir, { withFileTypes: true })
 
-        // Check component type and return
-        if (isCollector(instance)) {
-            if (verbose) logger(`  Detected as Collector`)
-            return instance
-        }
-        if (isHarvester(instance)) {
-            if (verbose) logger(`  Detected as Harvester`)
-            return instance
-        }
-        if (isAssetsManager(instance)) {
-            if (verbose) logger(`  Detected as AssetsManager`)
-            return instance
-        }
-        if (isCustomTableManager(instance)) {
-            if (verbose) logger(`  Detected as CustomTableManager`)
-            return instance
-        }
-        if (isHandler(instance)) {
-            if (verbose) logger(`  Detected as Handler`)
-            return instance
-        }
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name)
 
-        return null
+            // Skip hidden files/directories
+            if (entry.name.startsWith('.') || entry.name.startsWith('_')) {
+                continue
+            }
+
+            if (entry.isDirectory() && options.recursive) {
+                const subResults = await scanDirectory(fullPath, options)
+                results.push(...subResults)
+            } else if (entry.isFile()) {
+                // Check extension
+                const ext = path.extname(entry.name)
+                if (!options.extensions.includes(ext)) {
+                    continue
+                }
+
+                // Check exclusions
+                if (matchesExcludePattern(entry.name, options.exclude)) {
+                    continue
+                }
+
+                // Determine component type
+                const componentType = getComponentTypeFromFilename(entry.name, options.patterns)
+                if (componentType) {
+                    results.push({ path: fullPath, type: componentType })
+                }
+            }
+        }
     } catch {
-        // Constructor failed - likely abstract class or requires parameters
-        return null
+        // Directory doesn't exist or can't be read - return empty array
     }
+
+    return results
 }
 
 /**
- * Load and instantiate components from a directory.
+ * Convert a snake_case or kebab-case string to PascalCase.
+ */
+function toPascalCase(str: string): string {
+    return str
+        .split(/[-_]/)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join('')
+}
+
+/**
+ * Auto-discovers and loads Digital Twin components from a directory.
  *
- * This function scans a directory for component files, dynamically imports them,
- * and instantiates any components found. Components are automatically categorized
- * by type based on their class structure.
+ * This function scans the specified directory for component files following
+ * the naming conventions (*_collector.js, *_harvester.js, etc.), dynamically
+ * imports them, and instantiates any component classes found.
  *
- * The loader looks for classes that:
- * - Can be instantiated with no arguments
- * - Match the component type signatures (Collector, Harvester, Handler, etc.)
+ * ## Naming Conventions
  *
- * @param {string} directoryPath - Path to the components directory
- * @param {LoadComponentsOptions} options - Loading options
- * @returns {Promise<LoadedComponents>} Object containing arrays of each component type
+ * Component files should follow these naming patterns:
+ * - Collectors: `*_collector.js` (e.g., `weather_collector.js`)
+ * - Harvesters: `*_harvester.js` (e.g., `traffic_harvester.js`)
+ * - Handlers: `*_handler.js` (e.g., `api_handler.js`)
+ * - Assets Managers: `*_assets_manager.js` (e.g., `gltf_assets_manager.js`)
+ * - Custom Table Managers: `*_custom_table.js` (e.g., `wms_custom_table.js`)
+ *
+ * ## Component Export Requirements
+ *
+ * Components should be exported as default export or named export matching the class name:
+ * ```typescript
+ * // Default export (preferred)
+ * export default class WeatherCollector extends Collector { ... }
+ *
+ * // Named export matching file name
+ * export class WeatherCollector extends Collector { ... }
+ * ```
+ *
+ * @param directory - Directory path to scan for components (absolute or relative to cwd)
+ * @param options - Configuration options for discovery
+ * @returns Promise resolving to loaded components and metadata
  *
  * @example
  * ```typescript
- * import { DigitalTwinEngine, loadComponents } from 'digitaltwin-core'
+ * import { loadComponents, DigitalTwinEngine } from 'digitaltwin-core'
  *
- * // Load all components from a directory
- * const components = await loadComponents('./src/components', {
- *   verbose: true
- * })
+ * // Basic usage - scan compiled components
+ * const result = await loadComponents('./dist/components')
  *
- * // Create engine with loaded components
- * const engine = new DigitalTwinEngine({
- *   storage,
- *   database,
- *   ...components
- * })
+ * console.log(`Loaded ${result.summary.total} components`)
  *
+ * const engine = new DigitalTwinEngine({ storage, database })
+ * engine.registerComponents(result)
  * await engine.start()
  * ```
  *
  * @example
  * ```typescript
- * // With exclusions
- * const components = await loadComponents('./src/components', {
- *   exclude: ['*_test', 'example_*'],
+ * // Advanced usage with options
+ * const result = await loadComponents('./dist/components', {
+ *   recursive: true,
  *   verbose: true,
- *   logger: (msg) => console.log(`[Loader] ${msg}`)
+ *   extensions: ['.js'],
+ *   exclude: ['*.test.*', 'deprecated_*']
  * })
+ *
+ * if (result.errors.length > 0) {
+ *   console.warn('Some components failed to load:', result.errors)
+ * }
  * ```
  */
 export async function loadComponents(
-    directoryPath: string,
+    directory: string,
     options: LoadComponentsOptions = {}
-): Promise<LoadedComponents> {
-    const {
-        exclude = [],
-        verbose = false,
-        logger = console.log,
-        extensions = ['.js', '.ts']
-    } = options
+): Promise<LoadComponentsResult> {
+    const patterns: ResolvedPatterns = { ...DEFAULT_PATTERNS, ...options.patterns }
+    const extensions = options.extensions ?? DEFAULT_EXTENSIONS
+    const exclude = options.exclude ?? DEFAULT_EXCLUDE
+    const recursive = options.recursive ?? true
+    const verbose = options.verbose ?? false
 
-    const result: LoadedComponents = {
+    const result: LoadComponentsResult = {
         collectors: [],
         harvesters: [],
         handlers: [],
         assetsManagers: [],
-        customTableManagers: []
-    }
-
-    const log = (message: string) => {
-        if (verbose) {
-            logger(message)
+        customTableManagers: [],
+        scannedFiles: [],
+        errors: [],
+        summary: {
+            total: 0,
+            collectors: 0,
+            harvesters: 0,
+            handlers: 0,
+            assetsManagers: 0,
+            customTableManagers: 0,
+            errors: 0
         }
     }
 
-    log(`Loading components from: ${directoryPath}`)
+    // Resolve directory path
+    const absoluteDir = path.isAbsolute(directory) ? directory : path.resolve(process.cwd(), directory)
 
-    let files: string[]
+    // Check if directory exists
     try {
-        files = await readdir(directoryPath)
-    } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-            log(`Directory does not exist: ${directoryPath}`)
-            return result
+        await fs.access(absoluteDir)
+    } catch {
+        if (verbose) {
+            console.warn(`[loadComponents] Directory not found: ${absoluteDir}`)
         }
-        throw error
+        return result
     }
 
-    // Filter and sort files
-    const componentFiles = files
-        .filter(file => {
-            const ext = extname(file)
-            const baseName = basename(file, ext)
+    // Scan for component files
+    const files = await scanDirectory(absoluteDir, { extensions, exclude, recursive, patterns })
 
-            // Skip non-matching extensions
-            if (!extensions.includes(ext)) {
-                return false
-            }
+    result.scannedFiles = files.map(f => f.path)
 
-            // Skip index files
-            if (baseName === 'index') {
-                return false
-            }
+    if (verbose) {
+        console.log(`[loadComponents] Found ${files.length} potential component files`)
+    }
 
-            // Skip excluded patterns
-            if (matchesExcludePattern(baseName, exclude)) {
-                log(`Excluding: ${file}`)
-                return false
-            }
-
-            return true
-        })
-        .sort()
-
-    log(`Found ${componentFiles.length} potential component files`)
-
-    // Load each file
-    for (const file of componentFiles) {
-        const filePath = join(directoryPath, file)
-        const fileUrl = pathToFileURL(filePath).href
-
-        log(`Loading: ${file}`)
-
+    // Load each component file
+    for (const { path: filePath, type: expectedType } of files) {
         try {
-            // Dynamic import
+            // Convert to file URL for ESM import
+            const fileUrl = pathToFileURL(filePath).href
             const module = await import(fileUrl)
 
-            // Check all exports
-            for (const [exportName, exportValue] of Object.entries(module)) {
-                if (exportName === 'default' && exportValue === module.default) {
-                    // Already handled via named exports
-                    continue
-                }
+            // Find component class in module exports
+            let ComponentClass: (new (...args: any[]) => AnyComponent) | null = null
 
-                const component = tryInstantiateComponent(exportValue, log, verbose)
-                if (component) {
-                    if (isCollector(component)) {
-                        result.collectors.push(component)
-                    } else if (isHarvester(component)) {
-                        result.harvesters.push(component)
-                    } else if (isAssetsManager(component)) {
-                        result.assetsManagers.push(component)
-                    } else if (isCustomTableManager(component)) {
-                        result.customTableManagers.push(component)
-                    } else if (isHandler(component)) {
-                        result.handlers.push(component)
+            // Try default export first
+            if (module.default && isClassConstructor(module.default)) {
+                ComponentClass = module.default
+            } else {
+                // Try named exports
+                const fileName = path.basename(filePath, path.extname(filePath))
+                const expectedClassName = toPascalCase(fileName)
+
+                if (module[expectedClassName] && isClassConstructor(module[expectedClassName])) {
+                    ComponentClass = module[expectedClassName]
+                } else {
+                    // Try to find any class export that's a valid component
+                    for (const [, value] of Object.entries(module)) {
+                        if (isClassConstructor(value)) {
+                            try {
+                                const testInstance = new value()
+                                if (isValidComponent(testInstance)) {
+                                    ComponentClass = value as new (...args: any[]) => AnyComponent
+                                    break
+                                }
+                            } catch {
+                                // Skip if instantiation fails
+                            }
+                        }
                     }
-                    log(`  Loaded: ${exportName}`)
                 }
             }
 
-            // Also check default export if it exists
-            if (module.default) {
-                const component = tryInstantiateComponent(module.default, log, verbose)
-                if (component) {
-                    if (isCollector(component)) {
-                        result.collectors.push(component)
-                    } else if (isHarvester(component)) {
-                        result.harvesters.push(component)
-                    } else if (isAssetsManager(component)) {
-                        result.assetsManagers.push(component)
-                    } else if (isCustomTableManager(component)) {
-                        result.customTableManagers.push(component)
-                    } else if (isHandler(component)) {
-                        result.handlers.push(component)
-                    }
-                    log(`  Loaded default export`)
-                }
+            if (!ComponentClass) {
+                result.errors.push({
+                    file: filePath,
+                    error: 'No valid component class found in module exports'
+                })
+                continue
+            }
+
+            // Instantiate the component
+            const instance = new ComponentClass()
+
+            if (!isValidComponent(instance)) {
+                result.errors.push({
+                    file: filePath,
+                    error: 'Instantiated class is not a valid Digital Twin component'
+                })
+                continue
+            }
+
+            // Add to appropriate array based on actual type (not expected type)
+            if (isCollector(instance)) {
+                result.collectors.push(instance)
+                result.summary.collectors++
+            } else if (isHarvester(instance)) {
+                result.harvesters.push(instance)
+                result.summary.harvesters++
+            } else if (isHandler(instance)) {
+                result.handlers.push(instance)
+                result.summary.handlers++
+            } else if (isCustomTableManager(instance)) {
+                result.customTableManagers.push(instance)
+                result.summary.customTableManagers++
+            } else if (isAssetsManager(instance)) {
+                result.assetsManagers.push(instance)
+                result.summary.assetsManagers++
+            }
+
+            result.summary.total++
+
+            if (verbose) {
+                const config = instance.getConfiguration()
+                console.log(`[loadComponents] Loaded: ${config.name} (${expectedType})`)
             }
         } catch (error) {
-            log(`  Failed to load ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            result.errors.push({
+                file: filePath,
+                error: `Failed to import: ${errorMessage}`
+            })
+            result.summary.errors++
+
+            if (verbose) {
+                console.error(`[loadComponents] Error loading ${filePath}:`, errorMessage)
+            }
         }
     }
 
-    log(`Loaded components:`)
-    log(`  - ${result.collectors.length} collector(s)`)
-    log(`  - ${result.harvesters.length} harvester(s)`)
-    log(`  - ${result.handlers.length} handler(s)`)
-    log(`  - ${result.assetsManagers.length} assets manager(s)`)
-    log(`  - ${result.customTableManagers.length} custom table manager(s)`)
+    if (verbose) {
+        console.log(`[loadComponents] Summary:`, result.summary)
+    }
 
     return result
 }

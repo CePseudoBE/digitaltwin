@@ -21,7 +21,7 @@ export class {{ className }} extends Handler {
   @servableEndpoint({ path: '/api/{{ endpoint }}', method: '{{ method }}' })
   async handleRequest(): Promise<DataResponse> {
     // TODO: Implement your endpoint logic here
-    // This method will be available at GET /api/{{ endpoint }}
+    // This method will be available at {{ method | upper }} /api/{{ endpoint }}
     throw new Error('Handler endpoint not implemented')
   }
 }
