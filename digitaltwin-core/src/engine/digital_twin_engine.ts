@@ -658,6 +658,10 @@ export class DigitalTwinEngine {
      * ```
      */
     register(component: AnyComponent): this {
+        if (this.#isStarted) {
+            throw new Error('Cannot register components after the engine has started')
+        }
+
         const type = detectComponentType(component)
         const config = component.getConfiguration()
 
