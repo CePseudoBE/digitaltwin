@@ -214,6 +214,17 @@ test.group('ID Param Schema', () => {
         }
     })
 
+    test('rejects float id', async ({ assert }) => {
+        const data = { id: 1.5 }
+
+        try {
+            await validateData(validateIdParam, data)
+            assert.fail('Should have thrown ValidationError')
+        } catch (error) {
+            assert.instanceOf(error, ValidationError)
+        }
+    })
+
     test('rejects missing id', async ({ assert }) => {
         const data = {}
 

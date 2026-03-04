@@ -16,7 +16,7 @@ export const paginationSchema = vine.object({
  * ID parameter schema
  */
 export const idParamSchema = vine.object({
-    id: vine.number().positive()
+    id: vine.number().positive().withoutDecimals()
 })
 
 // ============================================
