@@ -6,7 +6,7 @@
  * Implementations handle component data storage, metadata management, and querying.
  */
 
-import type { DataRecord, MetadataRow } from '@digitaltwin/shared'
+import type { DataRecord, MetadataRow, UserRepository } from '@digitaltwin/shared'
 
 // Re-export MetadataRow for backward compatibility
 export type { MetadataRow } from '@digitaltwin/shared'
@@ -248,4 +248,10 @@ export abstract class DatabaseAdapter {
      * @returns Promise that resolves when all connections are closed
      */
     abstract close(): Promise<void>
+
+    /**
+     * Returns a UserRepository backed by this database adapter.
+     * Used by auth services to manage user records.
+     */
+    abstract getUserRepository(): UserRepository
 }

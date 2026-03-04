@@ -1,8 +1,9 @@
 import type { Knex } from 'knex'
 import knex from 'knex'
-import type { DataRecord, DataResolver, MetadataRow } from '@digitaltwin/shared'
+import type { DataRecord, DataResolver, MetadataRow, UserRepository } from '@digitaltwin/shared'
 import { DatabaseAdapter } from '../database_adapter.js'
 import { mapToDataRecord } from '../map_to_data_record.js'
+import { KnexUserRepository } from '../knex_user_repository.js'
 
 export interface PostgreSQLConfig {
     host: string
@@ -834,5 +835,9 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
      */
     getKnex(): Knex {
         return this.#knex
+    }
+
+    getUserRepository(): UserRepository {
+        return new KnexUserRepository(this.#knex)
     }
 }

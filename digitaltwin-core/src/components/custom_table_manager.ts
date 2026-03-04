@@ -117,7 +117,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
      */
     setDependencies(db: DatabaseAdapter): void {
         this.db = db
-        this.userService = new UserService(db)
+        this.userService = new UserService(db.getUserRepository())
         this.tableName = this.getConfiguration().name
     }
 

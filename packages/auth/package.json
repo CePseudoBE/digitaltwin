@@ -1,0 +1,42 @@
+{
+  "name": "@digitaltwin/auth",
+  "version": "1.0.0",
+  "description": "Authentication providers, user management, and middleware for Digital Twin framework",
+  "license": "MIT",
+  "author": "Axel Hoffmann",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "test": "node -r ./bin/set-test-env.cjs --import ts-node-maintained/register/esm --enable-source-maps bin/test.ts",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@digitaltwin/shared": "workspace:*",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "@japa/assert": "^4.1.0",
+    "@japa/runner": "^4.3.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "ts-node-maintained": "^10.9.5"
+  }
+}

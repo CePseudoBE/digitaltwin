@@ -1,6 +1,6 @@
 import {DatabaseAdapter, MetadataRow} from '../../src/database/database_adapter.js'
 import {DataRecord} from '../../src/types/data_record.js'
-import type {DataResolver} from '@digitaltwin/shared'
+import type {DataResolver, UserRepository} from '@digitaltwin/shared'
 import {StorageService} from '../../src/storage/storage_service.js'
 import {mapToDataRecord} from '../../src/utils/map_to_data_record.js'
 import {MockStorageService} from "./mock_storage_service.js";
@@ -719,5 +719,51 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
         return Array.from(this.records.values())
             .filter(record => record.name === name)
             .sort((a, b) => b.date.getTime() - a.date.getTime())
+    }
+
+    getUserRepository(): UserRepository {
+        const users = this.users
+        const roles = this.roles
+        const userRoles = this.userRoles
+        let nextUserId = 100
+        let nextRoleId = 100
+
+        return {
+            async initializeTables(): Promise<void> {
+                // No-op for mock
+            },
+            async findOrCreateUser(authUser) {
+                // Find existing user by keycloak_id
+                for (const user of users.values()) {
+                    if (user.keycloak_id === authUser.id) {
+                        return {
+                            id: user.id,
+                            keycloak_id: user.keycloak_id,
+                            roles: authUser.roles,
+                            created_at: user.created_at,
+                            updated_at: user.updated_at
+                        }
+                    }
+                }
+                // Create new user
+                const id = nextUserId++
+                const now = new Date()
+                users.set(id, { id, keycloak_id: authUser.id, created_at: now, updated_at: now })
+                return { id, keycloak_id: authUser.id, roles: authUser.roles, created_at: now, updated_at: now }
+            },
+            async getUserById(id: number) {
+                const user = users.get(id)
+                if (!user) return undefined
+                return { id: user.id, keycloak_id: user.keycloak_id, roles: [], created_at: user.created_at, updated_at: user.updated_at }
+            },
+            async getUserByKeycloakId(keycloakId: string) {
+                for (const user of users.values()) {
+                    if (user.keycloak_id === keycloakId) {
+                        return { id: user.id, keycloak_id: user.keycloak_id, roles: [], created_at: user.created_at, updated_at: user.updated_at }
+                    }
+                }
+                return undefined
+            }
+        }
     }
 }

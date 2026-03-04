@@ -90,6 +90,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.981.0
         version: 3.981.0
+      '@digitaltwin/auth':
+        specifier: workspace:*
+        version: link:../packages/auth
       '@digitaltwin/database':
         specifier: workspace:*
         version: link:../packages/database
@@ -196,6 +199,28 @@ importers:
       typescript-eslint:
         specifier: ^8.0.0
         version: 8.53.0(eslint@9.39.2)(typescript@5.9.3)
+
+  packages/auth:
+    dependencies:
+      '@digitaltwin/shared':
+        specifier: workspace:*
+        version: link:../shared
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
+    devDependencies:
+      '@japa/assert':
+        specifier: ^4.1.0
+        version: 4.2.0(@japa/runner@4.5.0)
+      '@japa/runner':
+        specifier: ^4.3.0
+        version: 4.5.0
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
+      ts-node-maintained:
+        specifier: ^10.9.5
+        version: 10.9.6(@types/node@24.10.8)(typescript@5.9.3)
 
   packages/database:
     dependencies:

@@ -238,7 +238,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
     setDependencies(db: DatabaseAdapter, storage: StorageService, userService?: UserService): void {
         this.db = db
         this.storage = storage
-        this.userService = userService ?? new UserService(db)
+        this.userService = userService ?? new UserService(db.getUserRepository())
     }
 
     /**

@@ -27,7 +27,7 @@ test.group('UserService', (group) => {
   test('initializeTables() should create user management tables', async ({ assert }) => {
     ensureAuthEnabled()
     const mockDb = new MockDatabaseAdapter()
-    const userService = new UserService(mockDb)
+    const userService = new UserService(mockDb.getUserRepository())
 
     // Should not throw any errors
     await assert.doesNotThrow(async () => {
@@ -39,7 +39,7 @@ test.group('UserService', (group) => {
     ensureAuthEnabled()
     const mockDb = new MockDatabaseAdapter()
     mockDb.resetMockState() // Start fresh
-    const userService = new UserService(mockDb)
+    const userService = new UserService(mockDb.getUserRepository())
 
     const authUser: AuthenticatedUser = {
       id: '12345-abcde',
@@ -57,7 +57,7 @@ test.group('UserService', (group) => {
     ensureAuthEnabled()
     const mockDb = new MockDatabaseAdapter()
     mockDb.resetMockState()
-    const userService = new UserService(mockDb)
+    const userService = new UserService(mockDb.getUserRepository())
 
     // First create a user
     const authUser: AuthenticatedUser = {
@@ -79,7 +79,7 @@ test.group('UserService', (group) => {
     ensureAuthEnabled()
     const mockDb = new MockDatabaseAdapter()
     mockDb.resetMockState()
-    const userService = new UserService(mockDb)
+    const userService = new UserService(mockDb.getUserRepository())
 
     const authUser: AuthenticatedUser = {
       id: '12345-abcde',
@@ -99,7 +99,7 @@ test.group('UserService', (group) => {
     ensureAuthEnabled()
     const mockDb = new MockDatabaseAdapter()
     mockDb.resetMockState()
-    const userService = new UserService(mockDb)
+    const userService = new UserService(mockDb.getUserRepository())
 
     // First create a user
     const authUser: AuthenticatedUser = {
@@ -122,7 +122,7 @@ test.group('UserService', (group) => {
     ensureAuthEnabled()
     const mockDb = new MockDatabaseAdapter()
     mockDb.resetMockState()
-    const userService = new UserService(mockDb)
+    const userService = new UserService(mockDb.getUserRepository())
 
     const result = await userService.getUserById(999)
 
@@ -133,7 +133,7 @@ test.group('UserService', (group) => {
     ensureAuthEnabled()
     const mockDb = new MockDatabaseAdapter()
     mockDb.resetMockState()
-    const userService = new UserService(mockDb)
+    const userService = new UserService(mockDb.getUserRepository())
 
     // First create a user
     const authUser: AuthenticatedUser = {

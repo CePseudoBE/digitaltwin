@@ -470,7 +470,7 @@ export class DigitalTwinEngine {
         }
 
         // Normal startup - initialize user management tables first
-        const userService = new UserService(this.#database)
+        const userService = new UserService(this.#database.getUserRepository())
         await userService.initializeTables()
 
         // Get autoMigration setting (default: true)
