@@ -10,6 +10,7 @@ import type { Harvester } from '../components/harvester.js'
 import type { AssetsManager } from '../components/assets_manager.js'
 import type { DatabaseAdapter } from '../database/database_adapter.js'
 import type { StorageService } from '../storage/storage_service.js'
+import type { AuthMiddleware } from '../auth/index.js'
 
 /**
  * Initializes data collection and processing components with required dependencies.
@@ -78,7 +79,8 @@ export async function initializeAssetsManagers(
     assetsManagers: AssetsManager[],
     database: DatabaseAdapter,
     storage: StorageService,
-    autoMigration: boolean = true
+    autoMigration: boolean = true,
+    authMiddleware?: AuthMiddleware
 ): Promise<void> {
     // Create all tables in parallel for faster startup
     await Promise.all(
@@ -87,7 +89,7 @@ export async function initializeAssetsManagers(
 
     // Inject dependencies (synchronous, fast)
     for (const manager of assetsManagers) {
-        manager.setDependencies(database, storage)
+        manager.setDependencies(database, storage, authMiddleware)
     }
 }
 
