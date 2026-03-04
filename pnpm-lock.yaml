@@ -93,6 +93,9 @@ importers:
       '@digitaltwin/shared':
         specifier: workspace:*
         version: link:../packages/shared
+      '@digitaltwin/storage':
+        specifier: workspace:*
+        version: link:../packages/storage
       '@vinejs/vine':
         specifier: ^4.2.0
         version: 4.2.0
@@ -209,6 +212,25 @@ importers:
       ultimate-express:
         specifier: ^2.0.9
         version: 2.0.15
+
+  packages/storage:
+    dependencies:
+      '@digitaltwin/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.800.0
+        version: 3.981.0
+      '@japa/assert':
+        specifier: ^4.1.0
+        version: 4.2.0(@japa/runner@4.5.0)
+      '@japa/runner':
+        specifier: ^4.3.0
+        version: 4.5.0
+      ts-node-maintained:
+        specifier: ^10.9.5
+        version: 10.9.6(@types/node@24.10.8)(typescript@5.9.3)
 
 packages:
 
