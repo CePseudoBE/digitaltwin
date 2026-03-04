@@ -1,5 +1,9 @@
 // Types
 export type { DataRecord } from './types/data_record.js'
+export type { DataResolver } from './types/data_resolver.js'
+export type { MetadataRow } from './types/database.js'
+export type { UserRepository } from './types/user_repository.js'
+export type { AuthResult } from './types/auth_result.js'
 export type {
     DataResponse,
     MulterFile,
