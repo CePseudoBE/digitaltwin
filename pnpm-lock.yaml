@@ -90,6 +90,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.981.0
         version: 3.981.0
+      '@digitaltwin/database':
+        specifier: workspace:*
+        version: link:../packages/database
       '@digitaltwin/shared':
         specifier: workspace:*
         version: link:../packages/shared
@@ -193,6 +196,28 @@ importers:
       typescript-eslint:
         specifier: ^8.0.0
         version: 8.53.0(eslint@9.39.2)(typescript@5.9.3)
+
+  packages/database:
+    dependencies:
+      '@digitaltwin/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@japa/assert':
+        specifier: ^4.1.0
+        version: 4.2.0(@japa/runner@4.5.0)
+      '@japa/runner':
+        specifier: ^4.3.0
+        version: 4.5.0
+      better-sqlite3:
+        specifier: ^12.6.0
+        version: 12.6.0
+      knex:
+        specifier: ^3.1.0
+        version: 3.1.0(better-sqlite3@12.6.0)(mysql2@3.16.0)(pg@8.16.3)(sqlite3@5.1.7)
+      ts-node-maintained:
+        specifier: ^10.9.5
+        version: 10.9.6(@types/node@24.10.8)(typescript@5.9.3)
 
   packages/shared:
     dependencies:
