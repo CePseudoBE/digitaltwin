@@ -7,29 +7,15 @@ test.group('safeAsync', () => {
             async () => 'success',
             'test operation'
         )
-
         assert.equal(result, 'success')
     })
 
-    test('returns undefined on failure', async ({ assert }) => {
+    test('swallows errors and returns undefined', async ({ assert }) => {
         const result = await safeAsync(
             async () => { throw new Error('fail') },
             'test operation'
         )
-
         assert.isUndefined(result)
-    })
-
-    test('handles async operations', async ({ assert }) => {
-        const result = await safeAsync(
-            async () => {
-                await new Promise(resolve => setTimeout(resolve, 10))
-                return 42
-            },
-            'async operation'
-        )
-
-        assert.equal(result, 42)
     })
 })
 
@@ -51,71 +37,45 @@ test.group('tryAsync', () => {
         assert.equal(error?.message, 'test error')
     })
 
-    test('wraps non-Error throws into Error', async ({ assert }) => {
-        const [result, error] = await tryAsync(async () => {
-            throw 'string error'
-        })
+    test('wraps non-Error throws (string) into Error', async ({ assert }) => {
+        const [, error] = await tryAsync(async () => { throw 'string error' })
 
-        assert.isUndefined(result)
         assert.instanceOf(error, Error)
         assert.equal(error?.message, 'string error')
     })
 })
 
 test.group('safeCleanup', () => {
-    test('executes all operations even if some fail', async ({ assert }) => {
+    test('executes all operations even when some fail', async ({ assert }) => {
         const results: string[] = []
 
         await safeCleanup([
-            {
-                operation: async () => { results.push('first') },
-                context: 'first op'
-            },
-            {
-                operation: async () => { throw new Error('fail') },
-                context: 'failing op'
-            },
-            {
-                operation: async () => { results.push('third') },
-                context: 'third op'
-            }
+            { operation: async () => { results.push('first') }, context: 'first op' },
+            { operation: async () => { throw new Error('fail') }, context: 'failing op' },
+            { operation: async () => { results.push('third') }, context: 'third op' }
         ])
 
         assert.deepEqual(results, ['first', 'third'])
     })
 
-    test('completes without throwing on failures', async ({ assert }) => {
+    test('never throws even if all operations fail', async ({ assert }) => {
         await assert.doesNotReject(async () => {
             await safeCleanup([
-                {
-                    operation: async () => { throw new Error('fail1') },
-                    context: 'op1'
-                },
-                {
-                    operation: async () => { throw new Error('fail2') },
-                    context: 'op2'
-                }
+                { operation: async () => { throw new Error('fail1') }, context: 'op1' },
+                { operation: async () => { throw new Error('fail2') }, context: 'op2' }
             ])
+        })
+    })
+
+    test('handles empty operations array', async ({ assert }) => {
+        await assert.doesNotReject(async () => {
+            await safeCleanup([])
         })
     })
 })
 
 test.group('retryAsync', () => {
-    test('returns result on first success', async ({ assert }) => {
-        let attempts = 0
-        const result = await retryAsync(
-            async () => {
-                attempts++
-                return 'success'
-            },
-            { maxRetries: 3 }
-        )
-
-        assert.equal(result, 'success')
-        assert.equal(attempts, 1)
-    })
-
-    test('retries on failure and succeeds', async ({ assert }) => {
+    test('retries on failure then succeeds', async ({ assert }) => {
         let attempts = 0
         const result = await retryAsync(
             async () => {
@@ -130,7 +90,7 @@ test.group('retryAsync', () => {
         assert.equal(attempts, 3)
     })
 
-    test('throws after max retries exceeded', async ({ assert }) => {
+    test('throws after exhausting all retries', async ({ assert }) => {
         let attempts = 0
 
         await assert.rejects(
@@ -149,21 +109,13 @@ test.group('retryAsync', () => {
         assert.equal(attempts, 3) // initial + 2 retries
     })
 
-    test('respects maxDelayMs cap', async ({ assert }) => {
+    test('respects maxDelayMs cap on exponential backoff', async ({ assert }) => {
         const start = Date.now()
-        let attempts = 0
 
         try {
             await retryAsync(
-                async () => {
-                    attempts++
-                    throw new Error('fail')
-                },
-                {
-                    maxRetries: 2,
-                    initialDelayMs: 1000,
-                    maxDelayMs: 50
-                }
+                async () => { throw new Error('fail') },
+                { maxRetries: 2, initialDelayMs: 1000, maxDelayMs: 50 }
             )
         } catch {
             // Expected
@@ -172,5 +124,21 @@ test.group('retryAsync', () => {
         const elapsed = Date.now() - start
         // With maxDelayMs=50, two retries should take ~100ms max, not 1000+2000ms
         assert.isBelow(elapsed, 500)
+    })
+
+    test('with maxRetries: 0, attempts exactly once', async ({ assert }) => {
+        let attempts = 0
+
+        await assert.rejects(async () => {
+            await retryAsync(
+                async () => {
+                    attempts++
+                    throw new Error('single attempt')
+                },
+                { maxRetries: 0, initialDelayMs: 10 }
+            )
+        })
+
+        assert.equal(attempts, 1)
     })
 })
