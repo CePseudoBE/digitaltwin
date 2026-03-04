@@ -1,5 +1,6 @@
 import {DatabaseAdapter, MetadataRow} from '../../src/database/database_adapter.js'
 import {DataRecord} from '../../src/types/data_record.js'
+import type {DataResolver} from '@digitaltwin/shared'
 import {StorageService} from '../../src/storage/storage_service.js'
 import {mapToDataRecord} from '../../src/utils/map_to_data_record.js'
 import {MockStorageService} from "./mock_storage_service.js";
@@ -7,7 +8,9 @@ import {MockStorageService} from "./mock_storage_service.js";
 export interface MockDatabaseOptions {
     /** Données pré-stockées dans le mock */
     initialData?: DataRecord[]
-    /** Service de stockage à utiliser pour les DataRecord */
+    /** Data resolver callback for DataRecord lazy loading */
+    dataResolver?: DataResolver
+    /** Service de stockage à utiliser pour les DataRecord (converted to DataResolver) */
     storage?: StorageService
     /** Comportement des méthodes (pour tester les erreurs) */
     shouldThrow?: {
@@ -28,7 +31,7 @@ export interface MockDatabaseOptions {
 
 export class MockDatabaseAdapter extends DatabaseAdapter {
     private records: Map<string, DataRecord> = new Map()
-    private storage: StorageService
+    private dataResolver: DataResolver
     private shouldThrow: Required<NonNullable<MockDatabaseOptions['shouldThrow']>>
     private mockKnex: any
 
@@ -42,8 +45,13 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
             })
         }
 
-        // Service de stockage par défaut (mock simple)
-        this.storage = options.storage || new MockStorageService()
+        // Data resolver: use explicit resolver, or wrap storage, or use mock
+        if (options.dataResolver) {
+            this.dataResolver = options.dataResolver
+        } else {
+            const storage = options.storage || new MockStorageService()
+            this.dataResolver = (url) => storage.retrieve(url)
+        }
 
         // Configuration des erreurs (toutes les nouvelles méthodes)
         this.shouldThrow = {
@@ -340,7 +348,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
         // Use counter to ensure unique IDs in rapid succession
         const id = meta.id ?? (Date.now() + this.idCounter++)
-        const record = mapToDataRecord({ ...meta, id }, this.storage)
+        const record = mapToDataRecord({ ...meta, id }, this.dataResolver)
         this.records.set(id.toString(), record)
         return record
     }
@@ -579,7 +587,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
             type: 'application/json',
             url: `${name}/${id}.json`,
             date
-        }, this.storage)
+        }, this.dataResolver)
 
         this.records.set(id.toString(), record)
         return record

@@ -1,45 +1,23 @@
 import { test } from '@japa/runner'
 import { mapToDataRecord } from '../../src/utils/map_to_data_record.js'
-import type { StorageService } from '../../src/storage/storage_service.js'
+import type { DataResolver } from '@digitaltwin/shared'
 
-// Mock storage service
-class MockStorageService implements StorageService {
-    private storedData: Map<string, Buffer> = new Map()
-
-    async store(name: string, content: Buffer): Promise<string> {
-        const url = `mock://storage/${name}`
-        this.storedData.set(url, content)
-        return url
-    }
-
-    async retrieve(url: string): Promise<Buffer> {
-        const data = this.storedData.get(url)
+// Simple data resolver for testing
+function createMockResolver(): { resolver: DataResolver; storedData: Map<string, Buffer> } {
+    const storedData = new Map<string, Buffer>()
+    const resolver: DataResolver = async (url) => {
+        const data = storedData.get(url)
         if (!data) {
             return Buffer.from(`content for ${url}`)
         }
         return data
     }
-
-    async delete(url: string): Promise<void> {
-        this.storedData.delete(url)
-    }
-
-    async exists(url: string): Promise<boolean> {
-        return this.storedData.has(url)
-    }
-
-    async list(prefix?: string): Promise<string[]> {
-        const keys = Array.from(this.storedData.keys())
-        if (prefix) {
-            return keys.filter(k => k.startsWith(prefix))
-        }
-        return keys
-    }
+    return { resolver, storedData }
 }
 
 test.group('mapToDataRecord', () => {
     test('should map basic metadata row to DataRecord', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
         const row = {
             id: 1,
             name: 'test-record',
@@ -48,7 +26,7 @@ test.group('mapToDataRecord', () => {
             url: 'mock://storage/test.json'
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.equal(record.id, 1)
         assert.equal(record.name, 'test-record')
@@ -58,8 +36,8 @@ test.group('mapToDataRecord', () => {
     })
 
     test('should provide lazy-loaded data function', async ({ assert }) => {
-        const storage = new MockStorageService()
-        await storage.store('test.json', Buffer.from('{"data": true}'))
+        const { resolver, storedData } = createMockResolver()
+        storedData.set('mock://storage/test.json', Buffer.from('{"data": true}'))
 
         const row = {
             id: 1,
@@ -69,7 +47,7 @@ test.group('mapToDataRecord', () => {
             url: 'mock://storage/test.json'
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.isFunction(record.data)
         const data = await record.data()
@@ -78,7 +56,7 @@ test.group('mapToDataRecord', () => {
     })
 
     test('should map asset-specific fields when present', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
         const row = {
             id: 42,
             name: 'my-asset',
@@ -91,7 +69,7 @@ test.group('mapToDataRecord', () => {
             filename: 'uploaded_image.png'
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.equal(record.description, 'A test image')
         assert.equal(record.source, 'https://example.com/original.png')
@@ -100,7 +78,7 @@ test.group('mapToDataRecord', () => {
     })
 
     test('should handle missing asset-specific fields', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
         const row = {
             id: 1,
             name: 'minimal',
@@ -110,7 +88,7 @@ test.group('mapToDataRecord', () => {
             // No description, source, owner_id, filename
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.isUndefined(record.description)
         assert.isUndefined(record.source)
@@ -119,7 +97,7 @@ test.group('mapToDataRecord', () => {
     })
 
     test('should default is_public to true when undefined', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
         const row = {
             id: 1,
             name: 'public-by-default',
@@ -129,13 +107,13 @@ test.group('mapToDataRecord', () => {
             // is_public not set
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.isTrue(record.is_public)
     })
 
     test('should default is_public to true when null', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
         const row = {
             id: 1,
             name: 'public-by-default',
@@ -145,13 +123,13 @@ test.group('mapToDataRecord', () => {
             is_public: null
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.isTrue(record.is_public)
     })
 
     test('should convert SQLite boolean 0 to false', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
         const row = {
             id: 1,
             name: 'private-record',
@@ -161,13 +139,13 @@ test.group('mapToDataRecord', () => {
             is_public: 0 // SQLite stores false as 0
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.isFalse(record.is_public)
     })
 
     test('should convert SQLite boolean 1 to true', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
         const row = {
             id: 1,
             name: 'public-record',
@@ -177,13 +155,13 @@ test.group('mapToDataRecord', () => {
             is_public: 1 // SQLite stores true as 1
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.isTrue(record.is_public)
     })
 
     test('should handle proper boolean values', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
 
         const rowTrue = {
             id: 1,
@@ -203,12 +181,12 @@ test.group('mapToDataRecord', () => {
             is_public: false
         }
 
-        assert.isTrue(mapToDataRecord(rowTrue, storage).is_public)
-        assert.isFalse(mapToDataRecord(rowFalse, storage).is_public)
+        assert.isTrue(mapToDataRecord(rowTrue, resolver).is_public)
+        assert.isFalse(mapToDataRecord(rowFalse, resolver).is_public)
     })
 
     test('should parse date string to Date object', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
         const dateStr = '2024-03-15T14:30:00.000Z'
         const row = {
             id: 1,
@@ -218,14 +196,14 @@ test.group('mapToDataRecord', () => {
             url: 'mock://storage/file.txt'
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.instanceOf(record.date, Date)
         assert.equal(record.date.toISOString(), dateStr)
     })
 
     test('should handle Date object directly', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
         const dateObj = new Date('2024-03-15T14:30:00.000Z')
         const row = {
             id: 1,
@@ -235,15 +213,14 @@ test.group('mapToDataRecord', () => {
             url: 'mock://storage/file.txt'
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.instanceOf(record.date, Date)
-        // Date constructor with Date object creates equivalent date
         assert.equal(record.date.getTime(), dateObj.getTime())
     })
 
     test('should handle numeric timestamp', ({ assert }) => {
-        const storage = new MockStorageService()
+        const { resolver } = createMockResolver()
         const timestamp = Date.now()
         const row = {
             id: 1,
@@ -253,21 +230,17 @@ test.group('mapToDataRecord', () => {
             url: 'mock://storage/file.txt'
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         assert.instanceOf(record.date, Date)
         assert.equal(record.date.getTime(), timestamp)
     })
 
-    test('data function should call storage.retrieve with correct URL', async ({ assert }) => {
+    test('data function should call resolver with correct URL', async ({ assert }) => {
         let retrievedUrl: string | null = null
-        const storage = new MockStorageService()
-
-        // Override retrieve to capture the URL
-        const originalRetrieve = storage.retrieve.bind(storage)
-        storage.retrieve = async (url: string) => {
+        const resolver: DataResolver = async (url) => {
             retrievedUrl = url
-            return originalRetrieve(url)
+            return Buffer.from(`content for ${url}`)
         }
 
         const row = {
@@ -278,7 +251,7 @@ test.group('mapToDataRecord', () => {
             url: 'mock://storage/specific-file.txt'
         }
 
-        const record = mapToDataRecord(row, storage)
+        const record = mapToDataRecord(row, resolver)
 
         // Data not loaded yet
         assert.isNull(retrievedUrl)

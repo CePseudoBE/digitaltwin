@@ -1,20 +1,18 @@
-import type { StorageService } from '../storage/storage_service.js'
-import type { DataRecord } from '../types/data_record.js'
-import type { MetadataRow } from '../database/database_adapter.js'
+import type { DataRecord, DataResolver, MetadataRow } from '@digitaltwin/shared'
 
 /**
  * Convert a DB metadata row to a full DataRecord with lazy-loaded blob.
  *
  * Also maps asset-specific fields if present (for AssetsManager components).
  */
-export function mapToDataRecord(row: MetadataRow | any, storage: StorageService): DataRecord {
+export function mapToDataRecord(row: MetadataRow | any, dataResolver: DataResolver): DataRecord {
     return {
         id: row.id,
         name: row.name,
         date: new Date(row.date),
         contentType: row.type,
         url: row.url,
-        data: () => storage.retrieve(row.url),
+        data: () => dataResolver(row.url),
 
         // Asset-specific fields (optional, only for AssetsManager)
         description: row.description,

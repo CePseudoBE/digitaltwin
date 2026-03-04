@@ -1,9 +1,7 @@
 import type { Knex } from 'knex'
 import knex from 'knex'
-import type { MetadataRow } from '../database_adapter.js'
+import type { DataRecord, DataResolver, MetadataRow } from '@digitaltwin/shared'
 import { DatabaseAdapter } from '../database_adapter.js'
-import type { DataRecord } from '../../types/data_record.js'
-import type { StorageService } from '../../storage/storage_service.js'
 import { mapToDataRecord } from '../../utils/map_to_data_record.js'
 
 export interface PostgreSQLConfig {
@@ -27,12 +25,12 @@ export interface SQLiteConfig {
  */
 export class KnexDatabaseAdapter extends DatabaseAdapter {
     #knex: Knex
-    #storage: StorageService
+    #dataResolver: DataResolver
 
-    constructor(config: Knex.Config, storage: StorageService) {
+    constructor(config: Knex.Config, dataResolver: DataResolver) {
         super()
         this.#knex = knex(config)
-        this.#storage = storage
+        this.#dataResolver = dataResolver
     }
 
     /**
@@ -40,7 +38,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
      */
     static forPostgreSQL(
         pgConfig: PostgreSQLConfig,
-        storage: StorageService,
+        dataResolver: DataResolver,
         _tableName: string = 'data_index'
     ): KnexDatabaseAdapter {
         const knexConfig: Knex.Config = {
@@ -64,7 +62,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
             }
         }
 
-        return new KnexDatabaseAdapter(knexConfig, storage)
+        return new KnexDatabaseAdapter(knexConfig, dataResolver)
     }
 
     /**
@@ -72,7 +70,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
      */
     static forSQLite(
         sqliteConfig: SQLiteConfig,
-        storage: StorageService,
+        dataResolver: DataResolver,
         _tableName: string = 'data_index'
     ): KnexDatabaseAdapter {
         const client = sqliteConfig.client || 'sqlite3'
@@ -112,7 +110,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
             useNullAsDefault: true
         }
 
-        return new KnexDatabaseAdapter(knexConfig, storage)
+        return new KnexDatabaseAdapter(knexConfig, dataResolver)
     }
 
     // ========== Basic methods ==========
@@ -169,7 +167,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         const newId = typeof insertedId === 'object' ? insertedId.id : insertedId
 
         // Return record with the generated ID
-        return mapToDataRecord({ ...meta, id: newId }, this.#storage)
+        return mapToDataRecord({ ...meta, id: newId }, this.#dataResolver)
     }
 
     async delete(id: string, name: string): Promise<void> {
@@ -180,13 +178,13 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     async getById(id: string, name: string): Promise<DataRecord | undefined> {
         this.#validateTableName(name)
         const row = await this.#knex(name).where({ id }).first()
-        return row ? mapToDataRecord(row, this.#storage) : undefined
+        return row ? mapToDataRecord(row, this.#dataResolver) : undefined
     }
 
     async getLatestByName(name: string): Promise<DataRecord | undefined> {
         this.#validateTableName(name)
         const row = await this.#knex(name).select('*').orderBy('date', 'desc').limit(1).first()
-        return row ? mapToDataRecord(row, this.#storage) : undefined
+        return row ? mapToDataRecord(row, this.#dataResolver) : undefined
     }
 
     async doesTableExists(name: string): Promise<boolean> {
@@ -461,7 +459,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
     async getFirstByName(name: string): Promise<DataRecord | undefined> {
         this.#validateTableName(name)
         const row = await this.#knex(name).orderBy('date', 'asc').first()
-        return row ? mapToDataRecord(row, this.#storage) : undefined
+        return row ? mapToDataRecord(row, this.#dataResolver) : undefined
     }
 
     async getByDateRange(
@@ -485,7 +483,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         }
 
         const rows = await query
-        return rows.map(row => mapToDataRecord(row, this.#storage))
+        return rows.map(row => mapToDataRecord(row, this.#dataResolver))
     }
 
     async getAfterDate(name: string, afterDate: Date, limit?: number): Promise<DataRecord[]> {
@@ -497,13 +495,13 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         }
 
         const rows = await query
-        return rows.map(row => mapToDataRecord(row, this.#storage))
+        return rows.map(row => mapToDataRecord(row, this.#dataResolver))
     }
 
     async getLatestBefore(name: string, beforeDate: Date): Promise<DataRecord | undefined> {
         this.#validateTableName(name)
         const row = await this.#knex(name).where('date', '<', beforeDate.toISOString()).orderBy('date', 'desc').first()
-        return row ? mapToDataRecord(row, this.#storage) : undefined
+        return row ? mapToDataRecord(row, this.#dataResolver) : undefined
     }
 
     async getLatestRecordsBefore(name: string, beforeDate: Date, limit: number): Promise<DataRecord[]> {
@@ -513,7 +511,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
             .orderBy('date', 'desc')
             .limit(limit)
 
-        return rows.map(row => mapToDataRecord(row, this.#storage))
+        return rows.map(row => mapToDataRecord(row, this.#dataResolver))
     }
 
     async hasRecordsAfterDate(name: string, afterDate: Date): Promise<boolean> {
@@ -592,7 +590,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
 
                 // Convert to DataRecords
                 for (const meta of metas) {
-                    results.push(mapToDataRecord(meta, this.#storage))
+                    results.push(mapToDataRecord(meta, this.#dataResolver))
                 }
             }
 
@@ -654,7 +652,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         for (const [tableName, ids] of groupedByTable) {
             const rows = await this.#knex(tableName).whereIn('id', ids)
             for (const row of rows) {
-                results.push(mapToDataRecord(row, this.#storage))
+                results.push(mapToDataRecord(row, this.#dataResolver))
             }
         }
 
@@ -679,7 +677,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         // Get paginated results
         const rows = await this.#knex(name).select('*').orderBy('date', 'desc').offset(offset).limit(limit)
 
-        const records = rows.map(row => mapToDataRecord(row, this.#storage))
+        const records = rows.map(row => mapToDataRecord(row, this.#dataResolver))
 
         return { records, total }
     }
@@ -745,7 +743,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         const sortColumn = hasDateColumn ? 'date' : 'created_at'
 
         const rows = await query.orderBy(sortColumn, 'desc')
-        return rows.map(row => mapToDataRecord(row, this.#storage))
+        return rows.map(row => mapToDataRecord(row, this.#dataResolver))
     }
 
     async updateById(tableName: string, id: number, data: Record<string, any>): Promise<void> {
