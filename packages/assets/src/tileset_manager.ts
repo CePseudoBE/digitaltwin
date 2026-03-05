@@ -368,6 +368,103 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
     }
 
     /**
+     * Override presigned upload confirmation for tilesets.
+     * Instead of marking as completed, queue a BullMQ job for ZIP extraction.
+     */
+    override async handleUploadConfirm(req: TypedRequest): Promise<DataResponse> {
+        try {
+            // Authenticate user
+            const authResult = await this.authMiddleware.authenticate(req)
+            if (!authResult.success) {
+                return authResult.response
+            }
+            const userId = authResult.userRecord.id
+            if (!userId) {
+                return errorResponse('Failed to retrieve user information')
+            }
+
+            const fileId = req.params?.fileId
+            if (!fileId) {
+                return badRequestResponse('File ID is required')
+            }
+
+            const config = this.getConfiguration()
+            const asset = await this.getAssetById(fileId)
+            if (!asset) {
+                return notFoundResponse('Tileset not found')
+            }
+
+            // Check ownership
+            const ownershipError = this.validateOwnership(asset, userId, req.headers)
+            if (ownershipError) {
+                return ownershipError
+            }
+
+            // Check status
+            if (asset.upload_status !== 'pending') {
+                return {
+                    status: 409,
+                    content: JSON.stringify({ error: `Upload is not pending (current status: ${asset.upload_status || 'completed'})` }),
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            }
+
+            // Verify file exists on storage
+            if (!asset.presigned_key) {
+                return badRequestResponse('No presigned key found for this record')
+            }
+
+            const existsResult = await this.storage.objectExists(asset.presigned_key)
+            if (!existsResult.exists) {
+                return badRequestResponse('File not found on storage. Please upload the file using the presigned URL first.')
+            }
+
+            // Queue extraction job instead of marking completed
+            if (!this.uploadQueue) {
+                return errorResponse('Upload processing queue is not available')
+            }
+
+            const jobData: TilesetUploadJobData = {
+                type: 'tileset',
+                recordId: asset.id,
+                tempFilePath: '', // Not used for presigned uploads
+                componentName: config.name,
+                userId,
+                filename: asset.filename || 'tileset.zip',
+                description: asset.description || '',
+                presignedKey: asset.presigned_key
+            }
+
+            const job = await this.uploadQueue.add(`tileset-presigned-${asset.id}`, jobData, {
+                jobId: `tileset-presigned-${asset.id}`
+            })
+
+            if (!job) {
+                return errorResponse('Failed to queue extraction job')
+            }
+
+            await this.db.updateById(config.name, asset.id, {
+                upload_status: 'processing',
+                upload_job_id: job.id
+            })
+
+            return {
+                status: 202,
+                content: JSON.stringify({
+                    message: 'Upload confirmed, extraction queued',
+                    id: asset.id,
+                    job_id: job.id,
+                    status: 'processing',
+                    status_url: `/${config.endpoint}/${asset.id}/status`
+                }),
+                headers: { 'Content-Type': 'application/json' }
+            }
+        } catch (error) {
+            return errorResponse(error)
+        }
+    }
+
+    /**
      * List all tilesets with their public URLs.
      */
     override async retrieve(req?: TypedRequest): Promise<DataResponse> {
@@ -497,11 +594,25 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 handler: this.retrieve.bind(this),
                 responseType: 'application/json'
             },
-            // Upload tileset
+            // Upload tileset (multipart)
             {
                 method: 'post',
                 path: `/${config.endpoint}`,
                 handler: this.handleUpload.bind(this),
+                responseType: 'application/json'
+            },
+            // Presigned upload request
+            {
+                method: 'post',
+                path: `/${config.endpoint}/upload-request`,
+                handler: this.handlePresignedUploadRequest.bind(this),
+                responseType: 'application/json'
+            },
+            // Presigned upload confirm (triggers extraction)
+            {
+                method: 'post',
+                path: `/${config.endpoint}/confirm/:fileId`,
+                handler: this.handleUploadConfirm.bind(this),
                 responseType: 'application/json'
             },
             // Update metadata

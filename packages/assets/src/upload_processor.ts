@@ -16,6 +16,8 @@ export interface TilesetUploadJobData {
     userId: number
     filename: string
     description: string
+    /** S3 key for presigned uploads (when set, download from S3 instead of reading temp file) */
+    presignedKey?: string
 }
 
 export type UploadJobData = TilesetUploadJobData
@@ -68,17 +70,24 @@ export class UploadProcessor {
     }
 
     private async processTilesetUpload(job: Job<TilesetUploadJobData>): Promise<void> {
-        const { recordId, tempFilePath, componentName } = job.data
+        const { recordId, tempFilePath, componentName, presignedKey } = job.data
         let basePath: string | null = null
 
         try {
             await this.updateRecordStatus(recordId, componentName, 'processing')
             await job.updateProgress(10)
 
-            // Read ZIP file
-            const zipBuffer = await fs.readFile(tempFilePath).catch(err => {
-                throw new Error(`Failed to read temp file: ${err.message}`)
-            })
+            // Read ZIP file from presigned S3 key or temp file
+            let zipBuffer: Buffer
+            if (presignedKey) {
+                zipBuffer = await this.storage.retrieve(presignedKey).catch(err => {
+                    throw new Error(`Failed to download presigned file from storage: ${err.message}`)
+                })
+            } else {
+                zipBuffer = await fs.readFile(tempFilePath).catch(err => {
+                    throw new Error(`Failed to read temp file: ${err.message}`)
+                })
+            }
             await job.updateProgress(20)
 
             // Generate unique base path
@@ -114,8 +123,13 @@ export class UploadProcessor {
             })
             await job.updateProgress(90)
 
-            // Clean up temp file
-            await safeAsync(() => fs.unlink(tempFilePath), 'cleanup temp file after upload', logger)
+            // Clean up source file
+            if (presignedKey) {
+                // Delete the original ZIP from S3 (extraction created individual files)
+                await safeAsync(() => this.storage.delete(presignedKey), 'cleanup presigned ZIP after extraction', logger)
+            } else if (tempFilePath) {
+                await safeAsync(() => fs.unlink(tempFilePath), 'cleanup temp file after upload', logger)
+            }
             await job.updateProgress(100)
 
             logger.info(`Tileset ${recordId} uploaded: ${extractResult.file_count} files`)
@@ -132,22 +146,27 @@ export class UploadProcessor {
                 logger
             )
 
-            // Clean up: uploaded files and temp file
+            // Clean up: uploaded files and source file
             const pathToClean = basePath // Capture for closure
-            await safeCleanup(
-                [
-                    ...(pathToClean
-                        ? [
-                              {
-                                  operation: () => this.storage.deleteByPrefix(pathToClean),
-                                  context: 'cleanup storage on upload error'
-                              }
-                          ]
-                        : []),
-                    { operation: () => fs.unlink(tempFilePath), context: 'cleanup temp file on upload error' }
-                ],
-                logger
-            )
+            const cleanupOps: Array<{ operation: () => Promise<unknown>; context: string }> = []
+            if (pathToClean) {
+                cleanupOps.push({
+                    operation: () => this.storage.deleteByPrefix(pathToClean),
+                    context: 'cleanup storage on upload error'
+                })
+            }
+            if (presignedKey) {
+                cleanupOps.push({
+                    operation: () => this.storage.delete(presignedKey),
+                    context: 'cleanup presigned ZIP on upload error'
+                })
+            } else if (tempFilePath) {
+                cleanupOps.push({
+                    operation: () => fs.unlink(tempFilePath),
+                    context: 'cleanup temp file on upload error'
+                })
+            }
+            await safeCleanup(cleanupOps, logger)
 
             throw error
         }
