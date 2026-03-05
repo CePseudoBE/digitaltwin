@@ -11,6 +11,7 @@ import type { Harvester } from '../components/harvester.js'
 import type { Handler } from '../components/handler.js'
 import type { Request, Response } from 'ultimate-express'
 import type { AssetsManager, CustomTableManager } from '../components/index.js'
+import type { HttpMethod } from '@digitaltwin/shared'
 import { DigitalTwinError } from '../errors/index.js'
 import { Logger } from '../utils/logger.js'
 
@@ -26,7 +27,8 @@ const logger = new Logger('Endpoints')
  * - patch: Update existing resources (partial update)
  * - delete: Remove resources
  */
-export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch'
+// Re-exported from @digitaltwin/shared for backward compatibility
+export type { HttpMethod } from '@digitaltwin/shared'
 
 /**
  * Interface defining an HTTP endpoint exposed by a component.
