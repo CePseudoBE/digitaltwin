@@ -1,7 +1,7 @@
 {
   "name": "@digitaltwin/database",
   "version": "1.0.0",
-  "description": "Database abstraction layer for Digital Twin framework (Knex-based PostgreSQL/SQLite)",
+  "description": "Database abstraction layer for Digital Twin framework (Kysely/Knex, PostgreSQL/SQLite)",
   "license": "MIT",
   "author": "Axel Hoffmann",
   "type": "module",
@@ -33,11 +33,15 @@
     "@digitaltwin/shared": "workspace:*"
   },
   "peerDependencies": {
-    "knex": ">=3.0.0"
+    "knex": ">=3.0.0",
+    "kysely": ">=0.27.0"
   },
   "peerDependenciesMeta": {
     "knex": {
-      "optional": false
+      "optional": true
+    },
+    "kysely": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -45,6 +49,7 @@
     "@japa/runner": "^4.3.0",
     "better-sqlite3": "^12.6.0",
     "knex": "^3.1.0",
+    "kysely": "^0.28.11",
     "ts-node-maintained": "^10.9.5"
   }
 }
