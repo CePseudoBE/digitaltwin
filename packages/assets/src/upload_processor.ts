@@ -69,7 +69,10 @@ export class UploadProcessor {
         }
     }
 
-    private async processTilesetUpload(job: Job<TilesetUploadJobData>): Promise<void> {
+    /**
+     * Process a tileset upload job. Public for testability.
+     */
+    async processTilesetUpload(job: Job<TilesetUploadJobData>): Promise<void> {
         const { recordId, tempFilePath, componentName, presignedKey } = job.data
         let basePath: string | null = null
 
