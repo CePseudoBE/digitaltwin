@@ -28,6 +28,9 @@ export type {
     CustomTableGetRequest,
     CustomTableCreateRequest,
     CustomTableUpdateRequest,
+    PresignedUploadRequestBody,
+    PresignedUploadRequest,
+    PresignedUploadConfirmRequest,
     TilesetUploadRequest,
     TilesetListQuery,
     TilesetListRequest
@@ -76,7 +79,9 @@ export {
     validateAssetBatchUpload,
     validateCustomRecordCreate,
     validateCustomRecordUpdate,
-    validateDateRangeQuery
+    validateDateRangeQuery,
+    presignedUploadRequestSchema,
+    validatePresignedUploadRequest
 } from './validation/schemas.js'
 export { validateData, safeValidate, validateQuery, validateParams, vine } from './validation/validate.js'
 
