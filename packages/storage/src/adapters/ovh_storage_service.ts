@@ -9,10 +9,13 @@ import {
     DeleteObjectCommand,
     DeleteObjectsCommand,
     ListObjectsV2Command,
+    HeadObjectCommand,
     PutBucketCorsCommand,
     ObjectCannedACL
 } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { StorageService } from '../storage_service.js'
+import type { PresignedUploadResult, ObjectExistsResult } from '../storage_service.js'
 import { safeAsync, Logger } from '@digitaltwin/shared'
 import type { Readable } from 'stream'
 
@@ -233,6 +236,58 @@ export class OvhS3StorageService extends StorageService {
     }
 
     /**
+     * This storage backend supports presigned URLs for direct client uploads.
+     */
+    override supportsPresignedUrls(): boolean {
+        return true
+    }
+
+    /**
+     * Generate a presigned PUT URL for direct client-to-S3 uploads.
+     */
+    override async generatePresignedUploadUrl(
+        key: string,
+        contentType: string,
+        expiresInSeconds: number = 300
+    ): Promise<PresignedUploadResult> {
+        const command = new PutObjectCommand({
+            Bucket: this.#bucket,
+            Key: key,
+            ContentType: contentType
+        })
+
+        const url = await getSignedUrl(this.#s3, command, { expiresIn: expiresInSeconds })
+        const expiresAt = new Date(Date.now() + expiresInSeconds * 1000)
+
+        return { url, key, expiresAt }
+    }
+
+    /**
+     * Check if an object exists in the S3 bucket using HeadObject.
+     */
+    override async objectExists(key: string): Promise<ObjectExistsResult> {
+        try {
+            const response = await this.#s3.send(
+                new HeadObjectCommand({
+                    Bucket: this.#bucket,
+                    Key: key
+                })
+            )
+            return {
+                exists: true,
+                contentLength: response.ContentLength,
+                contentType: response.ContentType
+            }
+        } catch (error: unknown) {
+            const name = (error as { name?: string })?.name
+            if (name === 'NotFound' || name === 'NoSuchKey') {
+                return { exists: false }
+            }
+            throw error
+        }
+    }
+
+    /**
      * Configure CORS settings for the bucket.
      * Required for browser-based access to public files (e.g., Cesium loading tilesets).
      * Should be called once during application startup.
@@ -244,7 +299,7 @@ export class OvhS3StorageService extends StorageService {
      */
     async configureCors(
         allowedOrigins: string[] = ['*'],
-        allowedMethods: string[] = ['GET', 'HEAD'],
+        allowedMethods: string[] = ['GET', 'HEAD', 'PUT'],
         allowedHeaders: string[] = ['*', 'Authorization']
     ): Promise<boolean> {
         try {

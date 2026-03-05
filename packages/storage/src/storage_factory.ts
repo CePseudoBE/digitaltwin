@@ -35,7 +35,11 @@ export class StorageServiceFactory {
                     region: env.OVH_REGION ?? 'gra'
                 })
                 // Configure CORS for browser access (non-blocking)
-                safeAsync(() => ovhStorage.configureCors(), 'configure OVH CORS', logger)
+                safeAsync(
+                    () => ovhStorage.configureCors(['*'], ['GET', 'HEAD', 'PUT'], ['*', 'Authorization']),
+                    'configure OVH CORS',
+                    logger
+                )
                 return ovhStorage
             }
 

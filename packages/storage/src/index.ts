@@ -1,5 +1,6 @@
 // Storage service base class and factory
 export { StorageService } from './storage_service.js'
+export type { PresignedUploadResult, ObjectExistsResult } from './storage_service.js'
 export { StorageServiceFactory } from './storage_factory.js'
 
 // Storage adapters
