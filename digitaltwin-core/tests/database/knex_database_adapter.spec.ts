@@ -1,6 +1,7 @@
 import { test } from '@japa/runner'
 import { KnexDatabaseAdapter } from '../../src/database/adapters/knex_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
+import type { DataResolver } from '@digitaltwin/shared'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
@@ -10,19 +11,20 @@ async function createTestDb(): Promise<{ db: KnexDatabaseAdapter; cleanup: () =>
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'knex-test-'))
     const dbPath = path.join(tempDir, 'test.db')
     const storage = new LocalStorageService(tempDir)
+    const dataResolver: DataResolver = (url) => storage.retrieve(url)
 
     // Try better-sqlite3 first, fall back to sqlite3
     let db: KnexDatabaseAdapter
     try {
         db = KnexDatabaseAdapter.forSQLite(
             { filename: dbPath, client: 'better-sqlite3', enableForeignKeys: false },
-            storage
+            dataResolver
         )
         // Test connection
         await db.getKnex().raw('SELECT 1')
     } catch {
         // Fall back to sqlite3
-        db = KnexDatabaseAdapter.forSQLite({ filename: dbPath, client: 'sqlite3', enableForeignKeys: false }, storage)
+        db = KnexDatabaseAdapter.forSQLite({ filename: dbPath, client: 'sqlite3', enableForeignKeys: false }, dataResolver)
         await db.getKnex().raw('SELECT 1')
     }
 
@@ -755,7 +757,7 @@ test.group('KnexDatabaseAdapter - Static Factory Methods', () => {
     test('forPostgreSQL creates adapter with correct config', ({ assert }) => {
         // We can't actually connect to PostgreSQL without a server,
         // but we can verify the adapter is created
-        const storage = new LocalStorageService('.test-pg')
+        const resolver: DataResolver = async () => Buffer.alloc(0)
 
         const pgConfig = {
             host: 'localhost',
@@ -765,7 +767,7 @@ test.group('KnexDatabaseAdapter - Static Factory Methods', () => {
             database: 'test_db'
         }
 
-        const db = KnexDatabaseAdapter.forPostgreSQL(pgConfig, storage)
+        const db = KnexDatabaseAdapter.forPostgreSQL(pgConfig, resolver)
 
         assert.isDefined(db)
         assert.isDefined(db.getKnex())
@@ -775,18 +777,18 @@ test.group('KnexDatabaseAdapter - Static Factory Methods', () => {
     })
 
     test('forSQLite creates adapter with in-memory database', async ({ assert }) => {
-        const storage = new LocalStorageService('.test-sqlite-memory')
+        const resolver: DataResolver = async () => Buffer.alloc(0)
 
         let db: KnexDatabaseAdapter | null = null
         try {
-            db = KnexDatabaseAdapter.forSQLite({ filename: ':memory:', client: 'better-sqlite3' }, storage)
+            db = KnexDatabaseAdapter.forSQLite({ filename: ':memory:', client: 'better-sqlite3' }, resolver)
             // Should be able to execute queries
             await db.getKnex().raw('SELECT 1')
             assert.isTrue(true)
         } catch {
             // Try sqlite3
             try {
-                db = KnexDatabaseAdapter.forSQLite({ filename: ':memory:', client: 'sqlite3' }, storage)
+                db = KnexDatabaseAdapter.forSQLite({ filename: ':memory:', client: 'sqlite3' }, resolver)
                 await db.getKnex().raw('SELECT 1')
                 assert.isTrue(true)
             } catch {

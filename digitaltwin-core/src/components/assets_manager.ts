@@ -4,11 +4,11 @@ import type { HttpMethod } from '../engine/endpoints.js'
 import type { StorageService } from '../storage/storage_service.js'
 import type { DatabaseAdapter, MetadataRow } from '../database/database_adapter.js'
 import type { DataRecord } from '../types/data_record.js'
-import type { UserRecord } from '../auth/types.js'
+import type { AuthResult } from '../auth/types.js'
 import type { OpenAPIDocumentable, OpenAPIComponentSpec } from '../openapi/types.js'
 import { ApisixAuthParser } from '../auth/apisix_parser.js'
+import { AuthMiddleware } from '../auth/index.js'
 import { UserService } from '../auth/user_service.js'
-import { AuthConfig } from '../auth/auth_config.js'
 import {
     successResponse,
     errorResponse,
@@ -28,12 +28,6 @@ import { validateAssetUpdate, validateIdParam, validatePagination } from '../val
 import { validateData, validateQuery, validateParams } from '../validation/validate.js'
 
 const logger = new Logger('AssetsManager')
-
-/**
- * Result of authentication check.
- * Either contains the authenticated user record or an error response.
- */
-type AuthResult = { success: true; userRecord: UserRecord } | { success: false; response: DataResponse }
 
 /**
  * Extracted upload data from request (potentially incomplete).
@@ -213,7 +207,7 @@ export interface UpdateAssetRequest {
 export abstract class AssetsManager implements Component, Servable, OpenAPIDocumentable {
     protected db!: DatabaseAdapter
     protected storage!: StorageService
-    protected userService!: UserService
+    protected authMiddleware!: AuthMiddleware
 
     /**
      * Injects dependencies into the assets manager.
@@ -222,23 +216,22 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      *
      * @param {DatabaseAdapter} db - The database adapter for metadata storage
      * @param {StorageService} storage - The storage service for file persistence
-     * @param {UserService} [userService] - Optional user service for authentication (created automatically if not provided)
+     * @param {AuthMiddleware} [authMiddleware] - Optional auth middleware for authentication (created automatically if not provided)
      *
      * @example
      * ```typescript
-     * // Standard usage (UserService created automatically)
+     * // Standard usage (AuthMiddleware created automatically)
      * const assetsManager = new MyAssetsManager()
      * assetsManager.setDependencies(databaseAdapter, storageService)
      *
-     * // For testing (inject mock UserService)
-     * const mockUserService = new MockUserService()
-     * assetsManager.setDependencies(databaseAdapter, storageService, mockUserService)
+     * // For testing (inject mock AuthMiddleware)
+     * assetsManager.setDependencies(databaseAdapter, storageService, mockAuthMiddleware)
      * ```
      */
-    setDependencies(db: DatabaseAdapter, storage: StorageService, userService?: UserService): void {
+    setDependencies(db: DatabaseAdapter, storage: StorageService, authMiddleware?: AuthMiddleware): void {
         this.db = db
         this.storage = storage
-        this.userService = userService ?? new UserService(db)
+        this.authMiddleware = authMiddleware ?? new AuthMiddleware(new UserService(db.getUserRepository()))
     }
 
     /**
@@ -400,31 +393,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      * ```
      */
     private async authenticateRequest(req: any): Promise<AuthResult> {
-        // If auth is disabled, create an anonymous user
-        if (AuthConfig.isAuthDisabled()) {
-            const anonymousUser = {
-                id: AuthConfig.getAnonymousUserId(),
-                roles: []
-            }
-            const userRecord = await this.userService.findOrCreateUser(anonymousUser)
-            return { success: true, userRecord }
-        }
-
-        if (!ApisixAuthParser.hasValidAuth(req.headers || {})) {
-            return { success: false, response: unauthorizedResponse() }
-        }
-
-        const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-        if (!authUser) {
-            return { success: false, response: unauthorizedResponse('Invalid authentication headers') }
-        }
-
-        const userRecord = await this.userService.findOrCreateUser(authUser)
-        if (!userRecord.id) {
-            return { success: false, response: errorResponse('Failed to retrieve user information') }
-        }
-
-        return { success: true, userRecord }
+        return this.authMiddleware.authenticate(req)
     }
 
     /**
@@ -558,17 +527,12 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
         }
 
         // Private asset - require authentication
-        if (!ApisixAuthParser.hasValidAuth(req.headers || {})) {
+        const authResult = await this.authMiddleware.authenticate(req)
+        if (!authResult.success) {
             return unauthorizedResponse('Authentication required for private assets')
         }
 
-        const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-        if (!authUser) {
-            return unauthorizedResponse('Invalid authentication headers')
-        }
-
-        const userRecord = await this.userService.findOrCreateUser(authUser)
-        if (!userRecord.id || asset.owner_id !== userRecord.id) {
+        if (asset.owner_id !== authResult.userRecord.id) {
             return forbiddenResponse('This asset is private')
         }
 
@@ -726,17 +690,10 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      * @returns User ID or null if not authenticated
      */
     private async getAuthenticatedUserId(req: any): Promise<number | null> {
-        if (!req || !ApisixAuthParser.hasValidAuth(req.headers || {})) {
-            return null
-        }
-
-        const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-        if (!authUser) {
-            return null
-        }
-
-        const userRecord = await this.userService.findOrCreateUser(authUser)
-        return userRecord.id || null
+        if (!req) return null
+        const authResult = await this.authMiddleware.authenticate(req)
+        if (!authResult.success) return null
+        return authResult.userRecord.id || null
     }
 
     /**

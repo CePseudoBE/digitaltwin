@@ -3,5 +3,6 @@ export type {
     AuthenticatedUser,
     UserRecord,
     AuthContext,
-    AuthenticatedRequest
+    AuthenticatedRequest,
+    AuthResult
 } from '@digitaltwin/shared'

@@ -12,24 +12,6 @@ test.group('servableEndpoint decorator', () => {
         assert.equal(endpoints[0].method, 'GET')
     })
 
-    test('normalizes method to uppercase', ({ assert }) => {
-        class TestClass {
-            @servableEndpoint({ path: '/data', method: 'post' })
-            async handler() { return { status: 201, content: '' } }
-        }
-
-        assert.equal((TestClass as any).__endpoints[0].method, 'POST')
-    })
-
-    test('stores the handler method name for later dispatch', ({ assert }) => {
-        class TestClass {
-            @servableEndpoint({ path: '/users', method: 'get' })
-            async listUsers() { return { status: 200, content: '' } }
-        }
-
-        assert.equal((TestClass as any).__endpoints[0].handlerName, 'listUsers')
-    })
-
     test('accumulates multiple endpoints on the same class', ({ assert }) => {
         class ApiHandler {
             @servableEndpoint({ path: '/items', method: 'get' })

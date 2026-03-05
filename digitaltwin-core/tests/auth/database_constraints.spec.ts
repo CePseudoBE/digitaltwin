@@ -1,14 +1,14 @@
 import { test } from '@japa/runner'
 import { KnexDatabaseAdapter } from '../../src/database/adapters/knex_database_adapter.js'
-import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
+import type { DataResolver } from '@digitaltwin/shared'
 
 test.group('Database Constraints - Authentication', () => {
   test('createTable should setup foreign key constraints for owner_id', async ({ assert }) => {
     // This test verifies the table structure includes proper foreign keys
     // Using SQLite in-memory database for testing
     
-    const storage = new LocalStorageService('.test-constraints')
-    
+    const resolver: DataResolver = async () => Buffer.alloc(0)
+
     const sqliteConfig = {
       filename: ':memory:',
       client: 'better-sqlite3' as const
@@ -16,7 +16,7 @@ test.group('Database Constraints - Authentication', () => {
 
     // Skip this test if better-sqlite3 is not available
     try {
-      const db = KnexDatabaseAdapter.forSQLite(sqliteConfig, storage)
+      const db = KnexDatabaseAdapter.forSQLite(sqliteConfig, resolver)
       
       // First create users table (would be done by UserService)
       const knex = db.getKnex()
@@ -54,7 +54,7 @@ test.group('Database Constraints - Authentication', () => {
   })
 
   test('foreign key constraint should be nullable for backward compatibility', async ({ assert }) => {
-    const storage = new LocalStorageService('.test-nullable-constraints')
+    const resolver: DataResolver = async () => Buffer.alloc(0)
     
     const sqliteConfig = {
       filename: ':memory:',
@@ -62,7 +62,7 @@ test.group('Database Constraints - Authentication', () => {
     }
 
     try {
-      const db = KnexDatabaseAdapter.forSQLite(sqliteConfig, storage)
+      const db = KnexDatabaseAdapter.forSQLite(sqliteConfig, resolver)
       const knex = db.getKnex()
       
       // Create users table first
@@ -100,7 +100,7 @@ test.group('Database Constraints - Authentication', () => {
   })
 
   test('foreign key constraint should prevent invalid user references', async ({ assert }) => {
-    const storage = new LocalStorageService('.test-fk-validation')
+    const resolver: DataResolver = async () => Buffer.alloc(0)
 
     const sqliteConfig = {
       filename: ':memory:',
@@ -111,7 +111,7 @@ test.group('Database Constraints - Authentication', () => {
     let db: KnexDatabaseAdapter | null = null
 
     try {
-      db = KnexDatabaseAdapter.forSQLite(sqliteConfig, storage)
+      db = KnexDatabaseAdapter.forSQLite(sqliteConfig, resolver)
       const knex = db.getKnex()
 
       // Create users table
@@ -147,10 +147,13 @@ test.group('Database Constraints - Authentication', () => {
         )
       }
 
-      // If FK constraints are properly enforced, we should have thrown
-      // Some SQLite configurations may not enforce FK by default
-      // If no error was thrown, FK constraints are not enforced - that's OK
-      assert.isTrue(true, 'Test completed - FK constraints may or may not be enforced')
+      // If FK constraints are properly enforced, threwError should be true.
+      // Some SQLite configurations may not enforce FK by default — skip in that case.
+      if (!threwError) {
+        // FK not enforced by this SQLite build — test is inconclusive, not a failure
+        return
+      }
+      assert.isTrue(threwError, 'FK constraint should reject non-existent owner_id')
 
       await db.close()
       db = null
@@ -167,7 +170,7 @@ test.group('Database Constraints - Authentication', () => {
   })
 
   test('should handle assets table creation when users table exists', async ({ assert }) => {
-    const storage = new LocalStorageService('.test-table-order')
+    const resolver: DataResolver = async () => Buffer.alloc(0)
     
     const sqliteConfig = {
       filename: ':memory:',
@@ -175,7 +178,7 @@ test.group('Database Constraints - Authentication', () => {
     }
 
     try {
-      const db = KnexDatabaseAdapter.forSQLite(sqliteConfig, storage)
+      const db = KnexDatabaseAdapter.forSQLite(sqliteConfig, resolver)
       const knex = db.getKnex()
       
       // Simulate the proper initialization order

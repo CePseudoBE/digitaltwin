@@ -5,7 +5,6 @@ import type { HttpMethod } from '../engine/endpoints.js'
 import type { TypedRequest } from '../types/http.js'
 import { extractAndStoreArchive } from '../utils/zip_utils.js'
 import { ApisixAuthParser } from '../auth/apisix_parser.js'
-import { AuthConfig } from '../auth/auth_config.js'
 import type { AsyncUploadable } from './async_upload.js'
 import type { TilesetUploadJobData } from '../engine/upload_processor.js'
 import type { Queue } from 'bullmq'
@@ -167,29 +166,11 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
      * Returns user ID on success, or error response on failure.
      */
     private async authenticateUser(req: any): Promise<number | DataResponse> {
-        if (AuthConfig.isAuthDisabled()) {
-            const userRecord = await this.userService.findOrCreateUser({
-                id: AuthConfig.getAnonymousUserId(),
-                roles: []
-            })
-            return userRecord.id as number
+        const authResult = await this.authMiddleware.authenticate(req)
+        if (!authResult.success) {
+            return authResult.response
         }
-
-        if (!ApisixAuthParser.hasValidAuth(req.headers || {})) {
-            return unauthorizedResponse()
-        }
-
-        const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-        if (!authUser) {
-            return unauthorizedResponse('Invalid authentication headers')
-        }
-
-        const userRecord = await this.userService.findOrCreateUser(authUser)
-        if (!userRecord.id) {
-            return errorResponse('Failed to retrieve user information')
-        }
-
-        return userRecord.id
+        return authResult.userRecord.id as number
     }
 
     /**
@@ -397,11 +378,10 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
 
             // Get authenticated user ID if available
             let authenticatedUserId: number | null = null
-            if (req && ApisixAuthParser.hasValidAuth(req.headers || {})) {
-                const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-                if (authUser) {
-                    const userRecord = await this.userService.findOrCreateUser(authUser)
-                    authenticatedUserId = userRecord.id || null
+            if (req) {
+                const authResult = await this.authMiddleware.authenticate(req)
+                if (authResult.success) {
+                    authenticatedUserId = authResult.userRecord.id || null
                 }
             }
 

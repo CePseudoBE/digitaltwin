@@ -422,10 +422,9 @@ test.group('AssetsManager Authentication - Error Handling', () => {
     const assetsManager = new TestAssetsManager()
     assetsManager.setDependencies(db, mockStorage)
 
-    // Mock UserService to throw an error
-    const originalUserService = (assetsManager as any).userService
-    ;(assetsManager as any).userService = {
-      findOrCreateUser: async () => {
+    // Mock AuthMiddleware to throw an error
+    ;(assetsManager as any).authMiddleware = {
+      authenticate: async () => {
         throw new Error('Database connection failed')
       }
     }

@@ -25,7 +25,7 @@ import {
     isAssetsManager,
     isCustomTableManager
 } from './component_types.js'
-import { UserService } from '../auth/user_service.js'
+import { UserService, AuthMiddleware } from '../auth/index.js'
 import { exposeEndpoints } from './endpoints.js'
 import { scheduleComponents } from './scheduler.js'
 import { LogLevel } from '../utils/logger.js'
@@ -352,10 +352,10 @@ export class DigitalTwinEngine {
      * Initialize store managers and create their database tables
      * @private
      */
-    async #initializeCustomTableManagers(): Promise<void> {
+    async #initializeCustomTableManagers(authMiddleware?: AuthMiddleware): Promise<void> {
         for (const customTableManager of this.#customTableManagers) {
             // Inject dependencies
-            customTableManager.setDependencies(this.#database)
+            customTableManager.setDependencies(this.#database, authMiddleware)
 
             // Initialize the table with custom columns
             await customTableManager.initializeTable()
@@ -469,9 +469,11 @@ export class DigitalTwinEngine {
             this.#queueManager = this.#createQueueManager()
         }
 
-        // Normal startup - initialize user management tables first
-        const userService = new UserService(this.#database)
+        // Normal startup - initialize user management tables and auth middleware
+        const userRepository = this.#database.getUserRepository()
+        const userService = new UserService(userRepository)
         await userService.initializeTables()
+        const authMiddleware = new AuthMiddleware(userService)
 
         // Get autoMigration setting (default: true)
         const autoMigration = this.#options.autoMigration ?? true
@@ -480,10 +482,10 @@ export class DigitalTwinEngine {
         await initializeComponents(this.#activeComponents, this.#database, this.#storage, autoMigration)
 
         // Initialize assets managers and create their tables if needed
-        await initializeAssetsManagers(this.#assetsManagers, this.#database, this.#storage, autoMigration)
+        await initializeAssetsManagers(this.#assetsManagers, this.#database, this.#storage, autoMigration, authMiddleware)
 
         // Initialize store managers and create their tables if needed
-        await this.#initializeCustomTableManagers()
+        await this.#initializeCustomTableManagers(authMiddleware)
 
         // Initialize handlers (inject dependencies if needed)
         for (const handler of this.#handlers) {

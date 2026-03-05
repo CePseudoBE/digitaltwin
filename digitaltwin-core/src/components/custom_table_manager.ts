@@ -5,7 +5,7 @@ import type { HttpMethod } from '../engine/endpoints.js'
 import type { UserRecord } from '../auth/types.js'
 import type { OpenAPIDocumentable, OpenAPIComponentSpec } from '../openapi/types.js'
 import { UserService } from '../auth/user_service.js'
-import { ApisixAuthParser } from '../auth/apisix_parser.js'
+import { AuthMiddleware } from '../auth/index.js'
 import { validateIdParam, validateCustomRecordCreate, validateCustomRecordUpdate } from '../validation/index.js'
 import { validateData, validateParams } from '../validation/validate.js'
 import { DigitalTwinError } from '../errors/index.js'
@@ -96,8 +96,8 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
     /** Database adapter for data operations */
     protected db!: DatabaseAdapter
 
-    /** User service for authentication and authorization */
-    protected userService!: UserService
+    /** Auth middleware for authentication */
+    protected authMiddleware!: AuthMiddleware
 
     /** Cached table name from configuration */
     protected tableName!: string
@@ -115,9 +115,9 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
      * customTableManager.setDependencies(databaseAdapter)
      * ```
      */
-    setDependencies(db: DatabaseAdapter): void {
+    setDependencies(db: DatabaseAdapter, authMiddleware?: AuthMiddleware): void {
         this.db = db
-        this.userService = new UserService(db)
+        this.authMiddleware = authMiddleware ?? new AuthMiddleware(new UserService(db.getUserRepository()))
         this.tableName = this.getConfiguration().name
     }
 
@@ -502,21 +502,9 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
      * ```
      */
     protected async authenticateRequest(req: any): Promise<UserRecord | null> {
-        if (!ApisixAuthParser.hasValidAuth(req.headers || {})) {
-            return null
-        }
-
-        const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-        if (!authUser) {
-            return null
-        }
-
-        const userRecord = await this.userService.findOrCreateUser(authUser)
-        if (!userRecord.id) {
-            return null
-        }
-
-        return userRecord
+        const result = await this.authMiddleware.authenticate(req)
+        if (!result.success) return null
+        return result.userRecord
     }
 
     /**
@@ -1004,24 +992,12 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
 
     async handleCreate(req: any): Promise<DataResponse> {
         try {
-            // Check authentication
-            if (!ApisixAuthParser.hasValidAuth(req.headers || {})) {
-                return {
-                    status: 401,
-                    content: JSON.stringify({ error: 'Authentication required' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
+            // Authenticate request
+            const authResult = await this.authMiddleware.authenticate(req)
+            if (!authResult.success) {
+                return authResult.response
             }
-
-            // Parse authenticated user
-            const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-            if (!authUser) {
-                return {
-                    status: 401,
-                    content: JSON.stringify({ error: 'Invalid authentication headers' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
+            const userRecord = authResult.userRecord
 
             if (!req?.body) {
                 return {
@@ -1037,17 +1013,6 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 req.body,
                 'Record data'
             )
-
-            // Find or create user in database
-            const userRecord = await this.userService.findOrCreateUser(authUser)
-
-            if (!userRecord.id) {
-                return {
-                    status: 500,
-                    content: JSON.stringify({ error: 'Failed to retrieve user information' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
 
             // Add owner_id to the data
             const dataWithOwner = {
@@ -1092,24 +1057,12 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
 
     async handleUpdate(req: any): Promise<DataResponse> {
         try {
-            // Check authentication
-            if (!ApisixAuthParser.hasValidAuth(req.headers || {})) {
-                return {
-                    status: 401,
-                    content: JSON.stringify({ error: 'Authentication required' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
+            // Authenticate request
+            const authResult = await this.authMiddleware.authenticate(req)
+            if (!authResult.success) {
+                return authResult.response
             }
-
-            // Parse authenticated user
-            const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-            if (!authUser) {
-                return {
-                    status: 401,
-                    content: JSON.stringify({ error: 'Invalid authentication headers' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
+            const userRecord = authResult.userRecord
 
             // Validate ID parameter (ValidationError bubbles up to global handler -> 422)
             const validatedParams = await validateParams<{ id: number }>(validateIdParam, req.params || {}, 'Record ID')
@@ -1128,17 +1081,6 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 req.body,
                 'Record data'
             )
-
-            // Find or create user in database
-            const userRecord = await this.userService.findOrCreateUser(authUser)
-
-            if (!userRecord.id) {
-                return {
-                    status: 500,
-                    content: JSON.stringify({ error: 'Failed to retrieve user information' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
 
             // Check if record exists and belongs to this user
             const existingRecord = await this.findById(validatedParams.id)
@@ -1172,38 +1114,15 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
 
     async handleDelete(req: any): Promise<DataResponse> {
         try {
-            // Check authentication
-            if (!ApisixAuthParser.hasValidAuth(req.headers || {})) {
-                return {
-                    status: 401,
-                    content: JSON.stringify({ error: 'Authentication required' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
+            // Authenticate request
+            const authResult = await this.authMiddleware.authenticate(req)
+            if (!authResult.success) {
+                return authResult.response
             }
-
-            // Parse authenticated user
-            const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-            if (!authUser) {
-                return {
-                    status: 401,
-                    content: JSON.stringify({ error: 'Invalid authentication headers' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
+            const userRecord = authResult.userRecord
 
             // Validate ID parameter (ValidationError bubbles up to global handler -> 422)
             const validatedParams = await validateParams<{ id: number }>(validateIdParam, req.params || {}, 'Record ID')
-
-            // Find or create user in database
-            const userRecord = await this.userService.findOrCreateUser(authUser)
-
-            if (!userRecord.id) {
-                return {
-                    status: 500,
-                    content: JSON.stringify({ error: 'Failed to retrieve user information' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
 
             // Check if record exists and belongs to this user
             const existingRecord = await this.findById(validatedParams.id)

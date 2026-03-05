@@ -1,12 +1,13 @@
 // Auth providers (new system)
-export type { AuthProvider, AuthRequest, AuthMode, AuthProviderConfig, JwtConfig } from './auth_provider.js'
-export { AuthProviderFactory } from './auth_provider_factory.js'
-export { GatewayAuthProvider, JwtAuthProvider, NoAuthProvider } from './providers/index.js'
+export type { AuthProvider, AuthRequest, AuthMode, AuthProviderConfig, JwtConfig } from '@digitaltwin/auth'
+export { AuthProviderFactory } from '@digitaltwin/auth'
+export { GatewayAuthProvider, JwtAuthProvider, NoAuthProvider } from '@digitaltwin/auth'
 
 // Backward-compatible API
-export { ApisixAuthParser, type HeadersLike } from './apisix_parser.js'
-export { UserService } from './user_service.js'
-export { AuthConfig } from './auth_config.js'
+export { ApisixAuthParser, type HeadersLike } from '@digitaltwin/auth'
+export { UserService } from '@digitaltwin/auth'
+export { AuthConfig } from '@digitaltwin/auth'
+export { AuthMiddleware } from '@digitaltwin/auth'
 
 // Types
-export type { AuthenticatedUser, UserRecord, AuthContext, AuthenticatedRequest } from './types.js'
+export type { AuthenticatedUser, UserRecord, AuthContext, AuthenticatedRequest, AuthResult, UserRepository } from '@digitaltwin/auth'

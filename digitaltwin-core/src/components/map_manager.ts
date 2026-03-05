@@ -1,6 +1,5 @@
 import { AssetsManager } from './assets_manager.js'
 import type { DataResponse } from './types.js'
-import { ApisixAuthParser } from '../auth/apisix_parser.js'
 
 /**
  * Extended metadata for map layer assets
@@ -62,41 +61,12 @@ export abstract class MapManager extends AssetsManager {
                 }
             }
 
-            // Check authentication
-            if (!ApisixAuthParser.hasValidAuth(req.headers || {})) {
-                return {
-                    status: 401,
-                    content: JSON.stringify({
-                        error: 'Authentication required'
-                    }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
+            // Authenticate request
+            const authResult = await this.authMiddleware.authenticate(req)
+            if (!authResult.success) {
+                return authResult.response
             }
-
-            // Parse authenticated user
-            const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-            if (!authUser) {
-                return {
-                    status: 401,
-                    content: JSON.stringify({
-                        error: 'Invalid authentication headers'
-                    }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
-
-            // Find or create user in database
-            const userRecord = await this.userService.findOrCreateUser(authUser)
-
-            if (!userRecord.id) {
-                return {
-                    status: 500,
-                    content: JSON.stringify({
-                        error: 'Failed to retrieve user information'
-                    }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
+            const userRecord = authResult.userRecord
 
             const { layer, description } = req.body
 
@@ -145,7 +115,7 @@ export abstract class MapManager extends AssetsManager {
                 date: now,
                 description: description || layerInfo.description || 'Map layer',
                 source: req.body.source || 'uploaded',
-                owner_id: userRecord.id,
+                owner_id: userRecord.id ?? null,
                 filename,
                 // Layer-specific metadata
                 layer_type: layerInfo.layer_type,
