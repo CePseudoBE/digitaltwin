@@ -1,8 +1,7 @@
 import { test } from '@japa/runner'
-import { mapToDataRecord } from '../../src/utils/map_to_data_record.js'
+import { mapToDataRecord } from '../src/map_to_data_record.js'
 import type { DataResolver } from '@digitaltwin/shared'
 
-// Simple data resolver for testing
 function createMockResolver(): { resolver: DataResolver; storedData: Map<string, Buffer> } {
     const storedData = new Map<string, Buffer>()
     const resolver: DataResolver = async (url) => {
@@ -16,7 +15,7 @@ function createMockResolver(): { resolver: DataResolver; storedData: Map<string,
 }
 
 test.group('mapToDataRecord', () => {
-    test('should map basic metadata row to DataRecord', ({ assert }) => {
+    test('maps basic metadata row to DataRecord', ({ assert }) => {
         const { resolver } = createMockResolver()
         const row = {
             id: 1,
@@ -35,7 +34,7 @@ test.group('mapToDataRecord', () => {
         assert.equal(record.url, 'mock://storage/test.json')
     })
 
-    test('should provide lazy-loaded data function', async ({ assert }) => {
+    test('provides lazy-loaded data function', async ({ assert }) => {
         const { resolver, storedData } = createMockResolver()
         storedData.set('mock://storage/test.json', Buffer.from('{"data": true}'))
 
@@ -55,7 +54,7 @@ test.group('mapToDataRecord', () => {
         assert.equal(data.toString(), '{"data": true}')
     })
 
-    test('should map asset-specific fields when present', ({ assert }) => {
+    test('maps asset-specific fields when present', ({ assert }) => {
         const { resolver } = createMockResolver()
         const row = {
             id: 42,
@@ -77,7 +76,7 @@ test.group('mapToDataRecord', () => {
         assert.equal(record.filename, 'uploaded_image.png')
     })
 
-    test('should handle missing asset-specific fields', ({ assert }) => {
+    test('handles missing asset-specific fields', ({ assert }) => {
         const { resolver } = createMockResolver()
         const row = {
             id: 1,
@@ -85,7 +84,6 @@ test.group('mapToDataRecord', () => {
             date: new Date().toISOString(),
             type: 'text/plain',
             url: 'mock://storage/file.txt'
-            // No description, source, owner_id, filename
         }
 
         const record = mapToDataRecord(row, resolver)
@@ -96,7 +94,7 @@ test.group('mapToDataRecord', () => {
         assert.isUndefined(record.filename)
     })
 
-    test('should default is_public to true when undefined', ({ assert }) => {
+    test('defaults is_public to true when undefined', ({ assert }) => {
         const { resolver } = createMockResolver()
         const row = {
             id: 1,
@@ -104,7 +102,6 @@ test.group('mapToDataRecord', () => {
             date: new Date().toISOString(),
             type: 'text/plain',
             url: 'mock://storage/file.txt'
-            // is_public not set
         }
 
         const record = mapToDataRecord(row, resolver)
@@ -112,7 +109,7 @@ test.group('mapToDataRecord', () => {
         assert.isTrue(record.is_public)
     })
 
-    test('should default is_public to true when null', ({ assert }) => {
+    test('defaults is_public to true when null', ({ assert }) => {
         const { resolver } = createMockResolver()
         const row = {
             id: 1,
@@ -128,73 +125,49 @@ test.group('mapToDataRecord', () => {
         assert.isTrue(record.is_public)
     })
 
-    test('should convert SQLite boolean 0 to false', ({ assert }) => {
+    test('converts SQLite boolean 0 to false', ({ assert }) => {
         const { resolver } = createMockResolver()
         const row = {
             id: 1,
-            name: 'private-record',
+            name: 'private',
             date: new Date().toISOString(),
             type: 'text/plain',
             url: 'mock://storage/file.txt',
-            is_public: 0 // SQLite stores false as 0
+            is_public: 0
         }
 
-        const record = mapToDataRecord(row, resolver)
-
-        assert.isFalse(record.is_public)
+        assert.isFalse(mapToDataRecord(row, resolver).is_public)
     })
 
-    test('should convert SQLite boolean 1 to true', ({ assert }) => {
+    test('converts SQLite boolean 1 to true', ({ assert }) => {
         const { resolver } = createMockResolver()
         const row = {
             id: 1,
-            name: 'public-record',
+            name: 'public',
             date: new Date().toISOString(),
             type: 'text/plain',
             url: 'mock://storage/file.txt',
-            is_public: 1 // SQLite stores true as 1
+            is_public: 1
         }
 
-        const record = mapToDataRecord(row, resolver)
-
-        assert.isTrue(record.is_public)
+        assert.isTrue(mapToDataRecord(row, resolver).is_public)
     })
 
-    test('should handle proper boolean values', ({ assert }) => {
+    test('handles proper boolean values', ({ assert }) => {
         const { resolver } = createMockResolver()
+        const makeRow = (is_public: boolean) => ({
+            id: 1, name: 'test', date: new Date().toISOString(),
+            type: 'text/plain', url: 'mock://file.txt', is_public
+        })
 
-        const rowTrue = {
-            id: 1,
-            name: 'test',
-            date: new Date().toISOString(),
-            type: 'text/plain',
-            url: 'mock://storage/file.txt',
-            is_public: true
-        }
-
-        const rowFalse = {
-            id: 2,
-            name: 'test2',
-            date: new Date().toISOString(),
-            type: 'text/plain',
-            url: 'mock://storage/file2.txt',
-            is_public: false
-        }
-
-        assert.isTrue(mapToDataRecord(rowTrue, resolver).is_public)
-        assert.isFalse(mapToDataRecord(rowFalse, resolver).is_public)
+        assert.isTrue(mapToDataRecord(makeRow(true), resolver).is_public)
+        assert.isFalse(mapToDataRecord(makeRow(false), resolver).is_public)
     })
 
-    test('should parse date string to Date object', ({ assert }) => {
+    test('parses date string to Date object', ({ assert }) => {
         const { resolver } = createMockResolver()
         const dateStr = '2024-03-15T14:30:00.000Z'
-        const row = {
-            id: 1,
-            name: 'test',
-            date: dateStr,
-            type: 'text/plain',
-            url: 'mock://storage/file.txt'
-        }
+        const row = { id: 1, name: 'test', date: dateStr, type: 'text/plain', url: 'mock://file.txt' }
 
         const record = mapToDataRecord(row, resolver)
 
@@ -202,16 +175,10 @@ test.group('mapToDataRecord', () => {
         assert.equal(record.date.toISOString(), dateStr)
     })
 
-    test('should handle Date object directly', ({ assert }) => {
+    test('handles Date object directly', ({ assert }) => {
         const { resolver } = createMockResolver()
         const dateObj = new Date('2024-03-15T14:30:00.000Z')
-        const row = {
-            id: 1,
-            name: 'test',
-            date: dateObj,
-            type: 'text/plain',
-            url: 'mock://storage/file.txt'
-        }
+        const row = { id: 1, name: 'test', date: dateObj, type: 'text/plain', url: 'mock://file.txt' }
 
         const record = mapToDataRecord(row, resolver)
 
@@ -219,16 +186,10 @@ test.group('mapToDataRecord', () => {
         assert.equal(record.date.getTime(), dateObj.getTime())
     })
 
-    test('should handle numeric timestamp', ({ assert }) => {
+    test('handles numeric timestamp', ({ assert }) => {
         const { resolver } = createMockResolver()
         const timestamp = Date.now()
-        const row = {
-            id: 1,
-            name: 'test',
-            date: timestamp,
-            type: 'text/plain',
-            url: 'mock://storage/file.txt'
-        }
+        const row = { id: 1, name: 'test', date: timestamp, type: 'text/plain', url: 'mock://file.txt' }
 
         const record = mapToDataRecord(row, resolver)
 
@@ -236,29 +197,18 @@ test.group('mapToDataRecord', () => {
         assert.equal(record.date.getTime(), timestamp)
     })
 
-    test('data function should call resolver with correct URL', async ({ assert }) => {
+    test('data function calls resolver with correct URL', async ({ assert }) => {
         let retrievedUrl: string | null = null
         const resolver: DataResolver = async (url) => {
             retrievedUrl = url
             return Buffer.from(`content for ${url}`)
         }
 
-        const row = {
-            id: 1,
-            name: 'test',
-            date: new Date().toISOString(),
-            type: 'text/plain',
-            url: 'mock://storage/specific-file.txt'
-        }
-
+        const row = { id: 1, name: 'test', date: new Date().toISOString(), type: 'text/plain', url: 'mock://storage/specific.txt' }
         const record = mapToDataRecord(row, resolver)
 
-        // Data not loaded yet
         assert.isNull(retrievedUrl)
-
-        // Trigger lazy load
         await record.data()
-
-        assert.equal(retrievedUrl, 'mock://storage/specific-file.txt')
+        assert.equal(retrievedUrl, 'mock://storage/specific.txt')
     })
 })
