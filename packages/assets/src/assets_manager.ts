@@ -8,7 +8,8 @@ import type {
     OpenAPIComponentSpec,
     DataRecord,
     AuthResult,
-    TypedRequest
+    TypedRequest,
+    PresignedUploadRequestBody
 } from '@digitaltwin/shared'
 import {
     successResponse,
@@ -28,7 +29,8 @@ import {
     validatePagination,
     validateData,
     validateQuery,
-    validateParams
+    validateParams,
+    validatePresignedUploadRequest
 } from '@digitaltwin/shared'
 import type { StorageService } from '@digitaltwin/storage'
 import type { DatabaseAdapter, MetadataRow } from '@digitaltwin/database'
@@ -322,7 +324,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      * this.validateFileExtension('any-file.ext') // returns true
      * ```
      */
-    private validateFileExtension(filename: string): boolean {
+    protected validateFileExtension(filename: string): boolean {
         const config = this.getConfiguration()
 
         // If no extension is configured, allow any file
@@ -411,7 +413,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      * const userRecord = authResult.userRecord
      * ```
      */
-    private async authenticateRequest(req: TypedRequest): Promise<AuthResult> {
+    protected async authenticateRequest(req: TypedRequest): Promise<AuthResult> {
         return this.authMiddleware.authenticate(req)
     }
 
@@ -508,7 +510,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      * @param headers - HTTP request headers (optional, for admin check)
      * @returns DataResponse with error if not owner/admin, undefined if valid
      */
-    private validateOwnership(
+    protected validateOwnership(
         asset: DataRecord,
         userId: number,
         headers?: HeadersLike
@@ -997,6 +999,18 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
                 responseType: 'application/json'
             },
             {
+                method: 'post',
+                path: `/${config.endpoint}/upload-request`,
+                handler: this.handlePresignedUploadRequest.bind(this),
+                responseType: 'application/json'
+            },
+            {
+                method: 'post',
+                path: `/${config.endpoint}/confirm/:fileId`,
+                handler: this.handleUploadConfirm.bind(this),
+                responseType: 'application/json'
+            },
+            {
                 method: 'get',
                 path: `/${config.endpoint}/:id`,
                 handler: this.handleGetAsset.bind(this),
@@ -1311,6 +1325,94 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
                             '401': { description: 'Unauthorized' }
                         }
                     }
+                },
+                [`${basePath}/upload-request`]: {
+                    post: {
+                        summary: 'Request presigned upload URL',
+                        description:
+                            'Generate a presigned PUT URL for direct client-to-storage upload. Only available when storage supports presigned URLs (S3-compatible).',
+                        tags: [tagName],
+                        security: [{ ApiKeyAuth: [] }],
+                        requestBody: {
+                            required: true,
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        required: ['fileName', 'fileSize', 'contentType'],
+                                        properties: {
+                                            fileName: { type: 'string' },
+                                            fileSize: { type: 'integer' },
+                                            contentType: { type: 'string' },
+                                            description: { type: 'string' },
+                                            source: { type: 'string', format: 'uri' },
+                                            is_public: { type: 'boolean' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        responses: {
+                            '200': {
+                                description: 'Presigned upload URL generated',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                fileId: { type: 'integer' },
+                                                uploadUrl: { type: 'string', format: 'uri' },
+                                                key: { type: 'string' },
+                                                expiresAt: { type: 'string', format: 'date-time' }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            '400': { description: 'Presigned URLs not supported or invalid request' },
+                            '401': { description: 'Unauthorized' }
+                        }
+                    }
+                },
+                [`${basePath}/confirm/{fileId}`]: {
+                    post: {
+                        summary: 'Confirm presigned upload',
+                        description:
+                            'Confirm that a file has been uploaded via the presigned URL. Verifies the file exists on storage and updates the record status.',
+                        tags: [tagName],
+                        security: [{ ApiKeyAuth: [] }],
+                        parameters: [
+                            {
+                                name: 'fileId',
+                                in: 'path',
+                                required: true,
+                                schema: { type: 'string' },
+                                description: 'File record ID from upload-request'
+                            }
+                        ],
+                        responses: {
+                            '200': {
+                                description: 'Upload confirmed',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                message: { type: 'string' },
+                                                id: { type: 'integer' },
+                                                url: { type: 'string' }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            '400': { description: 'File not found on storage' },
+                            '401': { description: 'Unauthorized' },
+                            '403': { description: 'Not the owner' },
+                            '404': { description: 'Record not found' },
+                            '409': { description: 'Upload not in pending state' }
+                        }
+                    }
                 }
             },
             tags: [
@@ -1347,33 +1449,163 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
     }
 
     /**
-     * Handle single asset upload via HTTP POST.
+     * Handle presigned upload URL request.
      *
      * Flow:
-     * 1. Validate request structure and authentication
-     * 2. Extract user identity from Apache APISIX headers
-     * 3. Validate file extension and read uploaded file
-     * 4. Store file via storage service and metadata in database
-     * 5. Set owner_id to authenticated user (prevents ownership spoofing)
-     * 6. Apply is_public setting (defaults to true if not specified)
+     * 1. Authenticate user
+     * 2. Validate body (fileName, fileSize, contentType)
+     * 3. Check storage supports presigned URLs
+     * 4. Validate file extension
+     * 5. Generate presigned PUT URL
+     * 6. Save pending DB record
+     * 7. Return { fileId, uploadUrl, key, expiresAt }
+     */
+    async handlePresignedUploadRequest(req: TypedRequest): Promise<DataResponse> {
+        try {
+            if (!req?.body) {
+                return badRequestResponse('Invalid request: missing request body')
+            }
+
+            // Authenticate user
+            const authResult = await this.authenticateRequest(req)
+            if (!authResult.success) {
+                return authResult.response
+            }
+            const userId = authResult.userRecord.id
+            if (!userId) {
+                return errorResponse('Failed to retrieve user information')
+            }
+
+            // Check presigned URL support
+            if (!this.storage.supportsPresignedUrls()) {
+                return badRequestResponse('Presigned uploads are not supported with the current storage backend')
+            }
+
+            // Validate request body
+            const validated = await validateData<PresignedUploadRequestBody>(validatePresignedUploadRequest, req.body)
+            const { fileName, contentType, description, source, is_public } = validated
+
+            // Validate file extension
+            if (!this.validateFileExtension(fileName)) {
+                const config = this.getConfiguration()
+                return badRequestResponse(`Invalid file extension. Expected: ${config.extension}`)
+            }
+
+            const config = this.getConfiguration()
+            const sanitizedFilename = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+            const key = `${config.name}/${Date.now()}/${sanitizedFilename}`
+
+            // Generate presigned URL (5 min expiry)
+            const presigned = await this.storage.generatePresignedUploadUrl(key, contentType, 300)
+
+            // Save pending record in database
+            const metadata: MetadataRow = {
+                name: config.name,
+                type: contentType,
+                url: '',
+                date: new Date(),
+                description: description || '',
+                source: source || '',
+                owner_id: userId,
+                filename: fileName,
+                is_public: is_public ?? true,
+                presigned_key: presigned.key,
+                presigned_expires_at: presigned.expiresAt
+            }
+
+            // Use upload_status field via updateById after save
+            const savedRecord = await this.db.save(metadata)
+            await this.db.updateById(config.name, savedRecord.id, {
+                upload_status: 'pending'
+            })
+
+            return successResponse({
+                fileId: savedRecord.id,
+                uploadUrl: presigned.url,
+                key: presigned.key,
+                expiresAt: presigned.expiresAt.toISOString()
+            })
+        } catch (error) {
+            return errorResponse(error)
+        }
+    }
+
+    /**
+     * Handle presigned upload confirmation.
      *
-     * Authentication: Required
-     * Ownership: Automatically set to authenticated user
-     *
-     * @param req - HTTP request with multipart/form-data file upload
-     * @returns HTTP response with success/error status
-     *
-     * @example
-     * POST /assets
-     * Content-Type: multipart/form-data
-     * x-user-id: user-uuid
-     * x-user-roles: user,premium
-     *
-     * Form data:
-     * - file: <binary file>
-     * - description: "3D model of building"
-     * - source: "https://source.com"
-     * - is_public: true
+     * Flow:
+     * 1. Authenticate user
+     * 2. Fetch record, check ownership
+     * 3. Check upload_status === 'pending'
+     * 4. Verify file exists on storage via objectExists
+     * 5. Update record to completed with URL = presigned_key
+     */
+    async handleUploadConfirm(req: TypedRequest): Promise<DataResponse> {
+        try {
+            // Authenticate user
+            const authResult = await this.authenticateRequest(req)
+            if (!authResult.success) {
+                return authResult.response
+            }
+            const userId = authResult.userRecord.id
+            if (!userId) {
+                return errorResponse('Failed to retrieve user information')
+            }
+
+            const fileId = req.params?.fileId
+            if (!fileId) {
+                return badRequestResponse('File ID is required')
+            }
+
+            const config = this.getConfiguration()
+            const asset = await this.getAssetById(fileId)
+            if (!asset) {
+                return notFoundResponse('Asset not found')
+            }
+
+            // Check ownership
+            const ownershipError = this.validateOwnership(asset, userId, req.headers)
+            if (ownershipError) {
+                return ownershipError
+            }
+
+            // Check status
+            if (asset.upload_status !== 'pending') {
+                return {
+                    status: 409,
+                    content: JSON.stringify({ error: `Upload is not pending (current status: ${asset.upload_status || 'completed'})` }),
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            }
+
+            // Verify file exists on storage
+            if (!asset.presigned_key) {
+                return badRequestResponse('No presigned key found for this record')
+            }
+
+            const existsResult = await this.storage.objectExists(asset.presigned_key)
+            if (!existsResult.exists) {
+                return badRequestResponse('File not found on storage. Please upload the file using the presigned URL first.')
+            }
+
+            // Update record to completed
+            await this.db.updateById(config.name, asset.id, {
+                upload_status: 'completed',
+                url: asset.presigned_key
+            })
+
+            return successResponse({
+                message: 'Upload confirmed successfully',
+                id: asset.id,
+                url: asset.presigned_key
+            })
+        } catch (error) {
+            return errorResponse(error)
+        }
+    }
+
+    /**
+     * Handle single asset upload via HTTP POST (multipart/form-data).
      */
     async handleUpload(req: TypedRequest): Promise<DataResponse> {
         try {
