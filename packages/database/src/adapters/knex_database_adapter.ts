@@ -161,6 +161,14 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         if ('upload_error' in meta) insertData.upload_error = meta.upload_error
         if ('upload_job_id' in meta) insertData.upload_job_id = meta.upload_job_id
 
+        // Presigned upload support
+        if ('presigned_key' in meta) insertData.presigned_key = meta.presigned_key
+        if ('presigned_expires_at' in meta) {
+            insertData.presigned_expires_at = meta.presigned_expires_at instanceof Date
+                ? meta.presigned_expires_at.toISOString()
+                : meta.presigned_expires_at
+        }
+
         // Insert and get the auto-generated ID
         const [insertedId] = await this.#knex(meta.name).insert(insertData).returning('id')
 
@@ -219,6 +227,10 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
                 table.string('upload_status', 20).nullable() // pending, processing, completed, failed
                 table.text('upload_error').nullable()
                 table.string('upload_job_id', 100).nullable() // BullMQ job ID for status tracking
+
+                // Presigned upload support
+                table.text('presigned_key').nullable()
+                table.datetime('presigned_expires_at').nullable()
 
                 // Foreign key constraint to users table (if it exists)
                 // Note: This will only work if users table exists first
@@ -390,6 +402,24 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
                         table.datetime('updated_at').defaultTo(this.#knex.fn.now()).nullable()
                     })
                     migrations.push(`Added column 'updated_at' (DATETIME nullable)`)
+                }
+            },
+            presigned_key: {
+                exists: await this.#knex.schema.hasColumn(name, 'presigned_key'),
+                add: async () => {
+                    await this.#knex.schema.alterTable(name, table => {
+                        table.text('presigned_key').nullable()
+                    })
+                    migrations.push(`Added column 'presigned_key' (TEXT nullable)`)
+                }
+            },
+            presigned_expires_at: {
+                exists: await this.#knex.schema.hasColumn(name, 'presigned_expires_at'),
+                add: async () => {
+                    await this.#knex.schema.alterTable(name, table => {
+                        table.datetime('presigned_expires_at').nullable()
+                    })
+                    migrations.push(`Added column 'presigned_expires_at' (DATETIME nullable)`)
                 }
             }
         }

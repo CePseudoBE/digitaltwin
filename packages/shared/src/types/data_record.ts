@@ -125,14 +125,27 @@ export interface DataRecord {
 
     // ========== Async upload support (optional) ==========
 
+    // ========== Presigned upload support (optional) ==========
+
+    /**
+     * S3 key for presigned upload (set when upload-request is made).
+     */
+    presigned_key?: string | null
+
+    /**
+     * Expiration time of the presigned upload URL.
+     */
+    presigned_expires_at?: Date | null
+
     /**
      * Status of async upload processing.
      * - 'pending': Job queued, waiting to start
      * - 'processing': Job is running
      * - 'completed': Job finished successfully
      * - 'failed': Job failed with error
+     * - 'expired': Presigned URL expired without upload
      */
-    upload_status?: 'pending' | 'processing' | 'completed' | 'failed' | null
+    upload_status?: 'pending' | 'processing' | 'completed' | 'failed' | 'expired' | null
 
     /**
      * Error message if upload failed.

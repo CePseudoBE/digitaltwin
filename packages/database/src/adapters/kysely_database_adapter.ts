@@ -232,6 +232,12 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
         if ('upload_status' in meta) insertData.upload_status = meta.upload_status
         if ('upload_error' in meta) insertData.upload_error = meta.upload_error
         if ('upload_job_id' in meta) insertData.upload_job_id = meta.upload_job_id
+        if ('presigned_key' in meta) insertData.presigned_key = meta.presigned_key
+        if ('presigned_expires_at' in meta) {
+            insertData.presigned_expires_at = meta.presigned_expires_at instanceof Date
+                ? meta.presigned_expires_at.toISOString()
+                : meta.presigned_expires_at
+        }
 
         const result = await this.#db
             .insertInto(meta.name)
@@ -287,6 +293,8 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
             .addColumn('upload_status', 'varchar(20)')
             .addColumn('upload_error', 'text')
             .addColumn('upload_job_id', 'varchar(100)')
+            .addColumn('presigned_key', 'text')
+            .addColumn('presigned_expires_at', 'datetime')
             .execute()
 
         // Create indexes
@@ -357,7 +365,9 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
             { name: 'upload_error', type: 'text', description: 'TEXT nullable' },
             { name: 'upload_job_id', type: 'varchar(100)', description: 'VARCHAR(100) nullable' },
             { name: 'created_at', type: 'datetime', description: 'DATETIME nullable' },
-            { name: 'updated_at', type: 'datetime', description: 'DATETIME nullable' }
+            { name: 'updated_at', type: 'datetime', description: 'DATETIME nullable' },
+            { name: 'presigned_key', type: 'text', description: 'TEXT nullable' },
+            { name: 'presigned_expires_at', type: 'datetime', description: 'DATETIME nullable' }
         ]
 
         for (const col of columnsToAdd) {

@@ -1,4 +1,5 @@
 // Types
+export type { HttpMethod } from './types/http_method.js'
 export type { DataRecord } from './types/data_record.js'
 export type { DataResolver } from './types/data_resolver.js'
 export type { MetadataRow } from './types/database.js'
@@ -27,6 +28,9 @@ export type {
     CustomTableGetRequest,
     CustomTableCreateRequest,
     CustomTableUpdateRequest,
+    PresignedUploadRequestBody,
+    PresignedUploadRequest,
+    PresignedUploadConfirmRequest,
     TilesetUploadRequest,
     TilesetListQuery,
     TilesetListRequest
@@ -75,7 +79,9 @@ export {
     validateAssetBatchUpload,
     validateCustomRecordCreate,
     validateCustomRecordUpdate,
-    validateDateRangeQuery
+    validateDateRangeQuery,
+    presignedUploadRequestSchema,
+    validatePresignedUploadRequest
 } from './validation/schemas.js'
 export { validateData, safeValidate, validateQuery, validateParams, vine } from './validation/validate.js'
 
@@ -99,3 +105,39 @@ export {
     multiStatusResponse
 } from './utils/http_responses.js'
 export type { HttpStatusCode } from './utils/http_responses.js'
+
+// OpenAPI types
+export type {
+    OpenAPIInfo,
+    OpenAPIServer,
+    OpenAPITag,
+    OpenAPIParameter,
+    OpenAPISchema,
+    OpenAPIMediaType,
+    OpenAPIRequestBody,
+    OpenAPIResponse,
+    OpenAPISecurityRequirement,
+    OpenAPIOperation,
+    OpenAPIPathItem,
+    OpenAPISecurityScheme,
+    OpenAPIComponents,
+    OpenAPIDocument,
+    OpenAPIComponentSpec,
+    OpenAPIGeneratorOptions,
+    OpenAPIDocumentable
+} from './types/openapi.js'
+export { isOpenAPIDocumentable } from './types/openapi.js'
+
+// Component types and interfaces
+export type {
+    ComponentConfiguration,
+    AssetsManagerConfiguration,
+    CollectorConfiguration,
+    HarvesterConfiguration,
+    AssetsConfiguration,
+    StoreConfiguration,
+    EndpointDefinition,
+    Component,
+    ScheduleRunnable,
+    Servable
+} from './types/component.js'

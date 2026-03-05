@@ -1,7 +1,7 @@
 {
-  "name": "@digitaltwin/storage",
+  "name": "@digitaltwin/assets",
   "version": "1.0.0",
-  "description": "Storage service abstraction for Digital Twin framework (local filesystem, OVH S3)",
+  "description": "Asset management for Digital Twin framework (AssetsManager, TilesetManager, MapManager)",
   "license": "MIT",
   "author": "Axel Hoffmann",
   "type": "module",
@@ -30,23 +30,21 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@digitaltwin/shared": "workspace:*"
+    "@digitaltwin/shared": "workspace:*",
+    "@digitaltwin/database": "workspace:*",
+    "@digitaltwin/storage": "workspace:*",
+    "@digitaltwin/auth": "workspace:*",
+    "jszip": "^3.10.1"
   },
   "peerDependencies": {
-    "@aws-sdk/client-s3": ">=3.0.0",
-    "@aws-sdk/s3-request-presigner": ">=3.0.0"
+    "bullmq": ">=5.0.0"
   },
   "peerDependenciesMeta": {
-    "@aws-sdk/client-s3": {
-      "optional": true
-    },
-    "@aws-sdk/s3-request-presigner": {
+    "bullmq": {
       "optional": true
     }
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1002.0",
-    "@aws-sdk/s3-request-presigner": "^3.1002.0",
     "@japa/assert": "^4.1.0",
     "@japa/runner": "^4.3.0",
     "ts-node-maintained": "^10.9.5"

@@ -57,6 +57,22 @@ export const assetBatchUploadSchema = vine.object({
 })
 
 // ============================================
+// Presigned upload schemas
+// ============================================
+
+/**
+ * Presigned upload request body schema
+ */
+export const presignedUploadRequestSchema = vine.object({
+    fileName: vine.string().maxLength(255),
+    fileSize: vine.number().positive(),
+    contentType: vine.string(),
+    description: vine.string().maxLength(1000).optional(),
+    source: vine.string().url().optional(),
+    is_public: vine.boolean().optional()
+})
+
+// ============================================
 // Custom Table Manager schemas
 // ============================================
 
@@ -95,3 +111,4 @@ export const validateAssetBatchUpload = vine.compile(assetBatchUploadSchema)
 export const validateCustomRecordCreate = vine.compile(customRecordCreateSchema)
 export const validateCustomRecordUpdate = vine.compile(customRecordUpdateSchema)
 export const validateDateRangeQuery = vine.compile(dateRangeQuerySchema)
+export const validatePresignedUploadRequest = vine.compile(presignedUploadRequestSchema)

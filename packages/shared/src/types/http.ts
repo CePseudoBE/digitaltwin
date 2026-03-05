@@ -188,6 +188,24 @@ export type CustomTableCreateRequest<T = Record<string, unknown>> = TypedRequest
 /** Request for updating custom table record */
 export type CustomTableUpdateRequest<T = Record<string, unknown>> = TypedRequest<{ id: string }, T>
 
+// ========== Presigned upload request types ==========
+
+/** Request body for presigned upload URL generation */
+export interface PresignedUploadRequestBody {
+    fileName: string
+    fileSize: number
+    contentType: string
+    description?: string
+    source?: string
+    is_public?: boolean
+}
+
+/** Request for presigned upload URL */
+export type PresignedUploadRequest = TypedRequest<Record<string, never>, PresignedUploadRequestBody>
+
+/** Request for confirming a presigned upload */
+export type PresignedUploadConfirmRequest = TypedRequest<{ fileId: string }>
+
 // ========== Tileset request types ==========
 
 /** Tileset upload request */

@@ -2,6 +2,18 @@ import { safeAsync, Logger } from '@digitaltwin/shared'
 
 const logger = new Logger('StorageService')
 
+export interface PresignedUploadResult {
+    url: string
+    key: string
+    expiresAt: Date
+}
+
+export interface ObjectExistsResult {
+    exists: boolean
+    contentLength?: number
+    contentType?: string
+}
+
 /**
  * Abstract base class for storage service implementations.
  *
@@ -173,4 +185,40 @@ export abstract class StorageService {
      * ```
      */
     abstract deleteByPrefix(prefix: string): Promise<number>
+
+    /**
+     * Whether this storage backend supports presigned URLs for direct uploads.
+     * Override in subclasses that support presigned URLs (e.g., S3-compatible storage).
+     */
+    supportsPresignedUrls(): boolean {
+        return false
+    }
+
+    /**
+     * Generate a presigned PUT URL for direct client-to-storage uploads.
+     * Override in subclasses that support presigned URLs.
+     *
+     * @param key - The object key (path) in storage
+     * @param contentType - MIME type of the file to upload
+     * @param expiresInSeconds - URL validity duration (default: 300s = 5min)
+     * @returns Presigned upload URL, key, and expiration date
+     */
+    async generatePresignedUploadUrl(
+        _key: string,
+        _contentType: string,
+        _expiresInSeconds: number = 300
+    ): Promise<PresignedUploadResult> {
+        throw new Error('Presigned URLs are not supported by this storage backend')
+    }
+
+    /**
+     * Check if an object exists in storage and return its metadata.
+     * Override in subclasses that support presigned URLs.
+     *
+     * @param key - The object key (path) in storage
+     * @returns Whether the object exists, with optional size and content type
+     */
+    async objectExists(_key: string): Promise<ObjectExistsResult> {
+        throw new Error('Object existence check is not supported by this storage backend')
+    }
 }
