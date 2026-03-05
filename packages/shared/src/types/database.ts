@@ -32,4 +32,10 @@ export interface MetadataRow {
     filename?: string
     /** Whether the asset is publicly accessible (AssetsManager only) */
     is_public?: boolean
+
+    // ========== Presigned upload fields (optional) ==========
+    /** S3 key for presigned upload */
+    presigned_key?: string | null
+    /** Expiration time of the presigned upload URL */
+    presigned_expires_at?: Date | null
 }

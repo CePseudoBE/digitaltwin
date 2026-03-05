@@ -26,6 +26,10 @@ export function mapToDataRecord(row: MetadataRow | any, dataResolver: DataResolv
         // TilesetManager support
         tileset_url: row.tileset_url || undefined,
 
+        // Presigned upload support
+        presigned_key: row.presigned_key || null,
+        presigned_expires_at: row.presigned_expires_at ? new Date(row.presigned_expires_at) : null,
+
         // Legacy (deprecated)
         file_index: row.file_index
             ? typeof row.file_index === 'string'
