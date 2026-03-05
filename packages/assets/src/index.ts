@@ -14,6 +14,10 @@ export type { AsyncUploadable } from './async_upload.js'
 export { UploadProcessor } from './upload_processor.js'
 export type { TilesetUploadJobData, UploadJobData, UploadStatus } from './upload_processor.js'
 
+// Upload reconciler
+export { UploadReconciler } from './upload_reconciler.js'
+export type { ReconciliationResult, UploadReconcilerOptions } from './upload_reconciler.js'
+
 // ZIP utilities
 export {
     extractAndStoreArchive,
