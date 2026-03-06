@@ -43,7 +43,8 @@ jobs:
       - name: Build all packages
         run: pnpm build
 
-      - name: Publish @digitaltwin/shared (if version changed)
+      # LAYER 0
+      - name: Publish @digitaltwin/shared
         run: |
           cd packages/shared
           PACKAGE_NAME=$(node -p "require('./package.json').name")
@@ -57,7 +58,95 @@ jobs:
             echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
           fi
 
-      - name: Publish digitaltwin-core (if version changed)
+      # LAYER 1
+      - name: Publish @digitaltwin/database
+        run: |
+          cd packages/database
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          if [ "$LOCAL_VERSION" != "$NPM_VERSION" ]; then
+            echo "Publishing $PACKAGE_NAME@$LOCAL_VERSION (npm has $NPM_VERSION)"
+            npm publish --access public --provenance
+          else
+            echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
+          fi
+
+      - name: Publish @digitaltwin/storage
+        run: |
+          cd packages/storage
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          if [ "$LOCAL_VERSION" != "$NPM_VERSION" ]; then
+            echo "Publishing $PACKAGE_NAME@$LOCAL_VERSION (npm has $NPM_VERSION)"
+            npm publish --access public --provenance
+          else
+            echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
+          fi
+
+      - name: Publish @digitaltwin/auth
+        run: |
+          cd packages/auth
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          if [ "$LOCAL_VERSION" != "$NPM_VERSION" ]; then
+            echo "Publishing $PACKAGE_NAME@$LOCAL_VERSION (npm has $NPM_VERSION)"
+            npm publish --access public --provenance
+          else
+            echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
+          fi
+
+      # LAYER 2
+      - name: Publish @digitaltwin/components
+        run: |
+          cd packages/components
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          if [ "$LOCAL_VERSION" != "$NPM_VERSION" ]; then
+            echo "Publishing $PACKAGE_NAME@$LOCAL_VERSION (npm has $NPM_VERSION)"
+            npm publish --access public --provenance
+          else
+            echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
+          fi
+
+      - name: Publish @digitaltwin/assets
+        run: |
+          cd packages/assets
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          if [ "$LOCAL_VERSION" != "$NPM_VERSION" ]; then
+            echo "Publishing $PACKAGE_NAME@$LOCAL_VERSION (npm has $NPM_VERSION)"
+            npm publish --access public --provenance
+          else
+            echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
+          fi
+
+      # LAYER 3
+      - name: Publish @digitaltwin/engine
+        run: |
+          cd packages/engine
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+
+          if [ "$LOCAL_VERSION" != "$NPM_VERSION" ]; then
+            echo "Publishing $PACKAGE_NAME@$LOCAL_VERSION (npm has $NPM_VERSION)"
+            npm publish --access public --provenance
+          else
+            echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
+          fi
+
+      # Legacy packages
+      - name: Publish digitaltwin-core
         run: |
           cd digitaltwin-core
           PACKAGE_NAME=$(node -p "require('./package.json').name")
@@ -71,7 +160,7 @@ jobs:
             echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
           fi
 
-      - name: Publish digitaltwin-cli (if version changed)
+      - name: Publish digitaltwin-cli
         run: |
           cd digitaltwin-cli
           PACKAGE_NAME=$(node -p "require('./package.json').name")
@@ -85,7 +174,7 @@ jobs:
             echo "Skipping $PACKAGE_NAME - version $LOCAL_VERSION already published"
           fi
 
-      - name: Publish create-digitaltwin (if version changed)
+      - name: Publish create-digitaltwin
         run: |
           cd create-digitaltwin
           PACKAGE_NAME=$(node -p "require('./package.json').name")
