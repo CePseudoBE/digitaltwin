@@ -8,8 +8,7 @@ import type {
     OpenAPIComponentSpec,
     DataRecord,
     AuthResult,
-    TypedRequest,
-    PresignedUploadRequestBody
+    TypedRequest
 } from '@digitaltwin/shared'
 import {
     successResponse,
@@ -29,12 +28,12 @@ import {
     validatePagination,
     validateData,
     validateQuery,
-    validateParams,
-    validatePresignedUploadRequest
+    validateParams
 } from '@digitaltwin/shared'
 import type { StorageService } from '@digitaltwin/storage'
 import type { DatabaseAdapter, MetadataRow } from '@digitaltwin/database'
 import { ApisixAuthParser, AuthMiddleware, UserService, type HeadersLike } from '@digitaltwin/auth'
+import { PresignedUploadService } from './presigned_upload_service.js'
 import fs from 'fs/promises'
 
 const logger = new Logger('AssetsManager')
@@ -229,6 +228,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
     protected db!: DatabaseAdapter
     protected storage!: StorageService
     protected authMiddleware!: AuthMiddleware
+    protected presignedService!: PresignedUploadService
 
     /**
      * Injects dependencies into the assets manager.
@@ -253,6 +253,15 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
         this.db = db
         this.storage = storage
         this.authMiddleware = authMiddleware ?? new AuthMiddleware(new UserService(db.getUserRepository()))
+        this.presignedService = new PresignedUploadService({
+            db: this.db,
+            storage: this.storage,
+            authMiddleware: this.authMiddleware,
+            getConfiguration: () => this.getConfiguration(),
+            getAssetById: (id: string) => this.getAssetById(id),
+            validateOwnership: (asset, userId, headers) => this.validateOwnership(asset, userId, headers),
+            validateFileExtension: (filename: string) => this.validateFileExtension(filename)
+        })
     }
 
     /**
@@ -1450,158 +1459,18 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
 
     /**
      * Handle presigned upload URL request.
-     *
-     * Flow:
-     * 1. Authenticate user
-     * 2. Validate body (fileName, fileSize, contentType)
-     * 3. Check storage supports presigned URLs
-     * 4. Validate file extension
-     * 5. Generate presigned PUT URL
-     * 6. Save pending DB record
-     * 7. Return { fileId, uploadUrl, key, expiresAt }
+     * Delegates to PresignedUploadService.
      */
     async handlePresignedUploadRequest(req: TypedRequest): Promise<DataResponse> {
-        try {
-            if (!req?.body) {
-                return badRequestResponse('Invalid request: missing request body')
-            }
-
-            // Authenticate user
-            const authResult = await this.authenticateRequest(req)
-            if (!authResult.success) {
-                return authResult.response
-            }
-            const userId = authResult.userRecord.id
-            if (!userId) {
-                return errorResponse('Failed to retrieve user information')
-            }
-
-            // Check presigned URL support
-            if (!this.storage.supportsPresignedUrls()) {
-                return badRequestResponse('Presigned uploads are not supported with the current storage backend')
-            }
-
-            // Validate request body
-            const validated = await validateData<PresignedUploadRequestBody>(validatePresignedUploadRequest, req.body)
-            const { fileName, contentType, description, source, is_public } = validated
-
-            // Validate file extension
-            if (!this.validateFileExtension(fileName)) {
-                const config = this.getConfiguration()
-                return badRequestResponse(`Invalid file extension. Expected: ${config.extension}`)
-            }
-
-            const config = this.getConfiguration()
-            const sanitizedFilename = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
-            const key = `${config.name}/${Date.now()}/${sanitizedFilename}`
-
-            // Generate presigned URL (5 min expiry)
-            const presigned = await this.storage.generatePresignedUploadUrl(key, contentType, 300)
-
-            // Save pending record in database
-            const metadata: MetadataRow = {
-                name: config.name,
-                type: contentType,
-                url: '',
-                date: new Date(),
-                description: description || '',
-                source: source || '',
-                owner_id: userId,
-                filename: fileName,
-                is_public: is_public ?? true,
-                presigned_key: presigned.key,
-                presigned_expires_at: presigned.expiresAt
-            }
-
-            // Use upload_status field via updateById after save
-            const savedRecord = await this.db.save(metadata)
-            await this.db.updateById(config.name, savedRecord.id, {
-                upload_status: 'pending'
-            })
-
-            return successResponse({
-                fileId: savedRecord.id,
-                uploadUrl: presigned.url,
-                key: presigned.key,
-                expiresAt: presigned.expiresAt.toISOString()
-            })
-        } catch (error) {
-            return errorResponse(error)
-        }
+        return this.presignedService.handleUploadRequest(req)
     }
 
     /**
      * Handle presigned upload confirmation.
-     *
-     * Flow:
-     * 1. Authenticate user
-     * 2. Fetch record, check ownership
-     * 3. Check upload_status === 'pending'
-     * 4. Verify file exists on storage via objectExists
-     * 5. Update record to completed with URL = presigned_key
+     * Delegates to PresignedUploadService.
      */
     async handleUploadConfirm(req: TypedRequest): Promise<DataResponse> {
-        try {
-            // Authenticate user
-            const authResult = await this.authenticateRequest(req)
-            if (!authResult.success) {
-                return authResult.response
-            }
-            const userId = authResult.userRecord.id
-            if (!userId) {
-                return errorResponse('Failed to retrieve user information')
-            }
-
-            const fileId = req.params?.fileId
-            if (!fileId) {
-                return badRequestResponse('File ID is required')
-            }
-
-            const config = this.getConfiguration()
-            const asset = await this.getAssetById(fileId)
-            if (!asset) {
-                return notFoundResponse('Asset not found')
-            }
-
-            // Check ownership
-            const ownershipError = this.validateOwnership(asset, userId, req.headers)
-            if (ownershipError) {
-                return ownershipError
-            }
-
-            // Check status
-            if (asset.upload_status !== 'pending') {
-                return {
-                    status: 409,
-                    content: JSON.stringify({ error: `Upload is not pending (current status: ${asset.upload_status || 'completed'})` }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
-
-            // Verify file exists on storage
-            if (!asset.presigned_key) {
-                return badRequestResponse('No presigned key found for this record')
-            }
-
-            const existsResult = await this.storage.objectExists(asset.presigned_key)
-            if (!existsResult.exists) {
-                return badRequestResponse('File not found on storage. Please upload the file using the presigned URL first.')
-            }
-
-            // Update record to completed
-            await this.db.updateById(config.name, asset.id, {
-                upload_status: 'completed',
-                url: asset.presigned_key
-            })
-
-            return successResponse({
-                message: 'Upload confirmed successfully',
-                id: asset.id,
-                url: asset.presigned_key
-            })
-        } catch (error) {
-            return errorResponse(error)
-        }
+        return this.presignedService.handleConfirm(req)
     }
 
     /**
