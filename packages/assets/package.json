@@ -48,5 +48,22 @@
     "@japa/assert": "^4.1.0",
     "@japa/runner": "^4.3.0",
     "ts-node-maintained": "^10.9.5"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
+    "directory": "packages/assets"
+  },
+  "keywords": [
+    "digitaltwin",
+    "assets",
+    "upload",
+    "tileset",
+    "3d",
+    "presigned-url"
+  ],
+  "bugs": {
+    "url": "https://github.com/CePseudoBE/digitaltwin/issues"
+  },
+  "homepage": "https://github.com/CePseudoBE/digitaltwin#readme"
 }

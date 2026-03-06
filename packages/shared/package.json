@@ -45,5 +45,22 @@
     "@japa/runner": "^4.3.0",
     "ts-node-maintained": "^10.9.5",
     "ultimate-express": "^2.0.9"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
+    "directory": "packages/shared"
+  },
+  "keywords": [
+    "digitaltwin",
+    "shared",
+    "types",
+    "validation",
+    "errors",
+    "utilities"
+  ],
+  "bugs": {
+    "url": "https://github.com/CePseudoBE/digitaltwin/issues"
+  },
+  "homepage": "https://github.com/CePseudoBE/digitaltwin#readme"
 }
