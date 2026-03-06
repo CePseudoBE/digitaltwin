@@ -9,11 +9,32 @@ A component-based TypeScript framework for building Digital Twin applications wi
 
 ## Packages
 
-| Package | Description | Version |
-|---------|-------------|---------|
-| [digitaltwin-core](./digitaltwin-core) | Core framework with collectors, harvesters, handlers, and asset managers | 1.0.1 |
-| [digitaltwin-cli](./digitaltwin-cli) | CLI tools for generating components | 0.4.0 |
-| [create-digitaltwin](./create-digitaltwin) | Project scaffolding tool | 0.7.0 |
+| Package | Description | Layer |
+|---------|-------------|-------|
+| [@digitaltwin/shared](./packages/shared) | Types, errors, utilities, validation, environment helpers | 0 |
+| [@digitaltwin/database](./packages/database) | Database abstraction (Knex/Kysely, PostgreSQL/SQLite) | 1 |
+| [@digitaltwin/storage](./packages/storage) | Storage abstraction (local filesystem, OVH S3) | 1 |
+| [@digitaltwin/auth](./packages/auth) | Authentication providers and middleware | 1 |
+| [@digitaltwin/components](./packages/components) | Component base classes (Collector, Harvester, Handler, CustomTableManager) | 2 |
+| [@digitaltwin/assets](./packages/assets) | Asset management (files, tilesets, maps, presigned uploads) | 2 |
+| [@digitaltwin/engine](./packages/engine) | Engine, scheduler, queues, loader, OpenAPI | 3 |
+| [digitaltwin-core](./digitaltwin-core) | Legacy unified package (re-exports from above) | - |
+| [digitaltwin-cli](./digitaltwin-cli) | CLI tools for generating components | - |
+| [create-digitaltwin](./create-digitaltwin) | Project scaffolding tool | - |
+
+### Layer Architecture
+
+```
+LAYER 3  engine          → orchestrates everything
+LAYER 2  components      → base classes users extend
+         assets          → file/tileset/map management
+LAYER 1  database        → DB adapters (Knex, Kysely)
+         storage         → file storage (local, S3)
+         auth            → authentication & middleware
+LAYER 0  shared          → types, errors, utils (no internal deps)
+```
+
+Each layer can only depend on layers below it. Circular dependencies are forbidden.
 
 ## Quick Start
 
@@ -52,7 +73,7 @@ pnpm run dev
 │                                                                 │
 │  ┌────────────────────────┐    ┌────────────────────────────┐  │
 │  │    DatabaseAdapter     │    │      StorageService        │  │
-│  │  (Knex: SQLite/PG/MySQL)│   │    (Local / OVH S3)        │  │
+│  │  (Kysely/Knex: PG/SQLite)│  │    (Local / OVH S3)        │  │
 │  └────────────────────────┘    └────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -62,7 +83,7 @@ pnpm run dev
 - **Collectors**: Scheduled components that fetch data from external APIs on cron schedules
 - **Harvesters**: Process and transform data from collectors with dependency management
 - **Handlers**: Custom HTTP endpoints with full request/response control
-- **Assets Managers**: File upload/download with metadata and CRUD operations
+- **Assets Managers**: File upload/download with metadata, presigned URLs, and CRUD operations
 - **Custom Table Managers**: Structured data management with automatic CRUD endpoints
 
 ## Development
@@ -85,39 +106,11 @@ pnpm test
 pnpm lint
 ```
 
-## Project Structure
-
-```
-digitaltwin/
-├── digitaltwin-core/      # Main framework
-│   ├── src/
-│   │   ├── components/    # Base classes (Collector, Harvester, Handler, etc.)
-│   │   ├── engine/        # DigitalTwinEngine, QueueManager, Scheduler
-│   │   ├── database/      # Knex adapters
-│   │   ├── storage/       # Local and S3 storage services
-│   │   ├── auth/          # Authentication (Gateway, JWT, NoAuth)
-│   │   └── utils/         # Logging, errors, helpers
-│   └── tests/
-├── digitaltwin-cli/       # CLI code generator
-│   ├── src/commands/      # make:collector, make:handler, etc.
-│   └── stubs/             # Component templates
-├── create-digitaltwin/    # Project scaffolding
-│   └── src/templates/     # Project templates
-└── TODO/                  # Task tracking
-```
-
-## Documentation
-
-- [Core Framework Documentation](./digitaltwin-core/README.md)
-- [Full API Documentation](./digitaltwin-core/DOCUMENTATION.md)
-- [CLI Usage](./digitaltwin-cli/README.md)
-- [Contributing Guide](./CONTRIBUTING.md)
-
 ## Features
 
 - **Scheduled Data Collection**: Cron-based collectors with automatic retry
-- **Data Processing Pipelines**: Harvesters with dependency chains
-- **Asset Management**: File uploads with metadata, validation, and streaming
+- **Data Processing Pipelines**: Harvesters with dependency chains and event triggers
+- **Asset Management**: File uploads with metadata, presigned URL uploads for large files
 - **Authentication**: Pluggable auth (API Gateway headers, JWT, or disabled)
 - **Queue Management**: BullMQ with Redis for reliable background processing
 - **Health Checks**: Kubernetes-ready liveness and readiness probes

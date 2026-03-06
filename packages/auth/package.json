@@ -38,5 +38,21 @@
     "@japa/runner": "^4.3.0",
     "@types/jsonwebtoken": "^9.0.10",
     "ts-node-maintained": "^10.9.5"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
+    "directory": "packages/auth"
+  },
+  "keywords": [
+    "digitaltwin",
+    "authentication",
+    "jwt",
+    "middleware",
+    "authorization"
+  ],
+  "bugs": {
+    "url": "https://github.com/CePseudoBE/digitaltwin/issues"
+  },
+  "homepage": "https://github.com/CePseudoBE/digitaltwin#readme"
 }
