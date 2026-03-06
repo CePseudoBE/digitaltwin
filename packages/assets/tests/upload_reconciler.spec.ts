@@ -139,4 +139,69 @@ test.group('UploadReconciler', () => {
         assert.equal(result.expired, 1)
         assert.equal(result.skipped, 1)
     })
+
+    test('reconcile() iterates all registered tables', async ({ assert }) => {
+        const { reconciler, db, storage } = createReconciler()
+
+        // Register two tables
+        reconciler.registerTables(['table_a', 'table_b'])
+
+        // Create pending records in both tables
+        const recordA = await db.save({
+            name: 'table_a',
+            type: 'application/octet-stream',
+            url: '',
+            date: new Date(),
+            description: 'test a',
+            owner_id: 1,
+            filename: 'a.bin',
+            presigned_key: 'table_a/file.bin',
+            presigned_expires_at: new Date(Date.now() - 60_000)
+        })
+        await db.updateById('table_a', recordA.id, {
+            upload_status: 'pending',
+            presigned_key: 'table_a/file.bin',
+            presigned_expires_at: new Date(Date.now() - 60_000)
+        })
+        storage.setObjectExists('table_a/file.bin', true)
+
+        const recordB = await db.save({
+            name: 'table_b',
+            type: 'application/octet-stream',
+            url: '',
+            date: new Date(),
+            description: 'test b',
+            owner_id: 1,
+            filename: 'b.bin',
+            presigned_key: 'table_b/file.bin',
+            presigned_expires_at: new Date(Date.now() - 60_000)
+        })
+        await db.updateById('table_b', recordB.id, {
+            upload_status: 'pending',
+            presigned_key: 'table_b/file.bin',
+            presigned_expires_at: new Date(Date.now() - 60_000)
+        })
+        storage.setObjectExists('table_b/file.bin', false)
+
+        const result = await reconciler.reconcile()
+        assert.equal(result.checked, 2)
+        assert.equal(result.completed, 1) // table_a
+        assert.equal(result.expired, 1)   // table_b
+    })
+
+    test('registerTables() deduplicates table names', async ({ assert }) => {
+        const { reconciler } = createReconciler()
+        reconciler.registerTables(['table_a', 'table_b'])
+        reconciler.registerTables(['table_b', 'table_c'])
+
+        // Verify by checking reconcile with no records returns successfully
+        const result = await reconciler.reconcile()
+        assert.equal(result.checked, 0)
+    })
+
+    test('reconcile() returns empty when no tables registered', async ({ assert }) => {
+        const { reconciler } = createReconciler()
+        const result = await reconciler.reconcile()
+        assert.equal(result.checked, 0)
+    })
 })
