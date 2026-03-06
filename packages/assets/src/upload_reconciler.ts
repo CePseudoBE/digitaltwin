@@ -29,6 +29,7 @@ export class UploadReconciler {
     private storage: StorageService
     private intervalMs: number
     private timer: ReturnType<typeof setInterval> | null = null
+    private tableNames: string[] = []
 
     constructor(db: DatabaseAdapter, storage: StorageService, options?: UploadReconcilerOptions) {
         this.db = db
@@ -36,9 +37,25 @@ export class UploadReconciler {
         this.intervalMs = options?.intervalMs ?? 5 * 60 * 1000 // 5 minutes default
     }
 
+    /**
+     * Register table names to reconcile.
+     * Call this before start() to tell the reconciler which tables to check.
+     */
+    registerTables(names: string[]): void {
+        for (const name of names) {
+            if (!this.tableNames.includes(name)) {
+                this.tableNames.push(name)
+            }
+        }
+    }
+
     start(): void {
         if (this.timer) return
-        logger.info(`Starting upload reconciler (interval: ${this.intervalMs}ms)`)
+        if (this.tableNames.length === 0) {
+            logger.info('No tables registered, upload reconciler not started')
+            return
+        }
+        logger.info(`Starting upload reconciler (interval: ${this.intervalMs}ms, tables: ${this.tableNames.join(', ')})`)
         this.timer = setInterval(() => {
             safeAsync(() => this.reconcile(), 'upload reconciliation cycle', logger)
         }, this.intervalMs)
@@ -52,8 +69,11 @@ export class UploadReconciler {
         }
     }
 
+    /**
+     * Run reconciliation across all registered tables.
+     */
     async reconcile(): Promise<ReconciliationResult> {
-        const result: ReconciliationResult = {
+        const totals: ReconciliationResult = {
             checked: 0,
             completed: 0,
             expired: 0,
@@ -61,18 +81,24 @@ export class UploadReconciler {
         }
 
         if (!this.storage.supportsPresignedUrls()) {
-            return result
+            return totals
         }
 
-        // Find all pending records with presigned_key across all tables
-        // We query using findByConditions which is available on the adapter
-        // But we don't know table names. The reconciler needs table names passed in
-        // or we use a different approach.
-        // For now, this reconciler works per-table. The engine should call reconcile
-        // for each asset manager's table name.
-        logger.info('Reconciliation requires per-table execution via reconcileTable()')
+        for (const tableName of this.tableNames) {
+            const result = await this.reconcileTable(tableName)
+            totals.checked += result.checked
+            totals.completed += result.completed
+            totals.expired += result.expired
+            totals.skipped += result.skipped
+        }
 
-        return result
+        if (totals.checked > 0) {
+            logger.info(
+                `Reconciliation totals: checked=${totals.checked}, completed=${totals.completed}, expired=${totals.expired}, skipped=${totals.skipped}`
+            )
+        }
+
+        return totals
     }
 
     /**

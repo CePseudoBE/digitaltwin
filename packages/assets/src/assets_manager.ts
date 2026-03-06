@@ -8,8 +8,7 @@ import type {
     OpenAPIComponentSpec,
     DataRecord,
     AuthResult,
-    TypedRequest,
-    PresignedUploadRequestBody
+    TypedRequest
 } from '@digitaltwin/shared'
 import {
     successResponse,
@@ -29,12 +28,13 @@ import {
     validatePagination,
     validateData,
     validateQuery,
-    validateParams,
-    validatePresignedUploadRequest
+    validateParams
 } from '@digitaltwin/shared'
 import type { StorageService } from '@digitaltwin/storage'
 import type { DatabaseAdapter, MetadataRow } from '@digitaltwin/database'
 import { ApisixAuthParser, AuthMiddleware, UserService, type HeadersLike } from '@digitaltwin/auth'
+import { PresignedUploadService } from './presigned_upload_service.js'
+import { generateAssetsOpenAPISpec } from './assets_openapi.js'
 import fs from 'fs/promises'
 
 const logger = new Logger('AssetsManager')
@@ -229,6 +229,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
     protected db!: DatabaseAdapter
     protected storage!: StorageService
     protected authMiddleware!: AuthMiddleware
+    protected presignedService!: PresignedUploadService
 
     /**
      * Injects dependencies into the assets manager.
@@ -253,6 +254,15 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
         this.db = db
         this.storage = storage
         this.authMiddleware = authMiddleware ?? new AuthMiddleware(new UserService(db.getUserRepository()))
+        this.presignedService = new PresignedUploadService({
+            db: this.db,
+            storage: this.storage,
+            authMiddleware: this.authMiddleware,
+            getConfiguration: () => this.getConfiguration(),
+            getAssetById: (id: string) => this.getAssetById(id),
+            validateOwnership: (asset, userId, headers) => this.validateOwnership(asset, userId, headers),
+            validateFileExtension: (filename: string) => this.validateFileExtension(filename)
+        })
     }
 
     /**
@@ -1058,550 +1068,23 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      * @returns {OpenAPIComponentSpec} OpenAPI paths, tags, and schemas for this assets manager
      */
     getOpenAPISpec(): OpenAPIComponentSpec {
-        const config = this.getConfiguration()
-        const basePath = `/${config.endpoint}`
-        const tagName = config.tags?.[0] || config.name
-
-        return {
-            paths: {
-                [basePath]: {
-                    get: {
-                        summary: `List all ${config.name} assets`,
-                        description: config.description,
-                        tags: [tagName],
-                        responses: {
-                            '200': {
-                                description: 'List of assets',
-                                content: {
-                                    'application/json': {
-                                        schema: {
-                                            type: 'array',
-                                            items: { $ref: '#/components/schemas/AssetResponse' }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    post: {
-                        summary: `Upload a new ${config.name} asset`,
-                        description: 'Upload a new asset file with metadata. Requires authentication.',
-                        tags: [tagName],
-                        security: [{ ApiKeyAuth: [] }],
-                        requestBody: {
-                            required: true,
-                            content: {
-                                'multipart/form-data': {
-                                    schema: {
-                                        type: 'object',
-                                        required: ['file', 'description', 'source'],
-                                        properties: {
-                                            file: {
-                                                type: 'string',
-                                                format: 'binary',
-                                                description: 'The file to upload'
-                                            },
-                                            description: { type: 'string', description: 'Asset description' },
-                                            source: {
-                                                type: 'string',
-                                                format: 'uri',
-                                                description: 'Source URL for provenance'
-                                            },
-                                            is_public: {
-                                                type: 'boolean',
-                                                description: 'Whether asset is public (default: true)'
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        responses: {
-                            '200': {
-                                description: 'Asset uploaded successfully',
-                                content: {
-                                    'application/json': {
-                                        schema: { $ref: '#/components/schemas/SuccessResponse' }
-                                    }
-                                }
-                            },
-                            '400': { description: 'Bad request - missing or invalid fields' },
-                            '401': { description: 'Unauthorized - authentication required' }
-                        }
-                    }
-                },
-                [`${basePath}/{id}`]: {
-                    get: {
-                        summary: `Get ${config.name} asset by ID`,
-                        description: 'Returns the asset file content',
-                        tags: [tagName],
-                        parameters: [
-                            {
-                                name: 'id',
-                                in: 'path',
-                                required: true,
-                                schema: { type: 'string' },
-                                description: 'Asset ID'
-                            }
-                        ],
-                        responses: {
-                            '200': {
-                                description: 'Asset file content',
-                                content: {
-                                    [config.contentType]: {
-                                        schema: { type: 'string', format: 'binary' }
-                                    }
-                                }
-                            },
-                            '404': { description: 'Asset not found' }
-                        }
-                    },
-                    put: {
-                        summary: `Update ${config.name} asset metadata`,
-                        description:
-                            'Update asset description, source, or visibility. Requires authentication and ownership.',
-                        tags: [tagName],
-                        security: [{ ApiKeyAuth: [] }],
-                        parameters: [
-                            {
-                                name: 'id',
-                                in: 'path',
-                                required: true,
-                                schema: { type: 'string' },
-                                description: 'Asset ID'
-                            }
-                        ],
-                        requestBody: {
-                            required: true,
-                            content: {
-                                'application/json': {
-                                    schema: {
-                                        type: 'object',
-                                        properties: {
-                                            description: { type: 'string' },
-                                            source: { type: 'string', format: 'uri' },
-                                            is_public: { type: 'boolean' }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        responses: {
-                            '200': {
-                                description: 'Asset updated successfully',
-                                content: {
-                                    'application/json': {
-                                        schema: { $ref: '#/components/schemas/SuccessResponse' }
-                                    }
-                                }
-                            },
-                            '400': { description: 'Bad request' },
-                            '401': { description: 'Unauthorized' },
-                            '403': { description: 'Forbidden - not owner' },
-                            '404': { description: 'Asset not found' }
-                        }
-                    },
-                    delete: {
-                        summary: `Delete ${config.name} asset`,
-                        description: 'Delete an asset. Requires authentication and ownership.',
-                        tags: [tagName],
-                        security: [{ ApiKeyAuth: [] }],
-                        parameters: [
-                            {
-                                name: 'id',
-                                in: 'path',
-                                required: true,
-                                schema: { type: 'string' },
-                                description: 'Asset ID'
-                            }
-                        ],
-                        responses: {
-                            '200': {
-                                description: 'Asset deleted successfully',
-                                content: {
-                                    'application/json': {
-                                        schema: { $ref: '#/components/schemas/SuccessResponse' }
-                                    }
-                                }
-                            },
-                            '401': { description: 'Unauthorized' },
-                            '403': { description: 'Forbidden - not owner' },
-                            '404': { description: 'Asset not found' }
-                        }
-                    }
-                },
-                [`${basePath}/{id}/download`]: {
-                    get: {
-                        summary: `Download ${config.name} asset`,
-                        description: 'Download the asset file with Content-Disposition header',
-                        tags: [tagName],
-                        parameters: [
-                            {
-                                name: 'id',
-                                in: 'path',
-                                required: true,
-                                schema: { type: 'string' },
-                                description: 'Asset ID'
-                            }
-                        ],
-                        responses: {
-                            '200': {
-                                description: 'Asset file download',
-                                content: {
-                                    [config.contentType]: {
-                                        schema: { type: 'string', format: 'binary' }
-                                    }
-                                }
-                            },
-                            '404': { description: 'Asset not found' }
-                        }
-                    }
-                },
-                [`${basePath}/batch`]: {
-                    post: {
-                        summary: `Batch upload ${config.name} assets`,
-                        description: 'Upload multiple assets in one request. Files must be base64 encoded.',
-                        tags: [tagName],
-                        security: [{ ApiKeyAuth: [] }],
-                        requestBody: {
-                            required: true,
-                            content: {
-                                'application/json': {
-                                    schema: {
-                                        type: 'object',
-                                        required: ['requests'],
-                                        properties: {
-                                            requests: {
-                                                type: 'array',
-                                                items: {
-                                                    type: 'object',
-                                                    required: ['file', 'description', 'source', 'filename'],
-                                                    properties: {
-                                                        file: {
-                                                            type: 'string',
-                                                            format: 'byte',
-                                                            description: 'Base64 encoded file'
-                                                        },
-                                                        filename: { type: 'string' },
-                                                        description: { type: 'string' },
-                                                        source: { type: 'string', format: 'uri' },
-                                                        is_public: { type: 'boolean' }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        responses: {
-                            '200': { description: 'All assets uploaded successfully' },
-                            '207': { description: 'Partial success - some uploads failed' },
-                            '400': { description: 'Bad request' },
-                            '401': { description: 'Unauthorized' }
-                        }
-                    },
-                    delete: {
-                        summary: `Batch delete ${config.name} assets`,
-                        description:
-                            'Delete multiple assets by IDs. Requires authentication and ownership. Pass IDs as comma-separated query parameter.',
-                        tags: [tagName],
-                        security: [{ ApiKeyAuth: [] }],
-                        parameters: [
-                            {
-                                name: 'ids',
-                                in: 'query',
-                                required: true,
-                                schema: {
-                                    type: 'string'
-                                },
-                                description: 'Comma-separated list of asset IDs to delete (e.g., 1,2,3)'
-                            }
-                        ],
-                        responses: {
-                            '200': { description: 'All assets deleted successfully' },
-                            '207': { description: 'Partial success - some deletions failed' },
-                            '400': { description: 'Bad request' },
-                            '401': { description: 'Unauthorized' }
-                        }
-                    }
-                },
-                [`${basePath}/upload-request`]: {
-                    post: {
-                        summary: 'Request presigned upload URL',
-                        description:
-                            'Generate a presigned PUT URL for direct client-to-storage upload. Only available when storage supports presigned URLs (S3-compatible).',
-                        tags: [tagName],
-                        security: [{ ApiKeyAuth: [] }],
-                        requestBody: {
-                            required: true,
-                            content: {
-                                'application/json': {
-                                    schema: {
-                                        type: 'object',
-                                        required: ['fileName', 'fileSize', 'contentType'],
-                                        properties: {
-                                            fileName: { type: 'string' },
-                                            fileSize: { type: 'integer' },
-                                            contentType: { type: 'string' },
-                                            description: { type: 'string' },
-                                            source: { type: 'string', format: 'uri' },
-                                            is_public: { type: 'boolean' }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        responses: {
-                            '200': {
-                                description: 'Presigned upload URL generated',
-                                content: {
-                                    'application/json': {
-                                        schema: {
-                                            type: 'object',
-                                            properties: {
-                                                fileId: { type: 'integer' },
-                                                uploadUrl: { type: 'string', format: 'uri' },
-                                                key: { type: 'string' },
-                                                expiresAt: { type: 'string', format: 'date-time' }
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            '400': { description: 'Presigned URLs not supported or invalid request' },
-                            '401': { description: 'Unauthorized' }
-                        }
-                    }
-                },
-                [`${basePath}/confirm/{fileId}`]: {
-                    post: {
-                        summary: 'Confirm presigned upload',
-                        description:
-                            'Confirm that a file has been uploaded via the presigned URL. Verifies the file exists on storage and updates the record status.',
-                        tags: [tagName],
-                        security: [{ ApiKeyAuth: [] }],
-                        parameters: [
-                            {
-                                name: 'fileId',
-                                in: 'path',
-                                required: true,
-                                schema: { type: 'string' },
-                                description: 'File record ID from upload-request'
-                            }
-                        ],
-                        responses: {
-                            '200': {
-                                description: 'Upload confirmed',
-                                content: {
-                                    'application/json': {
-                                        schema: {
-                                            type: 'object',
-                                            properties: {
-                                                message: { type: 'string' },
-                                                id: { type: 'integer' },
-                                                url: { type: 'string' }
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            '400': { description: 'File not found on storage' },
-                            '401': { description: 'Unauthorized' },
-                            '403': { description: 'Not the owner' },
-                            '404': { description: 'Record not found' },
-                            '409': { description: 'Upload not in pending state' }
-                        }
-                    }
-                }
-            },
-            tags: [
-                {
-                    name: tagName,
-                    description: config.description
-                }
-            ],
-            schemas: {
-                AssetResponse: {
-                    type: 'object',
-                    properties: {
-                        id: { type: 'integer' },
-                        name: { type: 'string' },
-                        date: { type: 'string', format: 'date-time' },
-                        contentType: { type: 'string' },
-                        description: { type: 'string' },
-                        source: { type: 'string' },
-                        owner_id: { type: 'integer', nullable: true },
-                        filename: { type: 'string' },
-                        is_public: { type: 'boolean' },
-                        url: { type: 'string' },
-                        download_url: { type: 'string' }
-                    }
-                },
-                SuccessResponse: {
-                    type: 'object',
-                    properties: {
-                        message: { type: 'string' }
-                    }
-                }
-            }
-        }
+        return generateAssetsOpenAPISpec(this.getConfiguration())
     }
 
     /**
      * Handle presigned upload URL request.
-     *
-     * Flow:
-     * 1. Authenticate user
-     * 2. Validate body (fileName, fileSize, contentType)
-     * 3. Check storage supports presigned URLs
-     * 4. Validate file extension
-     * 5. Generate presigned PUT URL
-     * 6. Save pending DB record
-     * 7. Return { fileId, uploadUrl, key, expiresAt }
+     * Delegates to PresignedUploadService.
      */
     async handlePresignedUploadRequest(req: TypedRequest): Promise<DataResponse> {
-        try {
-            if (!req?.body) {
-                return badRequestResponse('Invalid request: missing request body')
-            }
-
-            // Authenticate user
-            const authResult = await this.authenticateRequest(req)
-            if (!authResult.success) {
-                return authResult.response
-            }
-            const userId = authResult.userRecord.id
-            if (!userId) {
-                return errorResponse('Failed to retrieve user information')
-            }
-
-            // Check presigned URL support
-            if (!this.storage.supportsPresignedUrls()) {
-                return badRequestResponse('Presigned uploads are not supported with the current storage backend')
-            }
-
-            // Validate request body
-            const validated = await validateData<PresignedUploadRequestBody>(validatePresignedUploadRequest, req.body)
-            const { fileName, contentType, description, source, is_public } = validated
-
-            // Validate file extension
-            if (!this.validateFileExtension(fileName)) {
-                const config = this.getConfiguration()
-                return badRequestResponse(`Invalid file extension. Expected: ${config.extension}`)
-            }
-
-            const config = this.getConfiguration()
-            const sanitizedFilename = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
-            const key = `${config.name}/${Date.now()}/${sanitizedFilename}`
-
-            // Generate presigned URL (5 min expiry)
-            const presigned = await this.storage.generatePresignedUploadUrl(key, contentType, 300)
-
-            // Save pending record in database
-            const metadata: MetadataRow = {
-                name: config.name,
-                type: contentType,
-                url: '',
-                date: new Date(),
-                description: description || '',
-                source: source || '',
-                owner_id: userId,
-                filename: fileName,
-                is_public: is_public ?? true,
-                presigned_key: presigned.key,
-                presigned_expires_at: presigned.expiresAt
-            }
-
-            // Use upload_status field via updateById after save
-            const savedRecord = await this.db.save(metadata)
-            await this.db.updateById(config.name, savedRecord.id, {
-                upload_status: 'pending'
-            })
-
-            return successResponse({
-                fileId: savedRecord.id,
-                uploadUrl: presigned.url,
-                key: presigned.key,
-                expiresAt: presigned.expiresAt.toISOString()
-            })
-        } catch (error) {
-            return errorResponse(error)
-        }
+        return this.presignedService.handleUploadRequest(req)
     }
 
     /**
      * Handle presigned upload confirmation.
-     *
-     * Flow:
-     * 1. Authenticate user
-     * 2. Fetch record, check ownership
-     * 3. Check upload_status === 'pending'
-     * 4. Verify file exists on storage via objectExists
-     * 5. Update record to completed with URL = presigned_key
+     * Delegates to PresignedUploadService.
      */
     async handleUploadConfirm(req: TypedRequest): Promise<DataResponse> {
-        try {
-            // Authenticate user
-            const authResult = await this.authenticateRequest(req)
-            if (!authResult.success) {
-                return authResult.response
-            }
-            const userId = authResult.userRecord.id
-            if (!userId) {
-                return errorResponse('Failed to retrieve user information')
-            }
-
-            const fileId = req.params?.fileId
-            if (!fileId) {
-                return badRequestResponse('File ID is required')
-            }
-
-            const config = this.getConfiguration()
-            const asset = await this.getAssetById(fileId)
-            if (!asset) {
-                return notFoundResponse('Asset not found')
-            }
-
-            // Check ownership
-            const ownershipError = this.validateOwnership(asset, userId, req.headers)
-            if (ownershipError) {
-                return ownershipError
-            }
-
-            // Check status
-            if (asset.upload_status !== 'pending') {
-                return {
-                    status: 409,
-                    content: JSON.stringify({ error: `Upload is not pending (current status: ${asset.upload_status || 'completed'})` }),
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            }
-
-            // Verify file exists on storage
-            if (!asset.presigned_key) {
-                return badRequestResponse('No presigned key found for this record')
-            }
-
-            const existsResult = await this.storage.objectExists(asset.presigned_key)
-            if (!existsResult.exists) {
-                return badRequestResponse('File not found on storage. Please upload the file using the presigned URL first.')
-            }
-
-            // Update record to completed
-            await this.db.updateById(config.name, asset.id, {
-                upload_status: 'completed',
-                url: asset.presigned_key
-            })
-
-            return successResponse({
-                message: 'Upload confirmed successfully',
-                id: asset.id,
-                url: asset.presigned_key
-            })
-        } catch (error) {
-            return errorResponse(error)
-        }
+        return this.presignedService.handleConfirm(req)
     }
 
     /**
