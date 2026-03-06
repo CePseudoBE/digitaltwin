@@ -128,6 +128,10 @@ export type {
 } from './types/openapi.js'
 export { isOpenAPIDocumentable } from './types/openapi.js'
 
+// Events
+export { EngineEventBus, engineEventBus } from './events/event_bus.js'
+export type { ComponentEvent } from './events/event_bus.js'
+
 // Component types and interfaces
 export type {
     ComponentConfiguration,
