@@ -9,7 +9,7 @@
     "build:cli": "pnpm --filter digitaltwin-cli run build",
     "build:create": "pnpm --filter create-digitaltwin run build",
     "clean": "pnpm -r run clean",
-    "test": "pnpm --filter @digitaltwin/shared run test && pnpm --filter digitaltwin-core run test",
+    "test": "pnpm --filter @digitaltwin/shared run test && pnpm --filter @digitaltwin/engine run test && pnpm --filter digitaltwin-core run test",
     "test:shared": "pnpm --filter @digitaltwin/shared run test",
     "lint": "pnpm --filter digitaltwin-core run lint",
     "lint:fix": "pnpm --filter digitaltwin-core run lint:fix",
