@@ -18,6 +18,9 @@ export type { TilesetUploadJobData, UploadJobData, UploadStatus } from './upload
 export { PresignedUploadService } from './presigned_upload_service.js'
 export type { PresignedUploadDeps } from './presigned_upload_service.js'
 
+// OpenAPI spec generation
+export { generateAssetsOpenAPISpec } from './assets_openapi.js'
+
 // Upload reconciler
 export { UploadReconciler } from './upload_reconciler.js'
 export type { ReconciliationResult, UploadReconcilerOptions } from './upload_reconciler.js'
