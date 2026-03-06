@@ -96,6 +96,9 @@ importers:
       '@digitaltwin/auth':
         specifier: workspace:*
         version: link:../packages/auth
+      '@digitaltwin/components':
+        specifier: workspace:*
+        version: link:../packages/components
       '@digitaltwin/database':
         specifier: workspace:*
         version: link:../packages/database
@@ -252,6 +255,31 @@ importers:
       '@types/jsonwebtoken':
         specifier: ^9.0.10
         version: 9.0.10
+      ts-node-maintained:
+        specifier: ^10.9.5
+        version: 10.9.6(@types/node@24.10.8)(typescript@5.9.3)
+
+  packages/components:
+    dependencies:
+      '@digitaltwin/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@digitaltwin/database':
+        specifier: workspace:*
+        version: link:../database
+      '@digitaltwin/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@digitaltwin/storage':
+        specifier: workspace:*
+        version: link:../storage
+    devDependencies:
+      '@japa/assert':
+        specifier: ^4.1.0
+        version: 4.2.0(@japa/runner@4.5.0)
+      '@japa/runner':
+        specifier: ^4.3.0
+        version: 4.5.0
       ts-node-maintained:
         specifier: ^10.9.5
         version: 10.9.6(@types/node@24.10.8)(typescript@5.9.3)
