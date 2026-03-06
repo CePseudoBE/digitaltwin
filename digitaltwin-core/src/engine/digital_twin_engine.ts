@@ -31,7 +31,7 @@ import { scheduleComponents } from './scheduler.js'
 import { LogLevel } from '../utils/logger.js'
 import type { QueueConfig } from './queue_manager.js'
 import { QueueManager } from './queue_manager.js'
-import { UploadProcessor } from './upload_processor.js'
+import { UploadProcessor, UploadReconciler } from './upload_processor.js'
 import { engineEventBus } from './events.js'
 import { isAsyncUploadable } from '../components/async_upload.js'
 import {
@@ -198,6 +198,7 @@ export class DigitalTwinEngine {
     readonly #options: EngineOptions
     #queueManager: QueueManager | null
     readonly #uploadProcessor: UploadProcessor | null
+    readonly #uploadReconciler: UploadReconciler
     /** uWebSockets.js TemplatedApp - has close() method to shut down all connections */
     #server?: { close(): unknown }
     #workers: Worker[] = []
@@ -288,6 +289,7 @@ export class DigitalTwinEngine {
         this.#router = express.Router()
         this.#queueManager = this.#createQueueManager()
         this.#uploadProcessor = this.#createUploadProcessor()
+        this.#uploadReconciler = new UploadReconciler(this.#database, this.#storage)
     }
 
     #createUploadProcessor(): UploadProcessor | null {
@@ -516,6 +518,13 @@ export class DigitalTwinEngine {
                 maxRetriesPerRequest: null
             }
             this.#uploadProcessor.start(redisConfig)
+        }
+
+        // Start upload reconciler for presigned uploads (registers all asset manager tables)
+        const assetTableNames = this.#allAssetsManagers.map(m => m.getConfiguration().name)
+        if (assetTableNames.length > 0) {
+            this.#uploadReconciler.registerTables(assetTableNames)
+            this.#uploadReconciler.start()
         }
 
         await exposeEndpoints(this.#router, this.#allComponents)
@@ -921,7 +930,13 @@ export class DigitalTwinEngine {
         // 4. Close all workers with extended timeout and force close
         await this.#closeWorkers(errors)
 
-        // 5. Stop upload processor worker
+        // 5. Stop upload reconciler and processor
+        try {
+            this.#uploadReconciler.stop()
+        } catch (error) {
+            errors.push(this.#wrapError('Upload reconciler', error))
+        }
+
         if (this.#uploadProcessor) {
             try {
                 await this.#uploadProcessor.stop()
