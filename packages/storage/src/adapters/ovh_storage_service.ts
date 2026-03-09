@@ -27,6 +27,7 @@ export interface OvhS3Config {
     endpoint: string // e.g. 'https://s3.gra.io.cloud.ovh.net'
     region?: string // e.g. 'gra'
     bucket: string
+    pathStyle?: boolean // true for MinIO/localhost, false for OVH (default)
 }
 
 export class OvhS3StorageService extends StorageService {
@@ -45,7 +46,7 @@ export class OvhS3StorageService extends StorageService {
                 accessKeyId: config.accessKey,
                 secretAccessKey: config.secretKey
             },
-            forcePathStyle: false,
+            forcePathStyle: config.pathStyle ?? false,
             // Match Python boto3 config for OVH compatibility
             requestChecksumCalculation: 'WHEN_REQUIRED',
             responseChecksumValidation: 'WHEN_REQUIRED'
