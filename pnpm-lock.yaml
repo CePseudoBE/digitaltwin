@@ -382,6 +382,43 @@ importers:
         specifier: ^10.9.5
         version: 10.9.6(@types/node@24.10.8)(typescript@5.9.3)
 
+  packages/ngsi-ld:
+    dependencies:
+      '@digitaltwin/components':
+        specifier: workspace:*
+        version: link:../components
+      '@digitaltwin/database':
+        specifier: workspace:*
+        version: link:../database
+      '@digitaltwin/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@japa/assert':
+        specifier: ^4.1.0
+        version: 4.2.0(@japa/runner@4.5.0)
+      '@japa/runner':
+        specifier: ^4.3.0
+        version: 4.5.0
+      '@testcontainers/redis':
+        specifier: ^11.3.1
+        version: 11.11.0
+      bullmq:
+        specifier: ^5.0.0
+        version: 5.66.5
+      ioredis:
+        specifier: ^5.0.0
+        version: 5.9.1
+      rimraf:
+        specifier: ^6.0.1
+        version: 6.1.2
+      testcontainers:
+        specifier: ^11.3.1
+        version: 11.11.0
+      ts-node-maintained:
+        specifier: ^10.9.5
+        version: 10.9.6(@types/node@24.10.8)(typescript@5.9.3)
+
   packages/shared:
     dependencies:
       '@vinejs/vine':
