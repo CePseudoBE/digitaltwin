@@ -192,6 +192,51 @@ test.group('SubscriptionMatcher', () => {
         assert.deepEqual(result, [])
     })
 
+    test('watchedAttributes OR semantics: matches when any one attribute changed', async ({ assert }) => {
+        const sub = makeSub({ watchedAttributes: ['pm25', 'temperature'] })
+        const cache = new MockSubscriptionCache([sub]) as unknown as SubscriptionCache
+        const matcher = new SubscriptionMatcher(cache)
+
+        // Only pm25 changed, temperature did not
+        const oldEntity = makeEntity({ pm25: 30, temperature: 20 })
+        const newEntity = makeEntity({ pm25: 63, temperature: 20 })
+
+        const result = await matcher.match(newEntity, oldEntity)
+        assert.deepEqual(result, ['sub-1'])
+    })
+
+    test('watchedAttributes OR semantics: excludes sub when none of the watched attributes changed', async ({ assert }) => {
+        const sub = makeSub({ watchedAttributes: ['pm25', 'temperature'] })
+        const cache = new MockSubscriptionCache([sub]) as unknown as SubscriptionCache
+        const matcher = new SubscriptionMatcher(cache)
+
+        const entity = makeEntity({ pm25: 63, temperature: 20 })
+        const sameEntity = makeEntity({ pm25: 63, temperature: 20 })
+
+        const result = await matcher.match(entity, sameEntity)
+        assert.deepEqual(result, [])
+    })
+
+    test('watchedAttributes: empty array behaves like undefined — matches everything', async ({ assert }) => {
+        const sub = makeSub({ watchedAttributes: [] })
+        const cache = new MockSubscriptionCache([sub]) as unknown as SubscriptionCache
+        const matcher = new SubscriptionMatcher(cache)
+
+        const entity = makeEntity({ pm25: 63 })
+        const result = await matcher.match(entity)
+        assert.deepEqual(result, ['sub-1'])
+    })
+
+    test('throttling: always allows when no lastNotificationAt set', async ({ assert }) => {
+        const sub = makeSub({ throttling: 60, lastNotificationAt: undefined })
+        const cache = new MockSubscriptionCache([sub]) as unknown as SubscriptionCache
+        const matcher = new SubscriptionMatcher(cache)
+
+        const entity = makeEntity({ pm25: 63 })
+        const result = await matcher.match(entity)
+        assert.deepEqual(result, ['sub-1'])
+    })
+
     test('malformed q-filter is silently skipped', async ({ assert }) => {
         const sub = makeSub({ q: 'not-valid-q!!!' })
         const cache = new MockSubscriptionCache([sub]) as unknown as SubscriptionCache

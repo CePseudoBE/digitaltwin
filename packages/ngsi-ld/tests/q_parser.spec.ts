@@ -73,6 +73,34 @@ test.group('parseQ() - single comparisons', () => {
     })
 })
 
+test.group('parseQ() - edge cases', () => {
+    test('parses float value correctly', ({ assert }) => {
+        const expr = parseQ('temperature>=18.5')
+        assert.equal(expr.kind, 'comparison')
+        if (expr.kind === 'comparison') {
+            assert.equal(expr.value, 18.5)
+        }
+    })
+
+    test('parses term with whitespace around operator', ({ assert }) => {
+        // The regex allows optional whitespace around operators
+        const expr = parseQ('pm25 > 30')
+        assert.equal(expr.kind, 'comparison')
+        if (expr.kind === 'comparison') {
+            assert.equal(expr.attribute, 'pm25')
+            assert.equal(expr.operator, '>')
+            assert.equal(expr.value, 30)
+        }
+    })
+
+    test('semicolon inside quoted value is a known limitation', ({ assert }) => {
+        // The parser splits on ';' before parsing individual terms.
+        // A value like "Jean;Pierre" would be split into ['name=="Jean', 'Pierre"']
+        // which causes a parse error. This is a known v1 limitation.
+        assert.throws(() => parseQ('name=="Jean;Pierre"'))
+    })
+})
+
 test.group('parseQ() - AND chaining with ;', () => {
     test('parses AND chain as QAnd', ({ assert }) => {
         const expr = parseQ('pm25>30;temperature<10')

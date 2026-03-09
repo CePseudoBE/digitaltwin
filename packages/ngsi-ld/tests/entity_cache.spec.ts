@@ -131,14 +131,22 @@ test.group('EntityCache (Redis integration)', group => {
         assert.lengthOf(intersection, 0)
     })
 
-    test('prefix isolation: keys do not bleed between namespaces', async ({ assert }) => {
-        // Set a raw key that looks like a non-ngsi key
-        await redis.set('other:key', 'noise')
+    test('listByType does not mix entities from different types', async ({ assert }) => {
+        const airEntity = makeEntity('AirQualityObserved', 'sensor-99', { pm25: 55 })
+        const weatherEntity = makeEntity('WeatherObserved', 'station-99', { temperature: 21 })
 
-        const entity = makeEntity('IsolationTest', 'device-1')
-        await cache.set(entity)
+        await cache.set(airEntity)
+        await cache.set(weatherEntity)
 
-        const retrieved = await cache.get(entity.id)
-        assert.isNotNull(retrieved)
+        const airEntities = await cache.listByType('AirQualityObserved')
+        const weatherEntities = await cache.listByType('WeatherObserved')
+
+        const airIds = airEntities.map(e => e.id)
+        const weatherIds = weatherEntities.map(e => e.id)
+
+        assert.include(airIds, airEntity.id)
+        assert.notInclude(airIds, weatherEntity.id)
+        assert.include(weatherIds, weatherEntity.id)
+        assert.notInclude(weatherIds, airEntity.id)
     })
 })
