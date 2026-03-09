@@ -805,6 +805,36 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
         }
     }
 
+    async ensureColumns(tableName: string, columns: Record<string, string>): Promise<void> {
+        this.#validateTableName(tableName)
+        if (!(await this.#knex.schema.hasTable(tableName))) return
+
+        for (const [colName, colDef] of Object.entries(columns)) {
+            if (await this.#knex.schema.hasColumn(tableName, colName)) continue
+
+            const lower = colDef.toLowerCase()
+            const isNotNull = lower.includes('not null')
+
+            await this.#knex.schema.alterTable(tableName, table => {
+                let col: any
+                if (lower.includes('integer')) col = table.integer(colName)
+                else if (lower.includes('boolean')) col = table.boolean(colName)
+                else if (lower.includes('timestamp') || lower.includes('datetime')) col = table.timestamp(colName)
+                else if (lower.includes('real') || lower.includes('decimal') || lower.includes('float')) col = table.float(colName)
+                else {
+                    const varchMatch = lower.match(/varchar\((\d+)\)/)
+                    col = varchMatch ? table.string(colName, parseInt(varchMatch[1])) : table.text(colName)
+                }
+
+                col = col.nullable()
+                if (isNotNull) {
+                    const implicitDefault = (lower.includes('integer') || lower.includes('boolean')) ? 0 : ''
+                    col = col.notNullable().defaultTo(implicitDefault)
+                }
+            })
+        }
+    }
+
     async close(): Promise<void> {
         await this.#knex.destroy()
     }
