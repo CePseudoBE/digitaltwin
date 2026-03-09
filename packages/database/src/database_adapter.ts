@@ -100,6 +100,22 @@ export abstract class DatabaseAdapter {
     abstract createTableWithColumns(name: string, columns: Record<string, string>): Promise<void>
 
     /**
+     * Adds any missing columns to an existing custom table.
+     *
+     * Compares the provided column schema against the actual table and runs
+     * ALTER TABLE ADD COLUMN for each missing column. Safe to call on every
+     * startup — columns that already exist are skipped.
+     *
+     * Note: SQLite does not support DROP or MODIFY, only ADD. For NOT NULL
+     * columns added to an existing table a sensible default is applied
+     * automatically ('' for text, 0 for integer/boolean) so the ALTER succeeds.
+     *
+     * @param tableName - Table to migrate
+     * @param columns - Expected column definitions (name -> SQL type string)
+     */
+    abstract ensureColumns(tableName: string, columns: Record<string, string>): Promise<void>
+
+    /**
      * Migrate existing table schema to add missing columns and indexes.
      *
      * Only performs safe operations like adding columns with defaults or nullable.

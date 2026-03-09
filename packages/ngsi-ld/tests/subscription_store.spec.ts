@@ -48,6 +48,27 @@ test.group('SubscriptionStore — migration', group => {
         const exists = await db.doesTableExists('ngsi_ld_subscriptions')
         assert.isTrue(exists)
     })
+
+    test('runMigration() adds missing columns to an existing table', async ({ assert }) => {
+        // Simulate a legacy table that pre-dates the times_failed column
+        await db.createTableWithColumns('ngsi_ld_subscriptions', {
+            sub_id: 'text not null',
+            notification_endpoint: 'text not null',
+            entity_types: 'text not null',
+            is_active: 'integer',
+            // times_failed intentionally absent — simulates old schema
+        })
+
+        // runMigration() should detect and add the missing columns
+        await store.runMigration()
+
+        // Verify the table still works end-to-end (times_failed is now present)
+        const sub = await store.create(makeInput())
+        await store.recordNotification(sub.id, false, new Date().toISOString())
+
+        const updated = await store.findById(sub.id)
+        assert.equal(updated!.timesFailed, 1)
+    })
 })
 
 test.group('SubscriptionStore — create', group => {

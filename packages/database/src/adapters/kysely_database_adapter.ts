@@ -720,6 +720,45 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
         return (result as any).id
     }
 
+    async ensureColumns(tableName: string, columns: Record<string, string>): Promise<void> {
+        this.#validateTableName(tableName)
+        const tables = await this.#db.introspection.getTables()
+        const table = tables.find(t => t.name === tableName)
+        if (!table) return
+
+        const existingCols = new Set(table.columns.map(c => c.name))
+
+        for (const [colName, colDef] of Object.entries(columns)) {
+            if (existingCols.has(colName)) continue
+
+            const lower = colDef.toLowerCase()
+            const isNotNull = lower.includes('not null')
+
+            let dataType: string
+            if (lower.includes('text')) dataType = 'text'
+            else if (lower.includes('integer')) dataType = 'integer'
+            else if (lower.includes('boolean')) dataType = 'boolean'
+            else if (lower.includes('timestamp') || lower.includes('datetime')) dataType = 'datetime'
+            else if (lower.includes('real') || lower.includes('decimal') || lower.includes('float')) dataType = 'real'
+            else {
+                const varchMatch = lower.match(/varchar\((\d+)\)/)
+                dataType = varchMatch ? `varchar(${varchMatch[1]})` : 'text'
+            }
+
+            // For NOT NULL on existing tables we must supply a default — SQLite
+            // requires it because existing rows can't retroactively have a value.
+            const implicitDefault = (dataType === 'integer' || dataType === 'boolean') ? 0 : ''
+
+            await this.#db.schema
+                .alterTable(tableName)
+                .addColumn(colName, dataType as any, col => {
+                    if (isNotNull) col = col.notNull().defaultTo(implicitDefault)
+                    return col
+                })
+                .execute()
+        }
+    }
+
     async close(): Promise<void> {
         await this.#db.destroy()
     }
