@@ -100,7 +100,7 @@ export class SubscriptionStore {
      * Returns a subscription by its UUID, or null if not found.
      */
     async findById(subId: string): Promise<Subscription | null> {
-        const rows = await this.#db.findCustomTableRecords(TABLE, { sub_id: subId })
+        const rows = await this.#db.findCustomTableRecords(TABLE, { sub_id: subId, is_active: 1 })
         if (rows.length === 0) return null
         return this.#rowToSubscription(rows[0])
     }
