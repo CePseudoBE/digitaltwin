@@ -207,9 +207,8 @@ test.group('AssetsManager — owner happy path', (group) => {
     test('handleUpdate() allows owner to modify their own asset', async ({ assert }) => {
         const { manager, db } = createManager()
 
-        // Create owner user in DB
-        await db.getKnex()('users').insert({ keycloak_id: 'owner-user-id' })
-        const owner = await db.getKnex()('users').where('keycloak_id', 'owner-user-id').first()
+        // Create owner user via the proper repository API
+        const owner = await db.getUserRepository().findOrCreateUser({ id: 'owner-user-id', roles: ['user'] })
 
         const existingAsset = {
             id: 1, name: 'test-assets', contentType: 'application/octet-stream',
@@ -236,8 +235,7 @@ test.group('AssetsManager — owner happy path', (group) => {
     test('handleDelete() allows owner to delete their own asset', async ({ assert }) => {
         const { manager, db } = createManager()
 
-        await db.getKnex()('users').insert({ keycloak_id: 'owner-user-id' })
-        const owner = await db.getKnex()('users').where('keycloak_id', 'owner-user-id').first()
+        const owner = await db.getUserRepository().findOrCreateUser({ id: 'owner-user-id', roles: ['user'] })
 
         const existingAsset = {
             id: 1, name: 'test-assets', contentType: 'application/octet-stream',

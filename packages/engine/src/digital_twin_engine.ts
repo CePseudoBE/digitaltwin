@@ -620,6 +620,34 @@ export class DigitalTwinEngine {
         // - During active data transfer (file uploads), the connection stays open
         // - Properties like timeout, keepAliveTimeout, headersTimeout don't exist on TemplatedApp
         // For large file uploads, this should work fine as the connection remains active during transfer.
+
+        // Attempt to load optional packages (e.g. @digitaltwin/ngsi-ld)
+        await this.#loadOptionalPackages()
+    }
+
+    /**
+     * Attempts to load optional plugin packages that extend the engine.
+     * Failures are silently ignored — the engine works without them.
+     * @private
+     */
+    async #loadOptionalPackages(): Promise<void> {
+        try {
+            // Using a computed specifier prevents TypeScript from requiring the module at compile time.
+            // The engine works correctly whether or not this optional package is installed.
+            const ngsiLdPkg = '@digitaltwin/ngsi-ld'
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ngsiLd = await import(ngsiLdPkg) as any
+            const { Logger } = await import('@digitaltwin/shared')
+            await ngsiLd.registerNgsiLd({
+                router: this.#router,
+                db: this.#database,
+                redis: this.getRedisConfig(),
+                components: this.getAllComponents(),
+                logger: new Logger('ngsi-ld'),
+            })
+        } catch {
+            // Package not installed — skip silently
+        }
     }
 
     /**
@@ -639,6 +667,50 @@ export class DigitalTwinEngine {
         // Use type assertion to access the port property
         const app = this.#app as unknown as { port?: number }
         return app.port ?? this.#options.server?.port
+    }
+
+    /**
+     * Returns the internal Express Router.
+     * Used by optional plugin packages to register additional routes.
+     */
+    getRouter(): ExpressRouter {
+        return this.#router
+    }
+
+    /**
+     * Returns the DatabaseAdapter instance.
+     * Used by optional plugin packages for their own persistence needs.
+     */
+    getDatabase(): DatabaseAdapter {
+        return this.#database
+    }
+
+    /**
+     * Returns the Redis connection configuration extracted from engine options.
+     * Falls back to localhost:6379 when no Redis config was provided.
+     */
+    getRedisConfig(): { host: string; port: number; password?: string } {
+        const redis = this.#options.redis
+        if (!redis) {
+            return { host: 'localhost', port: 6379 }
+        }
+        if ('host' in redis && 'port' in redis) {
+            return {
+                host: (redis as { host: string }).host,
+                port: (redis as { port: number }).port,
+                password: (redis as { password?: string }).password,
+            }
+        }
+        // Fallback for path-based connection strings
+        return { host: 'localhost', port: 6379 }
+    }
+
+    /**
+     * Returns a flat list of all components registered with the engine.
+     * Used by optional plugin packages to inspect component capabilities.
+     */
+    getAllComponents(): AnyComponent[] {
+        return [...this.#allComponents]
     }
 
     /**

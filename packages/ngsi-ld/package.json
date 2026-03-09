@@ -1,7 +1,7 @@
 {
-  "name": "@digitaltwin/storage",
+  "name": "@digitaltwin/ngsi-ld",
   "version": "1.0.0",
-  "description": "Storage service abstraction for Digital Twin framework (local filesystem, OVH S3)",
+  "description": "NGSI-LD plugin for Digital Twin framework (entities, subscriptions, notifications)",
   "license": "MIT",
   "author": "Axel Hoffmann",
   "type": "module",
@@ -23,46 +23,43 @@
     "dev": "tsc --watch",
     "clean": "rimraf dist tsconfig.tsbuildinfo",
     "test": "node -r ./bin/set-test-env.cjs --import ts-node-maintained/register/esm --enable-source-maps bin/test.ts",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix"
+    "lint": "eslint src/**/*.ts"
   },
   "engines": {
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@digitaltwin/shared": "workspace:*"
+    "@digitaltwin/shared": "workspace:*",
+    "@digitaltwin/database": "workspace:*",
+    "@digitaltwin/components": "workspace:*"
   },
   "peerDependencies": {
-    "@aws-sdk/client-s3": ">=3.0.0",
-    "@aws-sdk/s3-request-presigner": ">=3.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@aws-sdk/client-s3": {
-      "optional": true
-    },
-    "@aws-sdk/s3-request-presigner": {
-      "optional": true
-    }
+    "ioredis": ">=5.0.0",
+    "bullmq": ">=5.0.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1002.0",
-    "@aws-sdk/s3-request-presigner": "^3.1002.0",
     "@japa/assert": "^4.1.0",
     "@japa/runner": "^4.3.0",
-    "testcontainers": "^10.0.0",
+    "@testcontainers/redis": "^11.3.1",
+    "testcontainers": "^11.3.1",
+    "better-sqlite3": "^12.6.0",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.0.0",
+    "rimraf": "^6.0.1",
     "ts-node-maintained": "^10.9.5"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
-    "directory": "packages/storage"
+    "directory": "packages/ngsi-ld"
   },
   "keywords": [
     "digitaltwin",
-    "storage",
-    "s3",
-    "ovh",
-    "presigned-url"
+    "ngsi-ld",
+    "etsi",
+    "iot",
+    "smart-data-models",
+    "subscriptions"
   ],
   "bugs": {
     "url": "https://github.com/CePseudoBE/digitaltwin/issues"
