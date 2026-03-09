@@ -50,6 +50,8 @@ export class SubscriptionStore {
         const exists = await this.#db.doesTableExists(TABLE)
         if (!exists) {
             await this.#db.createTableWithColumns(TABLE, SUBSCRIPTION_COLUMNS)
+        } else {
+            await this.#db.ensureColumns(TABLE, SUBSCRIPTION_COLUMNS)
         }
     }
 
