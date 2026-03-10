@@ -41,7 +41,7 @@ export { StorageServiceFactory } from './storage/storage_factory.js'
 
 // Database Services
 export { DatabaseAdapter } from './database/database_adapter.js'
-export { KnexDatabaseAdapter, PostgreSQLConfig, SQLiteConfig } from './database/adapters/knex_database_adapter.js'
+export { KnexDatabaseAdapter, PostgreSQLConfig, SQLiteConfig, KyselyDatabaseAdapter, KyselyPostgreSQLConfig, KyselySQLiteConfig } from './database/adapters/knex_database_adapter.js'
 
 // Types and Interfaces
 export * from './components/types.js'
