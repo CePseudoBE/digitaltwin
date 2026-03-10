@@ -323,10 +323,6 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
         return knex
     }
 
-    getKnex(): any {
-        return this.mockKnex
-    }
-
     // Reset mock state (useful between tests)
     resetMockState(): void {
         this.users.clear()
@@ -638,6 +634,8 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
         // Mock implementation - tables exist automatically
     }
 
+    async ensureColumns(_tableName: string, _columns: Record<string, string>): Promise<void> {}
+
     async findByConditions(tableName: string, conditions: Record<string, any>): Promise<DataRecord[]> {
         // Filter records by table name and conditions
         return Array.from(this.records.values())
@@ -725,8 +723,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
         const users = this.users
         const roles = this.roles
         const userRoles = this.userRoles
-        let nextUserId = 100
-        let nextRoleId = 100
+        const self = this
 
         return {
             async initializeTables(): Promise<void> {
@@ -746,7 +743,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
                     }
                 }
                 // Create new user
-                const id = nextUserId++
+                const id = self.userIdCounter++
                 const now = new Date()
                 users.set(id, { id, keycloak_id: authUser.id, created_at: now, updated_at: now })
                 return { id, keycloak_id: authUser.id, roles: authUser.roles, created_at: now, updated_at: now }

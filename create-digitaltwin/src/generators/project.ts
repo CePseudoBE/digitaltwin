@@ -109,7 +109,7 @@ async function generatePackageJson(projectPath: string, answers: ProjectAnswers)
 
     const dependencies: PackageJsonDependencies = {
         'digitaltwin-core': `^${digitalTwinVersion}`,
-        'knex': '^3.0.0',
+        'kysely': '^0.28.0',
         'dotenv' : '^17.2.1'
     }
 
@@ -238,21 +238,14 @@ function generateIndexFile(answers: ProjectAnswers): string {
 
     const dbConfig = database === 'postgresql'
         ? `{
-    client: 'pg',
-    connection: {
-      host: env.DB_HOST,
-      port: env.DB_PORT || 5432,
-      user: env.DB_USER,
-      password: env.DB_PASSWORD,
-      database: env.DB_NAME
-    }
+    host: env.DB_HOST,
+    port: env.DB_PORT || 5432,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    database: env.DB_NAME
   }`
         : `{
-    client: 'better-sqlite3',
-    connection: {
-      filename: env.DB_PATH || './data/${projectName}.db'
-    },
-    useNullAsDefault: true
+    filename: env.DB_PATH || './data/${projectName}.db'
   }`
 
     const exampleComponents = includeExamples
@@ -267,7 +260,7 @@ function generateIndexFile(answers: ProjectAnswers): string {
     const dbDisplay = database === 'postgresql' ? 'PostgreSQL' : 'SQLite'
 
     return `${dotenvImport}
-import { DigitalTwinEngine, KnexDatabaseAdapter, Env, setupGracefulShutdown } from 'digitaltwin-core'
+import { DigitalTwinEngine, KyselyDatabaseAdapter, Env, setupGracefulShutdown } from 'digitaltwin-core'
 import { ${storageClass} } from 'digitaltwin-core'
 ${exampleImports}
 
@@ -284,7 +277,7 @@ async function main(): Promise<void> {
   const dbConfig = ${dbConfig}
 
   // Initialize database adapter
-  const database = new KnexDatabaseAdapter(dbConfig, storage)
+  const database = await KyselyDatabaseAdapter.${database === 'postgresql' ? 'forPostgreSQL' : 'forSQLite'}(dbConfig, (url) => storage.retrieve(url))
 
   // Create Digital Twin Engine
   const engine = new DigitalTwinEngine({
