@@ -477,9 +477,8 @@ test.group('TilesetManager — delete with auth', (group) => {
         const storage = new LocalStorageService('.test-delete-forbidden')
         manager.setDependencies(db, storage)
 
-        await db.getKnex()('users').insert({ keycloak_id: 'owner-1' })
-        const owner = await db.getKnex()('users').where('keycloak_id', 'owner-1').first()
-        await db.getKnex()('users').insert({ keycloak_id: 'other-user' })
+        const owner = await db.getUserRepository().findOrCreateUser({ id: 'owner-1', roles: ['user'] })
+        await db.getUserRepository().findOrCreateUser({ id: 'other-user', roles: ['user'] })
 
         const record = await db.save({
             name: 'test-tilesets', type: 'application/json',
@@ -503,8 +502,7 @@ test.group('TilesetManager — delete with auth', (group) => {
         const storage = new LocalStorageService('.test-delete-admin')
         manager.setDependencies(db, storage)
 
-        await db.getKnex()('users').insert({ keycloak_id: 'owner-1' })
-        const owner = await db.getKnex()('users').where('keycloak_id', 'owner-1').first()
+        const owner = await db.getUserRepository().findOrCreateUser({ id: 'owner-1', roles: ['user'] })
 
         const record = await db.save({
             name: 'test-tilesets', type: 'application/json',
@@ -592,8 +590,7 @@ test.group('TilesetManager — retrieve with visibility filtering', (group) => {
         const storage = new LocalStorageService('.test-retrieve-owner')
         manager.setDependencies(db, storage)
 
-        await db.getKnex()('users').insert({ keycloak_id: 'owner-user' })
-        const user = await db.getKnex()('users').where('keycloak_id', 'owner-user').first()
+        const user = await db.getUserRepository().findOrCreateUser({ id: 'owner-user', roles: ['user'] })
 
         await db.save({
             name: 'test-tilesets', type: 'application/json',

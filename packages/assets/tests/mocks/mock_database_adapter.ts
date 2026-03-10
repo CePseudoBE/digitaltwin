@@ -31,7 +31,6 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
     private records: Map<string, DataRecord> = new Map()
     private dataResolver: DataResolver
     private shouldThrow: Required<NonNullable<MockDatabaseOptions['shouldThrow']>>
-    private mockKnex: ReturnType<typeof this.createMockKnex>
     private users: Map<number, { id: number; keycloak_id: string; created_at: Date; updated_at: Date }> = new Map()
     private roles: Map<number, { id: number; name: string; created_at: Date }> = new Map()
     private userRoles: Array<{ user_id: number; role_id: number; created_at: Date }> = []
@@ -71,208 +70,6 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
             countByDateRange: options.shouldThrow?.countByDateRange ?? false,
         }
 
-        this.mockKnex = this.createMockKnex()
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private createMockKnex(): any {
-        const self = this
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const createQueryBuilder = (tableName: string): any => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let whereConditions: Record<string, any> = {}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let whereInConditions: Array<{ column: string; values: any[] }> = []
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let insertData: any = null
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let updateData: any = null
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const queryBuilder: any = {
-                select: (..._cols: string[]) => queryBuilder,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                where: (conditions: Record<string, any> | string, value?: any) => {
-                    if (typeof conditions === 'string') {
-                        whereConditions[conditions] = value
-                    } else {
-                        whereConditions = { ...whereConditions, ...conditions }
-                    }
-                    return queryBuilder
-                },
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                whereIn: (column: string, values: any[]) => {
-                    whereInConditions.push({ column, values })
-                    return queryBuilder
-                },
-                leftJoin: (_table: string, _col1: string, _col2: string) => queryBuilder,
-                join: (_table: string, _col1: string, _col2: string) => queryBuilder,
-                first: async () => {
-                    if (tableName === 'users') {
-                        for (const user of self.users.values()) {
-                            let match = true
-                            for (const [key, val] of Object.entries(whereConditions)) {
-                                if ((user as Record<string, unknown>)[key] !== val) match = false
-                            }
-                            if (match) return user
-                        }
-                        return undefined
-                    }
-                    if (tableName === 'roles') {
-                        for (const role of self.roles.values()) {
-                            let match = true
-                            for (const [key, val] of Object.entries(whereConditions)) {
-                                if ((role as Record<string, unknown>)[key] !== val) match = false
-                            }
-                            if (match) return role
-                        }
-                        return undefined
-                    }
-                    return undefined
-                },
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                insert: (data: any) => {
-                    insertData = data
-                    return {
-                        ...queryBuilder,
-                        onConflict: () => ({
-                            ignore: () => queryBuilder,
-                            merge: () => queryBuilder
-                        })
-                    }
-                },
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                update: (data: any) => {
-                    updateData = data
-                    return queryBuilder
-                },
-                del: async () => {
-                    if (tableName === 'user_roles') {
-                        self.userRoles = self.userRoles.filter(ur => {
-                            for (const [key, val] of Object.entries(whereConditions)) {
-                                if ((ur as Record<string, unknown>)[key] !== val) return true
-                            }
-                            return false
-                        })
-                    }
-                    return 1
-                },
-                delete: async function() {
-                    return queryBuilder.del()
-                },
-                returning: () => queryBuilder,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                then: async (resolve: (value: any) => void, reject?: (err: Error) => void) => {
-                    try {
-                        if (insertData) {
-                            if (tableName === 'users') {
-                                const id = self.userIdCounter++
-                                const user = { id, ...insertData, created_at: new Date(), updated_at: new Date() }
-                                self.users.set(id, user)
-                                resolve([{ id }])
-                            } else if (tableName === 'roles') {
-                                const id = self.roleIdCounter++
-                                const role = { id, ...insertData, created_at: new Date() }
-                                self.roles.set(id, role)
-                                resolve([{ id }])
-                            } else if (tableName === 'user_roles') {
-                                self.userRoles.push({ ...insertData, created_at: new Date() })
-                                resolve([])
-                            } else {
-                                resolve([])
-                            }
-                        } else if (updateData) {
-                            if (tableName === 'users') {
-                                for (const user of self.users.values()) {
-                                    let match = true
-                                    for (const [key, val] of Object.entries(whereConditions)) {
-                                        if ((user as Record<string, unknown>)[key] !== val) match = false
-                                    }
-                                    if (match) {
-                                        Object.assign(user, updateData)
-                                    }
-                                }
-                            }
-                            resolve(1)
-                        } else {
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            const matchesWhereIn = (item: Record<string, any>): boolean => {
-                                for (const { column, values } of whereInConditions) {
-                                    if (!values.includes(item[column])) return false
-                                }
-                                return true
-                            }
-
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            const matchesWhere = (item: Record<string, any>, conditions: Record<string, any>): boolean => {
-                                for (const [key, val] of Object.entries(conditions)) {
-                                    const actualKey = key.includes('.') ? key.split('.').pop()! : key
-                                    if (item[actualKey] !== val) return false
-                                }
-                                return true
-                            }
-
-                            if (tableName === 'users') {
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                const results: any[] = []
-                                for (const user of self.users.values()) {
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    if (matchesWhere(user as any, whereConditions) && matchesWhereIn(user as any)) {
-                                        results.push(user)
-                                    }
-                                }
-                                resolve(results)
-                            } else if (tableName === 'roles') {
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                const results: any[] = []
-                                for (const role of self.roles.values()) {
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    if (matchesWhere(role as any, whereConditions) && matchesWhereIn(role as any)) {
-                                        results.push(role)
-                                    }
-                                }
-                                resolve(results)
-                            } else if (tableName === 'user_roles') {
-                                const results = self.userRoles.filter(ur => {
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    return matchesWhere(ur as any, whereConditions) && matchesWhereIn(ur as any)
-                                })
-                                resolve(results)
-                            } else {
-                                resolve([])
-                            }
-                        }
-                    } catch (e) {
-                        if (reject) reject(e as Error)
-                        else throw e
-                    }
-                }
-            }
-            return queryBuilder
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const knex: any = (tableName: string) => createQueryBuilder(tableName)
-
-        knex.schema = {
-            hasTable: async (tableName: string) => {
-                return tableName === 'users' || tableName === 'roles' || tableName === 'user_roles'
-            },
-            createTable: async () => true
-        }
-
-        knex.raw = async () => ({ rows: [] })
-        knex.fn = { now: () => new Date() }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        knex.transaction = async (callback: (trx: any) => Promise<any>) => callback(knex)
-
-        return knex
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    getKnex(): any {
-        return this.mockKnex
     }
 
     resetMockState(): void {
@@ -439,6 +236,8 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
     async createTableWithColumns(_name: string, _columns: Record<string, string>): Promise<void> {}
 
+    async ensureColumns(_tableName: string, _columns: Record<string, string>): Promise<void> {}
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async findByConditions(tableName: string, conditions: Record<string, any>): Promise<DataRecord[]> {
         return Array.from(this.records.values())
@@ -510,7 +309,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
     getUserRepository(): UserRepository {
         const users = this.users
-        let nextUserId = 100
+        const self = this
 
         return {
             async initializeTables(): Promise<void> {},
@@ -523,7 +322,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
                         }
                     }
                 }
-                const id = nextUserId++
+                const id = self.userIdCounter++
                 const now = new Date()
                 users.set(id, { id, keycloak_id: authUser.id, created_at: now, updated_at: now })
                 return { id, keycloak_id: authUser.id, roles: authUser.roles, created_at: now, updated_at: now }
