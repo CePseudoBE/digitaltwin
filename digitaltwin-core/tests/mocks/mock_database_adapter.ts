@@ -88,11 +88,11 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
         const createQueryBuilder = (tableName: string) => {
             let whereConditions: Record<string, any> = {}
-            let whereInConditions: Array<{ column: string; values: any[] }> = []
+            const whereInConditions: Array<{ column: string; values: any[] }> = []
             let insertData: any = null
             let updateData: any = null
             let selectedColumns: string[] = ['*']
-            let joins: Array<{ type: string; table: string; col1: string; col2: string }> = []
+            const joins: Array<{ type: string; table: string; col1: string; col2: string }> = []
 
             const queryBuilder: any = {
                 select: (...cols: string[]) => {
