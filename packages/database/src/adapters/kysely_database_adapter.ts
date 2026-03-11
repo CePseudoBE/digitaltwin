@@ -764,7 +764,7 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
     }
 
     getUserRepository(): UserRepository {
-        return new KyselyUserRepository(this.#db)
+        return new KyselyUserRepository(this.#db, this.#dialect)
     }
 
     /** Expose the Kysely instance for advanced operations or testing */
