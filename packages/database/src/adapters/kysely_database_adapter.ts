@@ -372,7 +372,7 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
 
         for (const col of columnsToAdd) {
             if (!(await this.#columnExists(name, col.name))) {
-                let alter = this.#db.schema.alterTable(name).addColumn(col.name, col.type as any, (c: any) => {
+                const alter = this.#db.schema.alterTable(name).addColumn(col.name, col.type as any, (c: any) => {
                     if (col.defaultVal !== undefined) c = c.defaultTo(col.defaultVal)
                     if (col.notNull) c = c.notNull()
                     return c
