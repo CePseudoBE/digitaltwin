@@ -1,0 +1,42 @@
+{
+  "name": "@digitaltwin/e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "End-to-end integration tests for Digital Twin framework",
+  "license": "MIT",
+  "author": "Axel Hoffmann",
+  "type": "module",
+  "scripts": {
+    "test": "node -r ./bin/set-test-env.cjs --import ts-node-maintained/register/esm --enable-source-maps bin/test.ts",
+    "lint": "eslint tests --no-error-on-unmatched-pattern",
+    "lint:fix": "eslint tests --fix --no-error-on-unmatched-pattern"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@digitaltwin/shared": "workspace:*",
+    "@digitaltwin/database": "workspace:*",
+    "@digitaltwin/storage": "workspace:*",
+    "@digitaltwin/auth": "workspace:*",
+    "@digitaltwin/components": "workspace:*",
+    "@digitaltwin/assets": "workspace:*",
+    "@digitaltwin/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1002.0",
+    "@aws-sdk/s3-request-presigner": "^3.1002.0",
+    "@japa/assert": "^4.1.0",
+    "@japa/runner": "^4.3.0",
+    "@testcontainers/redis": "^11.3.1",
+    "jszip": "^3.10.1",
+    "pg": "^8.16.0",
+    "testcontainers": "^10.0.0",
+    "ts-node-maintained": "^10.9.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
+    "directory": "packages/e2e"
+  }
+}

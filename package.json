@@ -11,6 +11,7 @@
     "build:create": "pnpm --filter create-digitaltwin run build",
     "clean": "pnpm -r run clean",
     "test": "pnpm --filter @digitaltwin/shared run test && pnpm --filter @digitaltwin/database run test && pnpm --filter @digitaltwin/storage run test && pnpm --filter @digitaltwin/auth run test && pnpm --filter @digitaltwin/assets run test && pnpm --filter @digitaltwin/ngsi-ld run test && pnpm --filter @digitaltwin/engine run test && pnpm --filter digitaltwin-core run test",
+    "test:e2e": "pnpm --filter @digitaltwin/e2e test",
     "test:shared": "pnpm --filter @digitaltwin/shared run test",
     "lint": "pnpm -r run lint",
     "lint:fix": "pnpm -r run lint:fix",
