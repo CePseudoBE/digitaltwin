@@ -30,11 +30,10 @@ jobs:
           --health-retries 5
 
       minio:
-        image: bitnami/minio:2025
+        image: fclairamb/minio-github-actions
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
-          MINIO_DEFAULT_BUCKETS: test-bucket
         ports:
           - 9000:9000
         options: >-
