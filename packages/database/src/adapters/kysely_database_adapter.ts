@@ -271,17 +271,31 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
         return this.#tableExists(name)
     }
 
+    #idType(): 'serial' | 'integer' {
+        return this.#dialect === 'postgres' ? 'serial' : 'integer'
+    }
+
+    #idModifier() {
+        return this.#dialect === 'postgres'
+            ? (col: any) => col.primaryKey()
+            : (col: any) => col.primaryKey().autoIncrement()
+    }
+
+    #timestampType(): 'timestamptz' | 'datetime' {
+        return this.#dialect === 'postgres' ? 'timestamptz' : 'datetime'
+    }
+
     async createTable(name: string): Promise<void> {
         this.#validateTableName(name)
         if (await this.#tableExists(name)) return
 
         await this.#db.schema
             .createTable(name)
-            .addColumn('id', 'integer', col => col.primaryKey().autoIncrement())
+            .addColumn('id', this.#idType(), this.#idModifier())
             .addColumn('name', 'varchar(255)', col => col.notNull())
             .addColumn('type', 'varchar(255)', col => col.notNull())
             .addColumn('url', 'varchar(255)', col => col.notNull())
-            .addColumn('date', 'datetime', col => col.notNull())
+            .addColumn('date', this.#timestampType(), col => col.notNull())
             .addColumn('description', 'text')
             .addColumn('source', 'varchar(255)')
             .addColumn('owner_id', 'integer', col =>
@@ -294,7 +308,7 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
             .addColumn('upload_error', 'text')
             .addColumn('upload_job_id', 'varchar(100)')
             .addColumn('presigned_key', 'text')
-            .addColumn('presigned_expires_at', 'datetime')
+            .addColumn('presigned_expires_at', this.#timestampType())
             .execute()
 
         // Create indexes
@@ -312,9 +326,9 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
 
         let builder = this.#db.schema
             .createTable(name)
-            .addColumn('id', 'integer', col => col.primaryKey().autoIncrement())
-            .addColumn('created_at', 'datetime', col => col.defaultTo(sql`CURRENT_TIMESTAMP`).notNull())
-            .addColumn('updated_at', 'datetime', col => col.defaultTo(sql`CURRENT_TIMESTAMP`).notNull())
+            .addColumn('id', this.#idType(), this.#idModifier())
+            .addColumn('created_at', this.#timestampType(), col => col.defaultTo(sql`CURRENT_TIMESTAMP`).notNull())
+            .addColumn('updated_at', this.#timestampType(), col => col.defaultTo(sql`CURRENT_TIMESTAMP`).notNull())
 
         for (const [columnName, sqlType] of Object.entries(columns)) {
             builder = this.#addDynamicColumn(builder, columnName, sqlType)
@@ -334,7 +348,7 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
         if (lower.includes('text')) dataType = 'text'
         else if (lower.includes('integer')) dataType = 'integer'
         else if (lower.includes('boolean')) dataType = 'boolean'
-        else if (lower.includes('timestamp') || lower.includes('datetime')) dataType = 'datetime'
+        else if (lower.includes('timestamp') || lower.includes('datetime')) dataType = this.#timestampType()
         else if (lower.includes('real') || lower.includes('decimal') || lower.includes('float')) dataType = 'real'
         else if (lower.includes('varchar')) {
             const match = lower.match(/varchar\((\d+)\)/)
@@ -358,21 +372,22 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
 
         const migrations: string[] = []
 
+        const ts = this.#timestampType()
         const columnsToAdd: Array<{ name: string; type: string; defaultVal?: any; notNull?: boolean; description: string }> = [
             { name: 'is_public', type: 'boolean', defaultVal: true, notNull: true, description: 'BOOLEAN DEFAULT true NOT NULL' },
             { name: 'tileset_url', type: 'text', description: 'TEXT nullable' },
             { name: 'upload_status', type: 'varchar(20)', description: 'VARCHAR(20) nullable' },
             { name: 'upload_error', type: 'text', description: 'TEXT nullable' },
             { name: 'upload_job_id', type: 'varchar(100)', description: 'VARCHAR(100) nullable' },
-            { name: 'created_at', type: 'datetime', description: 'DATETIME nullable' },
-            { name: 'updated_at', type: 'datetime', description: 'DATETIME nullable' },
+            { name: 'created_at', type: ts, description: `${ts} nullable` },
+            { name: 'updated_at', type: ts, description: `${ts} nullable` },
             { name: 'presigned_key', type: 'text', description: 'TEXT nullable' },
-            { name: 'presigned_expires_at', type: 'datetime', description: 'DATETIME nullable' }
+            { name: 'presigned_expires_at', type: ts, description: `${ts} nullable` }
         ]
 
         for (const col of columnsToAdd) {
             if (!(await this.#columnExists(name, col.name))) {
-                let alter = this.#db.schema.alterTable(name).addColumn(col.name, col.type as any, (c: any) => {
+                const alter = this.#db.schema.alterTable(name).addColumn(col.name, col.type as any, (c: any) => {
                     if (col.defaultVal !== undefined) c = c.defaultTo(col.defaultVal)
                     if (col.notNull) c = c.notNull()
                     return c
@@ -738,7 +753,7 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
             if (lower.includes('text')) dataType = 'text'
             else if (lower.includes('integer')) dataType = 'integer'
             else if (lower.includes('boolean')) dataType = 'boolean'
-            else if (lower.includes('timestamp') || lower.includes('datetime')) dataType = 'datetime'
+            else if (lower.includes('timestamp') || lower.includes('datetime')) dataType = this.#timestampType()
             else if (lower.includes('real') || lower.includes('decimal') || lower.includes('float')) dataType = 'real'
             else {
                 const varchMatch = lower.match(/varchar\((\d+)\)/)
@@ -764,7 +779,7 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
     }
 
     getUserRepository(): UserRepository {
-        return new KyselyUserRepository(this.#db)
+        return new KyselyUserRepository(this.#db, this.#dialect)
     }
 
     /** Expose the Kysely instance for advanced operations or testing */

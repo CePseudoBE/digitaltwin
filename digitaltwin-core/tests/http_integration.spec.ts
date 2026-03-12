@@ -164,8 +164,6 @@ test('HTTP Integration - Real endpoints via GET requests', async ({ assert }) =>
       
       assert.equal(notFoundResponse.status, 404, 'Non-existent endpoint should return 404')
       
-    } catch (error) {
-      throw error
     } finally {
       // Graceful stop with proper timeout
       try {

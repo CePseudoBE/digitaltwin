@@ -11,22 +11,29 @@ import type { AuthenticatedUser, UserRecord, UserRepository } from '@digitaltwin
  */
 export class KyselyUserRepository implements UserRepository {
     readonly #db: Kysely<any>
+    readonly #dialect: 'postgres' | 'sqlite'
 
-    constructor(db: Kysely<any>) {
+    constructor(db: Kysely<any>, dialect: 'postgres' | 'sqlite' = 'sqlite') {
         this.#db = db
+        this.#dialect = dialect
     }
 
     async initializeTables(): Promise<void> {
         const tables = await this.#db.introspection.getTables()
         const tableNames = new Set(tables.map(t => t.name))
+        const idType: 'serial' | 'integer' = this.#dialect === 'postgres' ? 'serial' : 'integer'
+        const tsType: 'timestamptz' | 'timestamp' = this.#dialect === 'postgres' ? 'timestamptz' : 'timestamp'
+        const idModifier = this.#dialect === 'postgres'
+            ? (col: any) => col.primaryKey()
+            : (col: any) => col.primaryKey().autoIncrement()
 
         // 1. Create roles table
         if (!tableNames.has('roles')) {
             await this.#db.schema
                 .createTable('roles')
-                .addColumn('id', 'integer', col => col.primaryKey().autoIncrement())
+                .addColumn('id', idType, idModifier)
                 .addColumn('name', 'varchar(100)', col => col.notNull().unique())
-                .addColumn('created_at', 'timestamp', col => col.defaultTo(sql`CURRENT_TIMESTAMP`))
+                .addColumn('created_at', tsType, col => col.defaultTo(sql`CURRENT_TIMESTAMP`))
                 .execute()
 
             await this.#db.schema.createIndex('roles_idx_name').on('roles').column('name').execute()
@@ -36,10 +43,10 @@ export class KyselyUserRepository implements UserRepository {
         if (!tableNames.has('users')) {
             await this.#db.schema
                 .createTable('users')
-                .addColumn('id', 'integer', col => col.primaryKey().autoIncrement())
+                .addColumn('id', idType, idModifier)
                 .addColumn('keycloak_id', 'varchar(255)', col => col.notNull().unique())
-                .addColumn('created_at', 'timestamp', col => col.defaultTo(sql`CURRENT_TIMESTAMP`))
-                .addColumn('updated_at', 'timestamp', col => col.defaultTo(sql`CURRENT_TIMESTAMP`))
+                .addColumn('created_at', tsType, col => col.defaultTo(sql`CURRENT_TIMESTAMP`))
+                .addColumn('updated_at', tsType, col => col.defaultTo(sql`CURRENT_TIMESTAMP`))
                 .execute()
 
             await this.#db.schema.createIndex('users_idx_keycloak_id').on('users').column('keycloak_id').execute()
@@ -56,7 +63,7 @@ export class KyselyUserRepository implements UserRepository {
                 .addColumn('role_id', 'integer', col =>
                     col.notNull().references('roles.id').onDelete('cascade')
                 )
-                .addColumn('created_at', 'timestamp', col => col.defaultTo(sql`CURRENT_TIMESTAMP`))
+                .addColumn('created_at', tsType, col => col.defaultTo(sql`CURRENT_TIMESTAMP`))
                 .addPrimaryKeyConstraint('user_roles_pk', ['user_id', 'role_id'])
                 .execute()
 

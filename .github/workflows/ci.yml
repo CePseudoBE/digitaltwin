@@ -14,6 +14,21 @@ jobs:
       matrix:
         node-version: [20.x, 22.x]
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,7 +48,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: pnpm --filter digitaltwin-core lint
+        run: pnpm lint
 
       - name: Build all packages
         run: pnpm build
@@ -47,3 +62,8 @@ jobs:
         run: pnpm test
         env:
           NODE_ENV: test
+          TEST_PG_HOST: localhost
+          TEST_PG_PORT: 5432
+          TEST_PG_USER: test
+          TEST_PG_PASSWORD: test
+          TEST_PG_DATABASE: test

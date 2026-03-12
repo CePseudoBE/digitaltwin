@@ -1,6 +1,7 @@
 {
   "name": "digitaltwin",
   "private": true,
+  "type": "module",
   "description": "Digital Twin Framework Monorepo",
   "scripts": {
     "build": "pnpm -r run build",
@@ -11,8 +12,8 @@
     "clean": "pnpm -r run clean",
     "test": "pnpm --filter @digitaltwin/shared run test && pnpm --filter @digitaltwin/database run test && pnpm --filter @digitaltwin/storage run test && pnpm --filter @digitaltwin/auth run test && pnpm --filter @digitaltwin/assets run test && pnpm --filter @digitaltwin/ngsi-ld run test && pnpm --filter @digitaltwin/engine run test && pnpm --filter digitaltwin-core run test",
     "test:shared": "pnpm --filter @digitaltwin/shared run test",
-    "lint": "pnpm --filter digitaltwin-core run lint",
-    "lint:fix": "pnpm --filter digitaltwin-core run lint:fix",
+    "lint": "pnpm -r run lint",
+    "lint:fix": "pnpm -r run lint:fix",
     "format": "pnpm --filter digitaltwin-core run format",
     "format:check": "pnpm --filter digitaltwin-core run format:check",
     "check": "pnpm --filter digitaltwin-core run check"
@@ -21,11 +22,15 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
-    "@types/node": "^24.1.0",
+    "@eslint/js": "^9.39.2",
     "@types/fs-extra": "^11.0.4",
+    "@types/node": "^24.1.0",
+    "eslint": "^9.39.2",
+    "globals": "^15.15.0",
     "rimraf": "^6.0.1",
     "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.53.0"
   },
   "pnpm": {
     "overrides": {

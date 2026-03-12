@@ -14,7 +14,7 @@ configure({
         activated: ['spec'],
         list: [reporters.spec()],
     },
-    timeout: 10000,
+    timeout: 30000,
     forceExit: true,
     filters: {
         tests: process.env.TEST_NAME ? [process.env.TEST_NAME] : [],

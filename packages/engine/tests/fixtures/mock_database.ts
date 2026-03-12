@@ -130,6 +130,8 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
     async createTableWithColumns(name: string, columns: Record<string, string>): Promise<void> {}
 
+    async ensureColumns(_tableName: string, _columns: Record<string, string>): Promise<void> {}
+
     async findByConditions(tableName: string, conditions: Record<string, any>): Promise<DataRecord[]> {
         return Array.from(this.records.values()).filter(r => {
             if (r.name !== tableName) return false
@@ -184,5 +186,4 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
         }
     }
 
-    getKnex(): any { return {} }
 }
