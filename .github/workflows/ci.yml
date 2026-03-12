@@ -29,6 +29,19 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      minio:
+        image: fclairamb/minio-github-actions
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,3 +80,21 @@ jobs:
           TEST_PG_USER: test
           TEST_PG_PASSWORD: test
           TEST_PG_DATABASE: test
+          TEST_MINIO_ENDPOINT: http://localhost:9000
+          TEST_MINIO_ACCESS_KEY: minioadmin
+          TEST_MINIO_SECRET_KEY: minioadmin
+          TEST_MINIO_BUCKET: test-bucket
+
+      - name: E2E Tests
+        run: pnpm test:e2e
+        env:
+          NODE_ENV: test
+          TEST_PG_HOST: localhost
+          TEST_PG_PORT: 5432
+          TEST_PG_USER: test
+          TEST_PG_PASSWORD: test
+          TEST_PG_DATABASE: test
+          TEST_MINIO_ENDPOINT: http://localhost:9000
+          TEST_MINIO_ACCESS_KEY: minioadmin
+          TEST_MINIO_SECRET_KEY: minioadmin
+          TEST_MINIO_BUCKET: test-bucket
