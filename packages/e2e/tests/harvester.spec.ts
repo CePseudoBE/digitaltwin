@@ -26,7 +26,21 @@ test.group('Harvester E2E', (group) => {
     })
 
     test('run() returns false when no source data exists', async ({ assert }) => {
-        const result = await harvester.run()
+        // Use a dedicated harvester pointing to an empty source table
+        const emptyHarvester = new (class extends WeatherAverageHarvester {
+            override getUserConfiguration() {
+                return {
+                    ...super.getUserConfiguration(),
+                    name: 'e2e_weather_avg_empty',
+                    source: 'e2e_weather_empty_source',
+                }
+            }
+        })()
+        emptyHarvester.setDependencies(infra.db, infra.storage)
+        await infra.db.createTable('e2e_weather_empty_source')
+        await infra.db.createTable('e2e_weather_avg_empty')
+
+        const result = await emptyHarvester.run()
         assert.isFalse(result)
     })
 
