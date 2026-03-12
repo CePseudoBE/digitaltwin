@@ -22,6 +22,10 @@ const postgresFactory: StoreFactory = async () => {
         database: process.env.TEST_PG_DATABASE!,
     }, dataResolver)
     const store = new SubscriptionStore(db)
+    // PG shares the same database across tests — clean slate each time
+    if (await db.doesTableExists('ngsi_ld_subscriptions')) {
+        await db.getKysely().deleteFrom('ngsi_ld_subscriptions').execute()
+    }
     return { db, store, cleanup: () => db.close() }
 }
 

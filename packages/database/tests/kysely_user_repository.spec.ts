@@ -122,13 +122,13 @@ function registerUserRepositoryTests(label: string, factory: KyselyFactory) {
         test('timestamps are set on creation', async ({ assert }) => {
             const repo = new KyselyUserRepository(db, dialect)
             await repo.initializeTables()
-            const before = new Date()
             const result = await repo.findOrCreateUser({ id: 'keycloak-uuid-7', roles: ['user'] })
-            const after = new Date()
             assert.instanceOf(result.created_at, Date)
             assert.instanceOf(result.updated_at, Date)
-            assert.isTrue(result.created_at! >= before)
-            assert.isTrue(result.updated_at! <= after)
+            // Verify timestamps are recent (within 1 minute) — avoids clock skew issues between PG container and host
+            const oneMinuteAgo = Date.now() - 60_000
+            assert.isTrue(result.created_at!.getTime() > oneMinuteAgo)
+            assert.isTrue(result.updated_at!.getTime() > oneMinuteAgo)
         })
     })
 }
