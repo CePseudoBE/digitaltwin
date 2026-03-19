@@ -6,10 +6,10 @@
  * Implementations handle component data storage, metadata management, and querying.
  */
 
-import type { DataRecord, MetadataRow, UserRepository } from '@digitaltwin/shared'
+import type { DataRecord, MetadataRow, UserRepository } from '@cepseudo/shared'
 
 // Re-export MetadataRow for backward compatibility
-export type { MetadataRow } from '@digitaltwin/shared'
+export type { MetadataRow } from '@cepseudo/shared'
 
 /**
  * Abstract database adapter providing unified data operations for all components.

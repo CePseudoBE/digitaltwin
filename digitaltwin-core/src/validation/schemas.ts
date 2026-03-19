@@ -1,4 +1,4 @@
-// Re-exported from @digitaltwin/shared for backward compatibility
+// Re-exported from @cepseudo/shared for backward compatibility
 export {
     paginationSchema,
     idParamSchema,
@@ -16,4 +16,4 @@ export {
     validateCustomRecordCreate,
     validateCustomRecordUpdate,
     validateDateRangeQuery
-} from '@digitaltwin/shared'
+} from '@cepseudo/shared'

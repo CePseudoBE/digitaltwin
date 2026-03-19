@@ -1,4 +1,4 @@
-import type { AuthenticatedUser } from '@digitaltwin/shared'
+import type { AuthenticatedUser } from '@cepseudo/shared'
 import type { AuthProvider, AuthRequest } from './auth_provider.js'
 import { AuthProviderFactory } from './auth_provider_factory.js'
 

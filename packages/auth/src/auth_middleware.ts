@@ -1,5 +1,5 @@
-import type { AuthResult } from '@digitaltwin/shared'
-import { unauthorizedResponse, errorResponse } from '@digitaltwin/shared'
+import type { AuthResult } from '@cepseudo/shared'
+import { unauthorizedResponse, errorResponse } from '@cepseudo/shared'
 import { AuthConfig } from './auth_config.js'
 import { ApisixAuthParser } from './apisix_parser.js'
 import type { UserService } from './user_service.js'

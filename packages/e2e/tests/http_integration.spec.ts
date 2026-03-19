@@ -9,9 +9,9 @@ import { test } from '@japa/runner'
 import { RedisContainer } from '@testcontainers/redis'
 import type { StartedRedisContainer } from '@testcontainers/redis'
 import { setupInfrastructure, type E2EInfrastructure } from './helpers/setup.js'
-import { DigitalTwinEngine } from '@digitaltwin/engine'
-import { AuthConfig } from '@digitaltwin/auth'
-import { LogLevel } from '@digitaltwin/shared'
+import { DigitalTwinEngine } from '@cepseudo/engine'
+import { AuthConfig } from '@cepseudo/auth'
+import { LogLevel } from '@cepseudo/shared'
 import {
     WeatherCollector,
     CalculatorHandler,
@@ -39,7 +39,7 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
         AuthConfig._resetConfig()
 
         // Reset ApisixAuthParser cached provider
-        const { ApisixAuthParser } = await import('@digitaltwin/auth')
+        const { ApisixAuthParser } = await import('@cepseudo/auth')
         ApisixAuthParser._resetProvider()
 
         // --- Components ---

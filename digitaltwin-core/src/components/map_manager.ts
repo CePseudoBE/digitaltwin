@@ -1,3 +1,3 @@
-// Re-exported from @digitaltwin/assets for backward compatibility
-export { MapManager } from '@digitaltwin/assets'
-export type { MapLayerMetadataRow } from '@digitaltwin/assets'
+// Re-exported from @cepseudo/assets for backward compatibility
+export { MapManager } from '@cepseudo/assets'
+export type { MapLayerMetadataRow } from '@cepseudo/assets'

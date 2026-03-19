@@ -1,4 +1,4 @@
-import type { OpenAPIComponentSpec, AssetsManagerConfiguration } from '@digitaltwin/shared'
+import type { OpenAPIComponentSpec, AssetsManagerConfiguration } from '@cepseudo/shared'
 
 /**
  * Generate OpenAPI specification for an AssetsManager's endpoints.

@@ -1,4 +1,4 @@
-import { Env } from '@digitaltwin/shared'
+import { Env } from '@cepseudo/shared'
 
 /**
  * Authentication configuration for Digital Twin framework.

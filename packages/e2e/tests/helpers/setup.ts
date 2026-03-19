@@ -6,11 +6,11 @@
  */
 import { GenericContainer, Wait } from 'testcontainers'
 import type { StartedTestContainer } from 'testcontainers'
-import { KyselyDatabaseAdapter } from '@digitaltwin/database'
-import { OvhS3StorageService } from '@digitaltwin/storage'
-import { AuthMiddleware, UserService } from '@digitaltwin/auth'
-import type { DatabaseAdapter } from '@digitaltwin/database'
-import type { StorageService } from '@digitaltwin/storage'
+import { KyselyDatabaseAdapter } from '@cepseudo/database'
+import { OvhS3StorageService } from '@cepseudo/storage'
+import { AuthMiddleware, UserService } from '@cepseudo/auth'
+import type { DatabaseAdapter } from '@cepseudo/database'
+import type { StorageService } from '@cepseudo/storage'
 
 const MINIO_USER = 'minioadmin'
 const MINIO_PASSWORD = 'minioadmin'

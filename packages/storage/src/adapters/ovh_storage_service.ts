@@ -16,7 +16,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { StorageService } from '../storage_service.js'
 import type { PresignedUploadResult, ObjectExistsResult } from '../storage_service.js'
-import { safeAsync, Logger } from '@digitaltwin/shared'
+import { safeAsync, Logger } from '@cepseudo/shared'
 import type { Readable } from 'stream'
 
 const logger = new Logger('OvhS3Storage')

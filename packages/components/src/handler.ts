@@ -14,7 +14,7 @@ import type {
     OpenAPIDocumentable,
     OpenAPIComponentSpec,
     OpenAPIPathItem
-} from '@digitaltwin/shared'
+} from '@cepseudo/shared'
 
 /**
  * Metadata for declaring an HTTP endpoint on handler methods.

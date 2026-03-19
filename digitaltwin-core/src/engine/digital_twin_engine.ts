@@ -1,3 +1,3 @@
-// Re-exported from @digitaltwin/engine for backward compatibility
-export { DigitalTwinEngine } from '@digitaltwin/engine'
-export type { EngineOptions, ComponentValidationResult } from '@digitaltwin/engine'
+// Re-exported from @cepseudo/engine for backward compatibility
+export { DigitalTwinEngine } from '@cepseudo/engine'
+export type { EngineOptions, ComponentValidationResult } from '@cepseudo/engine'

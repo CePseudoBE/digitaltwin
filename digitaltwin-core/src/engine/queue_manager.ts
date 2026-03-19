@@ -1,3 +1,3 @@
-// Re-exported from @digitaltwin/engine for backward compatibility
-export { QueueManager } from '@digitaltwin/engine'
-export type { QueueConfig } from '@digitaltwin/engine'
+// Re-exported from @cepseudo/engine for backward compatibility
+export { QueueManager } from '@cepseudo/engine'
+export type { QueueConfig } from '@cepseudo/engine'

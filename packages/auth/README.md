@@ -1,6 +1,6 @@
-# @digitaltwin/auth
+# @cepseudo/auth
 
-[![npm version](https://img.shields.io/npm/v/@digitaltwin/auth)](https://www.npmjs.com/package/@digitaltwin/auth)
+[![npm version](https://img.shields.io/npm/v/@cepseudo/auth)](https://www.npmjs.com/package/@cepseudo/auth)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 Pluggable authentication and user management for the Digital Twin framework.
@@ -8,10 +8,10 @@ Pluggable authentication and user management for the Digital Twin framework.
 ## Installation
 
 ```bash
-pnpm add @digitaltwin/auth
+pnpm add @cepseudo/auth
 ```
 
-**Peer dependency:** `@digitaltwin/shared` (workspace)
+**Peer dependency:** `@cepseudo/shared` (workspace)
 
 ## Auth Modes
 
@@ -28,7 +28,7 @@ pnpm add @digitaltwin/auth
 The factory reads environment variables to create the right provider:
 
 ```typescript
-import { AuthProviderFactory } from '@digitaltwin/auth'
+import { AuthProviderFactory } from '@cepseudo/auth'
 
 // Auto-detect mode from AUTH_MODE env var (defaults to 'gateway')
 const provider = AuthProviderFactory.fromEnv()
@@ -63,10 +63,10 @@ const roles = provider.getUserRoles(req) // string[]
 `AuthMiddleware` is the single source of truth for authenticating HTTP requests across all components. It combines header/token parsing with user record management:
 
 ```typescript
-import { AuthMiddleware, UserService } from '@digitaltwin/auth'
-import type { UserRepository } from '@digitaltwin/shared'
+import { AuthMiddleware, UserService } from '@cepseudo/auth'
+import type { UserRepository } from '@cepseudo/shared'
 
-// UserRepository is injected (typically KnexUserRepository from @digitaltwin/database)
+// UserRepository is injected (typically KnexUserRepository from @cepseudo/database)
 const userService = new UserService(userRepository)
 const authMiddleware = new AuthMiddleware(userService)
 ```

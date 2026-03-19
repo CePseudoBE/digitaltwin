@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
 import { CalculatorHandler } from './helpers/test_components.js'
-import type { TypedRequest } from '@digitaltwin/shared'
+import type { TypedRequest } from '@cepseudo/shared'
 
 test.group('Handler E2E', () => {
     const handler = new CalculatorHandler()

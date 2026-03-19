@@ -1,2 +1,2 @@
-// Re-exported from @digitaltwin/database for backward compatibility
-export { mapToDataRecord } from '@digitaltwin/database'
+// Re-exported from @cepseudo/database for backward compatibility
+export { mapToDataRecord } from '@cepseudo/database'

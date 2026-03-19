@@ -5,7 +5,7 @@
 
 import type { Request, Response, NextFunction } from 'ultimate-express'
 import { randomUUID } from 'crypto'
-import { DigitalTwinError, Logger } from '@digitaltwin/shared'
+import { DigitalTwinError, Logger } from '@cepseudo/shared'
 
 const logger = new Logger('ErrorHandler')
 

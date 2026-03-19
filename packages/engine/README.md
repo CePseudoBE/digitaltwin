@@ -1,4 +1,4 @@
-# @digitaltwin/engine
+# @cepseudo/engine
 
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
@@ -8,17 +8,17 @@ Central orchestrator for the Digital Twin Framework. Wires together components, 
 ## Installation
 
 ```bash
-pnpm add @digitaltwin/engine
+pnpm add @cepseudo/engine
 ```
 
-This package depends on the full stack of `@digitaltwin/*` packages (shared, database, storage, auth, assets, components) and requires Redis for queue management.
+This package depends on the full stack of `@cepseudo/*` packages (shared, database, storage, auth, assets, components) and requires Redis for queue management.
 
 ## Quick Start
 
 ```typescript
-import { DigitalTwinEngine } from '@digitaltwin/engine'
-import { KnexDatabaseAdapter } from '@digitaltwin/database'
-import { StorageServiceFactory } from '@digitaltwin/storage'
+import { DigitalTwinEngine } from '@cepseudo/engine'
+import { KnexDatabaseAdapter } from '@cepseudo/database'
+import { StorageServiceFactory } from '@cepseudo/storage'
 import { MyCollector } from './collectors/my_collector.js'
 
 const database = new KnexDatabaseAdapter({
@@ -120,7 +120,7 @@ import {
     createDatabaseCheck,
     createRedisCheck,
     createStorageCheck
-} from '@digitaltwin/engine'
+} from '@cepseudo/engine'
 
 const checker = new HealthChecker()
 checker.register('database', createDatabaseCheck(database))
@@ -138,7 +138,7 @@ The engine automatically registers health endpoints:
 ### OpenAPI spec generation
 
 ```typescript
-import { OpenAPIGenerator } from '@digitaltwin/engine'
+import { OpenAPIGenerator } from '@cepseudo/engine'
 
 const generator = new OpenAPIGenerator({
     title: 'My Digital Twin API',
@@ -154,7 +154,7 @@ const spec = generator.generate(components)
 ### Graceful shutdown
 
 ```typescript
-import { setupGracefulShutdown } from '@digitaltwin/engine'
+import { setupGracefulShutdown } from '@cepseudo/engine'
 
 // Automatically handles SIGTERM and SIGINT
 setupGracefulShutdown({
@@ -168,7 +168,7 @@ setupGracefulShutdown({
 Load components from a user project directory at runtime:
 
 ```typescript
-import { loadComponents } from '@digitaltwin/engine'
+import { loadComponents } from '@cepseudo/engine'
 
 const result = await loadComponents({
     directory: './src/components',
@@ -184,7 +184,7 @@ engine.registerAll([
 
 ## Architecture
 
-`@digitaltwin/engine` is the LAYER 3 (top layer) package in the Digital Twin Framework. It depends on all lower layers and acts as the composition root that ties everything together.
+`@cepseudo/engine` is the LAYER 3 (top layer) package in the Digital Twin Framework. It depends on all lower layers and acts as the composition root that ties everything together.
 
 ```
 LAYER 3:  engine          -- orchestration, HTTP, scheduling, health

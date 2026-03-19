@@ -12,8 +12,8 @@ import type {
     OpenAPISchema,
     OpenAPIComponents,
     OpenAPISecurityScheme
-} from '@digitaltwin/shared'
-import { isOpenAPIDocumentable } from '@digitaltwin/shared'
+} from '@cepseudo/shared'
+import { isOpenAPIDocumentable } from '@cepseudo/shared'
 
 /**
  * Generates OpenAPI 3.0 specifications from Digital Twin components.

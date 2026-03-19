@@ -10,7 +10,7 @@
  */
 
 import type { AuthProvider, AuthRequest } from '../auth_provider.js'
-import type { AuthenticatedUser } from '@digitaltwin/shared'
+import type { AuthenticatedUser } from '@cepseudo/shared'
 
 /**
  * Authentication provider for API Gateway authentication.

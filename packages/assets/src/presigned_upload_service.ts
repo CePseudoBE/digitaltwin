@@ -5,7 +5,7 @@ import type {
     PresignedUploadRequestBody,
     AuthResult,
     AssetsManagerConfiguration
-} from '@digitaltwin/shared'
+} from '@cepseudo/shared'
 import {
     successResponse,
     errorResponse,
@@ -13,10 +13,10 @@ import {
     notFoundResponse,
     validateData,
     validatePresignedUploadRequest
-} from '@digitaltwin/shared'
-import type { StorageService } from '@digitaltwin/storage'
-import type { DatabaseAdapter, MetadataRow } from '@digitaltwin/database'
-import type { AuthMiddleware } from '@digitaltwin/auth'
+} from '@cepseudo/shared'
+import type { StorageService } from '@cepseudo/storage'
+import type { DatabaseAdapter, MetadataRow } from '@cepseudo/database'
+import type { AuthMiddleware } from '@cepseudo/auth'
 
 /**
  * Dependencies required by the presigned upload service.

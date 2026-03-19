@@ -1,4 +1,4 @@
-import { StorageService } from '@digitaltwin/storage'
+import { StorageService } from '@cepseudo/storage'
 
 export class MockStorageService extends StorageService {
     private storage: Map<string, Buffer> = new Map()

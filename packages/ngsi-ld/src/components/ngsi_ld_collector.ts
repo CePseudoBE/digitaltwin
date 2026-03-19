@@ -1,5 +1,5 @@
-import { Collector } from '@digitaltwin/components'
-import type { DataRecord } from '@digitaltwin/shared'
+import { Collector } from '@cepseudo/components'
+import type { DataRecord } from '@cepseudo/shared'
 import type { NgsiLdEntity } from '../types/entity.js'
 
 /**

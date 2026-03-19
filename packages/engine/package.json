@@ -1,5 +1,5 @@
 {
-  "name": "@digitaltwin/engine",
+  "name": "@cepseudo/engine",
   "version": "1.0.0",
   "description": "Core engine for Digital Twin framework (Engine, Scheduler, Queues, Loader, OpenAPI)",
   "license": "MIT",
@@ -30,12 +30,12 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@digitaltwin/shared": "workspace:*",
-    "@digitaltwin/database": "workspace:*",
-    "@digitaltwin/storage": "workspace:*",
-    "@digitaltwin/auth": "workspace:*",
-    "@digitaltwin/assets": "workspace:*",
-    "@digitaltwin/components": "workspace:*",
+    "@cepseudo/shared": "workspace:*",
+    "@cepseudo/database": "workspace:*",
+    "@cepseudo/storage": "workspace:*",
+    "@cepseudo/auth": "workspace:*",
+    "@cepseudo/assets": "workspace:*",
+    "@cepseudo/components": "workspace:*",
     "bullmq": "^5.56.5",
     "compression": "^1.7.5",
     "cors": "^2.8.5",

@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
 import { OpenAPIGenerator } from '../src/openapi/generator.js'
-import type { OpenAPIDocumentable, OpenAPIComponentSpec } from '@digitaltwin/shared'
+import type { OpenAPIDocumentable, OpenAPIComponentSpec } from '@cepseudo/shared'
 
 class MockDocumentable implements OpenAPIDocumentable {
     constructor(private spec: OpenAPIComponentSpec) {}

@@ -1,2 +1,2 @@
-// Re-exported from @digitaltwin/shared for backward compatibility
-export type { Component, ScheduleRunnable, Servable } from '@digitaltwin/shared'
+// Re-exported from @cepseudo/shared for backward compatibility
+export type { Component, ScheduleRunnable, Servable } from '@cepseudo/shared'

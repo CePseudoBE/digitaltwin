@@ -1,1 +1,1 @@
-export { UserService } from '@digitaltwin/auth'
+export { UserService } from '@cepseudo/auth'

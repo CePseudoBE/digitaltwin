@@ -1,6 +1,6 @@
 import {DatabaseAdapter, MetadataRow} from '../../src/database/database_adapter.js'
 import {DataRecord} from '../../src/types/data_record.js'
-import type {DataResolver, UserRepository} from '@digitaltwin/shared'
+import type {DataResolver, UserRepository} from '@cepseudo/shared'
 import {StorageService} from '../../src/storage/storage_service.js'
 import {mapToDataRecord} from '../../src/utils/map_to_data_record.js'
 import {MockStorageService} from "./mock_storage_service.js";

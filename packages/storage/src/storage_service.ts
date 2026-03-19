@@ -1,4 +1,4 @@
-import { safeAsync, Logger } from '@digitaltwin/shared'
+import { safeAsync, Logger } from '@cepseudo/shared'
 
 const logger = new Logger('StorageService')
 

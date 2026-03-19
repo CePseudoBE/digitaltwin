@@ -1,5 +1,5 @@
 {
-  "name": "@digitaltwin/components",
+  "name": "@cepseudo/components",
   "version": "1.0.0",
   "description": "Core component base classes for Digital Twin framework (Collector, Harvester, Handler, CustomTableManager)",
   "license": "MIT",
@@ -30,10 +30,10 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@digitaltwin/shared": "workspace:*",
-    "@digitaltwin/database": "workspace:*",
-    "@digitaltwin/storage": "workspace:*",
-    "@digitaltwin/auth": "workspace:*"
+    "@cepseudo/shared": "workspace:*",
+    "@cepseudo/database": "workspace:*",
+    "@cepseudo/storage": "workspace:*",
+    "@cepseudo/auth": "workspace:*"
   },
   "devDependencies": {
     "@japa/assert": "^4.1.0",

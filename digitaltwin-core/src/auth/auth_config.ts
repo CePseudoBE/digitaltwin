@@ -1,1 +1,1 @@
-export { AuthConfig } from '@digitaltwin/auth'
+export { AuthConfig } from '@cepseudo/auth'

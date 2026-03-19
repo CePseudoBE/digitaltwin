@@ -1,7 +1,7 @@
-import type { Collector, Harvester, Handler, CustomTableManager } from '@digitaltwin/components'
-import type { AssetsManager } from '@digitaltwin/assets'
-import type { StorageService } from '@digitaltwin/storage'
-import type { DatabaseAdapter } from '@digitaltwin/database'
+import type { Collector, Harvester, Handler, CustomTableManager } from '@cepseudo/components'
+import type { AssetsManager } from '@cepseudo/assets'
+import type { StorageService } from '@cepseudo/storage'
+import type { DatabaseAdapter } from '@cepseudo/database'
 import type { Router as ExpressRouter, RequestHandler } from 'ultimate-express'
 import express from 'ultimate-express'
 import multer from 'multer'
@@ -22,14 +22,14 @@ import {
     isAssetsManager,
     isCustomTableManager
 } from './component_types.js'
-import { UserService, AuthMiddleware } from '@digitaltwin/auth'
+import { UserService, AuthMiddleware } from '@cepseudo/auth'
 import { exposeEndpoints } from './endpoints.js'
 import { scheduleComponents } from './scheduler.js'
-import { LogLevel, engineEventBus } from '@digitaltwin/shared'
+import { LogLevel, engineEventBus } from '@cepseudo/shared'
 import type { QueueConfig } from './queue_manager.js'
 import { QueueManager } from './queue_manager.js'
-import { UploadProcessor, UploadReconciler } from '@digitaltwin/assets'
-import { isAsyncUploadable } from '@digitaltwin/assets'
+import { UploadProcessor, UploadReconciler } from '@cepseudo/assets'
+import { isAsyncUploadable } from '@cepseudo/assets'
 import {
     HealthChecker,
     createDatabaseCheck,
@@ -621,7 +621,7 @@ export class DigitalTwinEngine {
         // - Properties like timeout, keepAliveTimeout, headersTimeout don't exist on TemplatedApp
         // For large file uploads, this should work fine as the connection remains active during transfer.
 
-        // Attempt to load optional packages (e.g. @digitaltwin/ngsi-ld)
+        // Attempt to load optional packages (e.g. @cepseudo/ngsi-ld)
         await this.#loadOptionalPackages()
     }
 
@@ -634,10 +634,10 @@ export class DigitalTwinEngine {
         try {
             // Using a computed specifier prevents TypeScript from requiring the module at compile time.
             // The engine works correctly whether or not this optional package is installed.
-            const ngsiLdPkg = '@digitaltwin/ngsi-ld'
+            const ngsiLdPkg = '@cepseudo/ngsi-ld'
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ngsiLd = await import(ngsiLdPkg) as any
-            const { Logger } = await import('@digitaltwin/shared')
+            const { Logger } = await import('@cepseudo/shared')
             await ngsiLd.registerNgsiLd({
                 router: this.#router,
                 db: this.#database,

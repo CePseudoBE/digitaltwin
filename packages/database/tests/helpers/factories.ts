@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { Kysely, SqliteDialect, PostgresDialect } from 'kysely'
 import { KyselyDatabaseAdapter } from '../../src/adapters/kysely_database_adapter.js'
-import type { DataResolver } from '@digitaltwin/shared'
+import type { DataResolver } from '@cepseudo/shared'
 
 const dataResolver: DataResolver = async () => Buffer.alloc(0)
 

@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
-import { KyselyDatabaseAdapter } from '@digitaltwin/database'
-import type { DataResolver } from '@digitaltwin/shared'
+import { KyselyDatabaseAdapter } from '@cepseudo/database'
+import type { DataResolver } from '@cepseudo/shared'
 
 const resolver: DataResolver = async () => Buffer.alloc(0)
 

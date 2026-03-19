@@ -5,7 +5,7 @@
  * to support multiple authentication mechanisms (gateway headers, JWT tokens, etc.).
  */
 
-import type { AuthenticatedUser } from '@digitaltwin/shared'
+import type { AuthenticatedUser } from '@cepseudo/shared'
 
 /**
  * Authentication mode for the Digital Twin framework.

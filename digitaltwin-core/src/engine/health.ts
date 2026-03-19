@@ -1,4 +1,4 @@
-// Re-exported from @digitaltwin/engine for backward compatibility
+// Re-exported from @cepseudo/engine for backward compatibility
 export {
     HealthChecker,
     createDatabaseCheck,
@@ -6,5 +6,5 @@ export {
     createStorageCheck,
     performHealthCheck,
     livenessCheck
-} from '@digitaltwin/engine'
-export type { HealthCheckFn, HealthCheck, HealthStatus, ComponentCounts } from '@digitaltwin/engine'
+} from '@cepseudo/engine'
+export type { HealthCheckFn, HealthCheck, HealthStatus, ComponentCounts } from '@cepseudo/engine'

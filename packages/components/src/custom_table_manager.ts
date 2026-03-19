@@ -6,9 +6,9 @@ import type {
     UserRecord,
     OpenAPIDocumentable,
     OpenAPIComponentSpec
-} from '@digitaltwin/shared'
-import type { DatabaseAdapter } from '@digitaltwin/database'
-import { UserService, AuthMiddleware } from '@digitaltwin/auth'
+} from '@cepseudo/shared'
+import type { DatabaseAdapter } from '@cepseudo/database'
+import { UserService, AuthMiddleware } from '@cepseudo/auth'
 import {
     validateIdParam,
     validateCustomRecordCreate,
@@ -16,7 +16,7 @@ import {
     validateData,
     validateParams,
     DigitalTwinError
-} from '@digitaltwin/shared'
+} from '@cepseudo/shared'
 
 /**
  * Helper to create error response with proper status code for DigitalTwinError

@@ -1,2 +1,2 @@
-// Re-exported from @digitaltwin/shared for backward compatibility
-export { Env } from '@digitaltwin/shared'
+// Re-exported from @cepseudo/shared for backward compatibility
+export { Env } from '@cepseudo/shared'

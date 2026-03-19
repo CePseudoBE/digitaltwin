@@ -1,3 +1,3 @@
-// Re-exported from @digitaltwin/assets for backward compatibility
-export { TilesetManager } from '@digitaltwin/assets'
-export type { TilesetMetadataRow } from '@digitaltwin/assets'
+// Re-exported from @cepseudo/assets for backward compatibility
+export { TilesetManager } from '@cepseudo/assets'
+export type { TilesetMetadataRow } from '@cepseudo/assets'

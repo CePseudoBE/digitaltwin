@@ -1,4 +1,4 @@
-// Re-exported from @digitaltwin/engine for backward compatibility
+// Re-exported from @cepseudo/engine for backward compatibility
 export {
     detectComponentType,
     isCollector,
@@ -7,7 +7,7 @@ export {
     isAssetsManager,
     isCustomTableManager,
     isActiveComponent
-} from '@digitaltwin/engine'
+} from '@cepseudo/engine'
 export type {
     AnyComponent,
     ComponentTypeName,
@@ -15,4 +15,4 @@ export type {
     ActiveComponent,
     ComponentTypeMap,
     LoadedComponents
-} from '@digitaltwin/engine'
+} from '@cepseudo/engine'

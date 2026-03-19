@@ -6,10 +6,10 @@
  */
 
 import type { Router, Request, Response } from 'ultimate-express'
-import type { Collector, Harvester, Handler, CustomTableManager } from '@digitaltwin/components'
-import type { AssetsManager } from '@digitaltwin/assets'
-import type { HttpMethod } from '@digitaltwin/shared'
-import { DigitalTwinError, Logger } from '@digitaltwin/shared'
+import type { Collector, Harvester, Handler, CustomTableManager } from '@cepseudo/components'
+import type { AssetsManager } from '@cepseudo/assets'
+import type { HttpMethod } from '@cepseudo/shared'
+import { DigitalTwinError, Logger } from '@cepseudo/shared'
 
 const logger = new Logger('Endpoints')
 
@@ -23,8 +23,8 @@ const logger = new Logger('Endpoints')
  * - patch: Update existing resources (partial update)
  * - delete: Remove resources
  */
-// Re-exported from @digitaltwin/shared for backward compatibility
-export type { HttpMethod } from '@digitaltwin/shared'
+// Re-exported from @cepseudo/shared for backward compatibility
+export type { HttpMethod } from '@cepseudo/shared'
 
 /**
  * Interface defining an HTTP endpoint exposed by a component.

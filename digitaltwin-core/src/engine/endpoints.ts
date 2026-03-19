@@ -1,5 +1,5 @@
-// Re-exported from @digitaltwin/engine for backward compatibility
-export { exposeEndpoints } from '@digitaltwin/engine'
+// Re-exported from @cepseudo/engine for backward compatibility
+export { exposeEndpoints } from '@cepseudo/engine'
 
-// HttpMethod type was already re-exported from @digitaltwin/shared
-export type { HttpMethod } from '@digitaltwin/shared'
+// HttpMethod type was already re-exported from @cepseudo/shared
+export type { HttpMethod } from '@cepseudo/shared'
