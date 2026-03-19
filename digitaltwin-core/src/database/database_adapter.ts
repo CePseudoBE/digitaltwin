@@ -1,3 +1,3 @@
-// Re-exported from @digitaltwin/database for backward compatibility
-export { DatabaseAdapter } from '@digitaltwin/database'
-export type { MetadataRow } from '@digitaltwin/database'
+// Re-exported from @cepseudo/database for backward compatibility
+export { DatabaseAdapter } from '@cepseudo/database'
+export type { MetadataRow } from '@cepseudo/database'

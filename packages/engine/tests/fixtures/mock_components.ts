@@ -1,12 +1,12 @@
-import { Collector, Harvester, Handler, CustomTableManager } from '@digitaltwin/components'
-import { AssetsManager } from '@digitaltwin/assets'
+import { Collector, Harvester, Handler, CustomTableManager } from '@cepseudo/components'
+import { AssetsManager } from '@cepseudo/assets'
 import type {
     CollectorConfiguration,
     HarvesterConfiguration,
     ComponentConfiguration,
     AssetsManagerConfiguration,
     DataRecord
-} from '@digitaltwin/shared'
+} from '@cepseudo/shared'
 
 export class TestCollector extends Collector {
     constructor(private componentName: string = 'test-collector', private endpoints: any[] = []) {

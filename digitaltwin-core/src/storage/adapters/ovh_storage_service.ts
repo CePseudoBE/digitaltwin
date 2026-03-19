@@ -1,3 +1,3 @@
-// Re-exported from @digitaltwin/storage for backward compatibility
-export { OvhS3StorageService } from '@digitaltwin/storage'
-export type { OvhS3Config } from '@digitaltwin/storage'
+// Re-exported from @cepseudo/storage for backward compatibility
+export { OvhS3StorageService } from '@cepseudo/storage'
+export type { OvhS3Config } from '@cepseudo/storage'

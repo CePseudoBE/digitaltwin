@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 import { GlobalAssetsHandler } from '../src/global_assets_handler.js'
-import { AssetsManager } from '@digitaltwin/assets'
-import type { AssetsManagerConfiguration } from '@digitaltwin/shared'
+import { AssetsManager } from '@cepseudo/assets'
+import type { AssetsManagerConfiguration } from '@cepseudo/shared'
 import { MockDatabaseAdapter } from './fixtures/mock_database.js'
 import { MockStorageService } from './fixtures/mock_storage.js'
 

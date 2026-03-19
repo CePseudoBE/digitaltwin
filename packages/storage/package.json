@@ -1,5 +1,5 @@
 {
-  "name": "@digitaltwin/storage",
+  "name": "@cepseudo/storage",
   "version": "1.0.0",
   "description": "Storage service abstraction for Digital Twin framework (local filesystem, OVH S3)",
   "license": "MIT",
@@ -30,7 +30,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@digitaltwin/shared": "workspace:*"
+    "@cepseudo/shared": "workspace:*"
   },
   "peerDependencies": {
     "@aws-sdk/client-s3": ">=3.0.0",

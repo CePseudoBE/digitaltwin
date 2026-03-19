@@ -1,2 +1,2 @@
-// Re-exported from @digitaltwin/components for backward compatibility
-export { Collector } from '@digitaltwin/components'
+// Re-exported from @cepseudo/components for backward compatibility
+export { Collector } from '@cepseudo/components'

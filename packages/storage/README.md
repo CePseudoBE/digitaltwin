@@ -1,6 +1,6 @@
-# @digitaltwin/storage
+# @cepseudo/storage
 
-[![npm version](https://img.shields.io/npm/v/@digitaltwin/storage)](https://www.npmjs.com/package/@digitaltwin/storage)
+[![npm version](https://img.shields.io/npm/v/@cepseudo/storage)](https://www.npmjs.com/package/@cepseudo/storage)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../LICENSE)
 
 Abstract storage layer for the Digital Twin framework. Provides a unified API for persisting binary files (3D assets, collected data, tilesets) across local filesystem and S3-compatible cloud storage.
@@ -8,7 +8,7 @@ Abstract storage layer for the Digital Twin framework. Provides a unified API fo
 ## Installation
 
 ```bash
-pnpm add @digitaltwin/storage
+pnpm add @cepseudo/storage
 ```
 
 For S3-compatible storage (OVH, AWS, MinIO), install the AWS SDK peer dependencies:
@@ -38,7 +38,7 @@ These are **optional** -- only required when using `OvhS3StorageService`. The lo
 `StorageServiceFactory` reads the `STORAGE_CONFIG` environment variable and returns the appropriate adapter.
 
 ```typescript
-import { StorageServiceFactory } from '@digitaltwin/storage'
+import { StorageServiceFactory } from '@cepseudo/storage'
 
 // STORAGE_CONFIG=local  --> LocalStorageService
 // STORAGE_CONFIG=ovh    --> OvhS3StorageService (requires OVH_* env vars)
@@ -66,7 +66,7 @@ const storage = StorageServiceFactory.create()
 ### Direct adapter instantiation
 
 ```typescript
-import { LocalStorageService, OvhS3StorageService } from '@digitaltwin/storage'
+import { LocalStorageService, OvhS3StorageService } from '@cepseudo/storage'
 
 // Local filesystem
 const local = new LocalStorageService('./data')

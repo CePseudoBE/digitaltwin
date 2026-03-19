@@ -1,5 +1,5 @@
 {
-  "name": "@digitaltwin/ngsi-ld",
+  "name": "@cepseudo/ngsi-ld",
   "version": "1.0.0",
   "description": "NGSI-LD plugin for Digital Twin framework (entities, subscriptions, notifications)",
   "license": "MIT",
@@ -30,9 +30,9 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@digitaltwin/components": "workspace:*",
-    "@digitaltwin/database": "workspace:*",
-    "@digitaltwin/shared": "workspace:*"
+    "@cepseudo/components": "workspace:*",
+    "@cepseudo/database": "workspace:*",
+    "@cepseudo/shared": "workspace:*"
   },
   "peerDependencies": {
     "bullmq": ">=5.0.0",

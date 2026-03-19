@@ -1,6 +1,6 @@
-# @digitaltwin/database
+# @cepseudo/database
 
-[![npm version](https://img.shields.io/npm/v/@digitaltwin/database)](https://www.npmjs.com/package/@digitaltwin/database)
+[![npm version](https://img.shields.io/npm/v/@cepseudo/database)](https://www.npmjs.com/package/@cepseudo/database)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -9,7 +9,7 @@ Database abstraction layer for the Digital Twin Framework. Provides a unified `D
 ## Installation
 
 ```bash
-pnpm add @digitaltwin/database
+pnpm add @cepseudo/database
 ```
 
 You must also install **one** query builder and its database driver:
@@ -41,7 +41,7 @@ Both adapters implement the same abstract `DatabaseAdapter` class. Switching bet
 ### Kysely with PostgreSQL
 
 ```typescript
-import { KyselyDatabaseAdapter } from '@digitaltwin/database'
+import { KyselyDatabaseAdapter } from '@cepseudo/database'
 
 const database = await KyselyDatabaseAdapter.forPostgreSQL(
     {
@@ -59,7 +59,7 @@ const database = await KyselyDatabaseAdapter.forPostgreSQL(
 ### Knex with SQLite (development)
 
 ```typescript
-import { KnexDatabaseAdapter } from '@digitaltwin/database'
+import { KnexDatabaseAdapter } from '@cepseudo/database'
 
 const database = KnexDatabaseAdapter.forSQLite(
     {
@@ -76,7 +76,7 @@ const database = KnexDatabaseAdapter.forSQLite(
 Components depend on `DatabaseAdapter`, not on a specific implementation. The engine injects the concrete adapter at runtime.
 
 ```typescript
-import type { DatabaseAdapter } from '@digitaltwin/database'
+import type { DatabaseAdapter } from '@cepseudo/database'
 
 class WeatherCollector {
     #database: DatabaseAdapter

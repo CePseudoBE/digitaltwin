@@ -1,4 +1,4 @@
-// Re-exported from @digitaltwin/shared for backward compatibility
+// Re-exported from @cepseudo/shared for backward compatibility
 export {
     DigitalTwinError,
     ValidationError,
@@ -13,4 +13,4 @@ export {
     FileOperationError,
     isDigitalTwinError,
     wrapError
-} from '@digitaltwin/shared'
+} from '@cepseudo/shared'

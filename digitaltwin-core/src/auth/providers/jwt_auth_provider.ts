@@ -1,1 +1,1 @@
-export { JwtAuthProvider } from '@digitaltwin/auth'
+export { JwtAuthProvider } from '@cepseudo/auth'

@@ -11,13 +11,13 @@ A component-based TypeScript framework for building Digital Twin applications wi
 
 | Package | Description | Layer |
 |---------|-------------|-------|
-| [@digitaltwin/shared](./packages/shared) | Types, errors, utilities, validation, environment helpers | 0 |
-| [@digitaltwin/database](./packages/database) | Database abstraction (Knex/Kysely, PostgreSQL/SQLite) | 1 |
-| [@digitaltwin/storage](./packages/storage) | Storage abstraction (local filesystem, OVH S3) | 1 |
-| [@digitaltwin/auth](./packages/auth) | Authentication providers and middleware | 1 |
-| [@digitaltwin/components](./packages/components) | Component base classes (Collector, Harvester, Handler, CustomTableManager) | 2 |
-| [@digitaltwin/assets](./packages/assets) | Asset management (files, tilesets, maps, presigned uploads) | 2 |
-| [@digitaltwin/engine](./packages/engine) | Engine, scheduler, queues, loader, OpenAPI | 3 |
+| [@cepseudo/shared](./packages/shared) | Types, errors, utilities, validation, environment helpers | 0 |
+| [@cepseudo/database](./packages/database) | Database abstraction (Knex/Kysely, PostgreSQL/SQLite) | 1 |
+| [@cepseudo/storage](./packages/storage) | Storage abstraction (local filesystem, OVH S3) | 1 |
+| [@cepseudo/auth](./packages/auth) | Authentication providers and middleware | 1 |
+| [@cepseudo/components](./packages/components) | Component base classes (Collector, Harvester, Handler, CustomTableManager) | 2 |
+| [@cepseudo/assets](./packages/assets) | Asset management (files, tilesets, maps, presigned uploads) | 2 |
+| [@cepseudo/engine](./packages/engine) | Engine, scheduler, queues, loader, OpenAPI | 3 |
 | [digitaltwin-core](./digitaltwin-core) | Legacy unified package (re-exports from above) | - |
 | [digitaltwin-cli](./digitaltwin-cli) | CLI tools for generating components | - |
 | [create-digitaltwin](./create-digitaltwin) | Project scaffolding tool | - |

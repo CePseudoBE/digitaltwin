@@ -1,17 +1,17 @@
-# @digitaltwin/shared
+# @cepseudo/shared
 
-[![npm version](https://img.shields.io/npm/v/@digitaltwin/shared)](https://www.npmjs.com/package/@digitaltwin/shared)
+[![npm version](https://img.shields.io/npm/v/@cepseudo/shared)](https://www.npmjs.com/package/@cepseudo/shared)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue.svg)](https://www.typescriptlang.org/)
-[![License: MIT](https://img.shields.io/npm/l/@digitaltwin/shared)](./LICENSE)
+[![License: MIT](https://img.shields.io/npm/l/@cepseudo/shared)](./LICENSE)
 
 Foundation package for the Digital Twin Framework. Provides shared types, error hierarchy, validation schemas, utilities, and event bus used across all packages.
 
-**Layer 0** -- no internal dependencies. Every other `@digitaltwin/*` package depends on this one.
+**Layer 0** -- no internal dependencies. Every other `@cepseudo/*` package depends on this one.
 
 ## Installation
 
 ```bash
-pnpm add @digitaltwin/shared
+pnpm add @cepseudo/shared
 ```
 
 ## API Overview
@@ -27,7 +27,7 @@ Request and response types for building type-safe HTTP handlers.
 | `EndpointHandler` | Function signature for route handlers |
 | `DataRecord` | Core data structure for collected/harvested data |
 | `DataResolver` | Function that resolves data for a component |
-| `UserRepository` | Interface for user persistence (implemented in `@digitaltwin/database`) |
+| `UserRepository` | Interface for user persistence (implemented in `@cepseudo/database`) |
 | `AuthResult`, `AuthContext`, `AuthenticatedUser` | Authentication-related types |
 | `HttpMethod` | Union type of HTTP methods |
 | `OpenAPIDocument`, `OpenAPIDocumentable`, ... | OpenAPI 3.x specification types |
@@ -104,8 +104,8 @@ VineJS-based schemas and validators for common inputs.
 ### Type-safe HTTP handlers
 
 ```typescript
-import type { TypedRequest, EndpointHandler } from '@digitaltwin/shared'
-import { successResponse, notFoundResponse } from '@digitaltwin/shared'
+import type { TypedRequest, EndpointHandler } from '@cepseudo/shared'
+import { successResponse, notFoundResponse } from '@cepseudo/shared'
 
 interface GetSensorParams { id: string }
 interface SensorQuery { includeHistory?: string }
@@ -133,7 +133,7 @@ import {
   ValidationError,
   isDigitalTwinError,
   wrapError
-} from '@digitaltwin/shared'
+} from '@cepseudo/shared'
 
 try {
   const record = await db.find(id)
@@ -153,7 +153,7 @@ try {
 ### Validation schemas
 
 ```typescript
-import { validateData, paginationSchema, vine } from '@digitaltwin/shared'
+import { validateData, paginationSchema, vine } from '@cepseudo/shared'
 
 // Use a built-in schema
 const pagination = await validateData(paginationSchema, req.query)

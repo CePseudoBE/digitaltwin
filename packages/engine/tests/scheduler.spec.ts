@@ -6,7 +6,7 @@ import { QueueManager } from '../src/queue_manager.js'
 import { MockDatabaseAdapter } from './fixtures/mock_database.js'
 import { MockStorageService } from './fixtures/mock_storage.js'
 import { TestCollector, TestHarvester } from './fixtures/mock_components.js'
-import { engineEventBus } from '@digitaltwin/shared'
+import { engineEventBus } from '@cepseudo/shared'
 
 test.group('Scheduler (Redis integration)', (group) => {
     let redisContainer: any

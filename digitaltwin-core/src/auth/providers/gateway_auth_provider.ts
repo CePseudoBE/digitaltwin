@@ -1,1 +1,1 @@
-export { GatewayAuthProvider } from '@digitaltwin/auth'
+export { GatewayAuthProvider } from '@cepseudo/auth'

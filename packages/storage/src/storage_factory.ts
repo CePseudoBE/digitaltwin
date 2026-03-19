@@ -2,7 +2,7 @@
  * Factory class for creating the appropriate StorageService
  * implementation based on environment configuration.
  */
-import { Env, safeAsync, Logger } from '@digitaltwin/shared'
+import { Env, safeAsync, Logger } from '@cepseudo/shared'
 import { OvhS3StorageService } from './adapters/ovh_storage_service.js'
 import { LocalStorageService } from './adapters/local_storage_service.js'
 import type { StorageService } from './storage_service.js'

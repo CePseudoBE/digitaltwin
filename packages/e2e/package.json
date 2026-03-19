@@ -1,5 +1,5 @@
 {
-  "name": "@digitaltwin/e2e",
+  "name": "@cepseudo/e2e",
   "version": "1.0.0",
   "private": true,
   "description": "End-to-end integration tests for Digital Twin framework",
@@ -15,13 +15,13 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@digitaltwin/shared": "workspace:*",
-    "@digitaltwin/database": "workspace:*",
-    "@digitaltwin/storage": "workspace:*",
-    "@digitaltwin/auth": "workspace:*",
-    "@digitaltwin/components": "workspace:*",
-    "@digitaltwin/assets": "workspace:*",
-    "@digitaltwin/engine": "workspace:*"
+    "@cepseudo/shared": "workspace:*",
+    "@cepseudo/database": "workspace:*",
+    "@cepseudo/storage": "workspace:*",
+    "@cepseudo/auth": "workspace:*",
+    "@cepseudo/components": "workspace:*",
+    "@cepseudo/assets": "workspace:*",
+    "@cepseudo/engine": "workspace:*"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1002.0",
@@ -38,5 +38,16 @@
     "type": "git",
     "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
     "directory": "packages/e2e"
-  }
+  },
+  "keywords": [
+    "cepseudo",
+    "e2e",
+    "testing",
+    "integration",
+    "testcontainers"
+  ],
+  "bugs": {
+    "url": "https://github.com/CePseudoBE/digitaltwin/issues"
+  },
+  "homepage": "https://github.com/CePseudoBE/digitaltwin#readme"
 }

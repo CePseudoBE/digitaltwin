@@ -1,2 +1,2 @@
-// Re-exported from @digitaltwin/components for backward compatibility
-export { Handler } from '@digitaltwin/components'
+// Re-exported from @cepseudo/components for backward compatibility
+export { Handler } from '@cepseudo/components'

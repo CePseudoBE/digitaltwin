@@ -1,6 +1,6 @@
-# @digitaltwin/assets
+# @cepseudo/assets
 
-[![npm version](https://img.shields.io/npm/v/@digitaltwin/assets)](https://www.npmjs.com/package/@digitaltwin/assets)
+[![npm version](https://img.shields.io/npm/v/@cepseudo/assets)](https://www.npmjs.com/package/@cepseudo/assets)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 Asset lifecycle management for the Digital Twin framework -- upload, metadata, download, and deletion of files with user ownership and access control.
@@ -8,16 +8,16 @@ Asset lifecycle management for the Digital Twin framework -- upload, metadata, d
 ## Installation
 
 ```bash
-pnpm add @digitaltwin/assets
+pnpm add @cepseudo/assets
 ```
 
 This package depends on sibling workspace packages that must also be installed:
 
 ```
-@digitaltwin/shared
-@digitaltwin/database
-@digitaltwin/storage
-@digitaltwin/auth
+@cepseudo/shared
+@cepseudo/database
+@cepseudo/storage
+@cepseudo/auth
 ```
 
 ## Managers
@@ -76,8 +76,8 @@ The `UploadReconciler` runs on a configurable interval (default: 5 minutes) to h
 ### Creating a Custom AssetsManager
 
 ```typescript
-import { AssetsManager } from '@digitaltwin/assets'
-import type { AssetsManagerConfiguration } from '@digitaltwin/shared'
+import { AssetsManager } from '@cepseudo/assets'
+import type { AssetsManagerConfiguration } from '@cepseudo/shared'
 
 class PhotoManager extends AssetsManager {
     getConfiguration(): AssetsManagerConfiguration {
@@ -100,8 +100,8 @@ This creates a `photos` table in the database and exposes endpoints at `/api/pho
 ### Creating a TilesetManager
 
 ```typescript
-import { TilesetManager } from '@digitaltwin/assets'
-import type { AssetsManagerConfiguration } from '@digitaltwin/shared'
+import { TilesetManager } from '@cepseudo/assets'
+import type { AssetsManagerConfiguration } from '@cepseudo/shared'
 
 class BuildingTilesets extends TilesetManager {
     getConfiguration(): AssetsManagerConfiguration {
@@ -119,7 +119,7 @@ class BuildingTilesets extends TilesetManager {
 ### Presigned Upload Flow
 
 ```typescript
-import { PresignedUploadService } from '@digitaltwin/assets'
+import { PresignedUploadService } from '@cepseudo/assets'
 
 // The PresignedUploadService is created automatically by AssetsManager.
 // Client-side usage:
@@ -153,7 +153,7 @@ await fetch(`/api/photos/confirm/${fileId}`, {
 ### Setting Up the UploadReconciler
 
 ```typescript
-import { UploadReconciler } from '@digitaltwin/assets'
+import { UploadReconciler } from '@cepseudo/assets'
 
 const reconciler = new UploadReconciler(databaseAdapter, storageService, {
     intervalMs: 5 * 60 * 1000 // 5 minutes (default)
@@ -172,7 +172,7 @@ reconciler.stop()
 ### Generating OpenAPI Specs
 
 ```typescript
-import { generateAssetsOpenAPISpec } from '@digitaltwin/assets'
+import { generateAssetsOpenAPISpec } from '@cepseudo/assets'
 
 const spec = generateAssetsOpenAPISpec(manager.getConfiguration())
 ```

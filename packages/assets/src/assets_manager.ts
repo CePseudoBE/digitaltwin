@@ -9,7 +9,7 @@ import type {
     DataRecord,
     AuthResult,
     TypedRequest
-} from '@digitaltwin/shared'
+} from '@cepseudo/shared'
 import {
     successResponse,
     errorResponse,
@@ -29,10 +29,10 @@ import {
     validateData,
     validateQuery,
     validateParams
-} from '@digitaltwin/shared'
-import type { StorageService } from '@digitaltwin/storage'
-import type { DatabaseAdapter, MetadataRow } from '@digitaltwin/database'
-import { ApisixAuthParser, AuthMiddleware, UserService, type HeadersLike } from '@digitaltwin/auth'
+} from '@cepseudo/shared'
+import type { StorageService } from '@cepseudo/storage'
+import type { DatabaseAdapter, MetadataRow } from '@cepseudo/database'
+import { ApisixAuthParser, AuthMiddleware, UserService, type HeadersLike } from '@cepseudo/auth'
 import { PresignedUploadService } from './presigned_upload_service.js'
 import { generateAssetsOpenAPISpec } from './assets_openapi.js'
 import fs from 'fs/promises'

@@ -1,9 +1,9 @@
 import { test } from '@japa/runner'
 import { AssetsManager } from '../src/assets_manager.js'
-import type { AssetsManagerConfiguration } from '@digitaltwin/shared'
+import type { AssetsManagerConfiguration } from '@cepseudo/shared'
 import { MockDatabaseAdapter } from './mocks/mock_database_adapter.js'
 import { MockStorageService } from './mocks/mock_storage_service.js'
-import { AuthConfig, ApisixAuthParser } from '@digitaltwin/auth'
+import { AuthConfig, ApisixAuthParser } from '@cepseudo/auth'
 
 class TestPresignedAssetsManager extends AssetsManager {
     getConfiguration(): AssetsManagerConfiguration {

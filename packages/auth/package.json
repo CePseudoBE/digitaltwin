@@ -1,5 +1,5 @@
 {
-  "name": "@digitaltwin/auth",
+  "name": "@cepseudo/auth",
   "version": "1.0.0",
   "description": "Authentication providers, user management, and middleware for Digital Twin framework",
   "license": "MIT",
@@ -30,7 +30,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@digitaltwin/shared": "workspace:*",
+    "@cepseudo/shared": "workspace:*",
     "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {

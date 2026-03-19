@@ -1,5 +1,5 @@
 import JSZip from 'jszip'
-import type { StorageService } from '@digitaltwin/storage'
+import type { StorageService } from '@cepseudo/storage'
 
 /**
  * Result of extracting and storing a ZIP archive

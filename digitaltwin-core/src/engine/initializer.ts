@@ -1,2 +1,2 @@
-// Re-exported from @digitaltwin/engine for backward compatibility
-export { initializeComponents, initializeAssetsManagers } from '@digitaltwin/engine'
+// Re-exported from @cepseudo/engine for backward compatibility
+export { initializeComponents, initializeAssetsManagers } from '@cepseudo/engine'

@@ -1,6 +1,6 @@
-import { DatabaseAdapter, type MetadataRow, mapToDataRecord } from '@digitaltwin/database'
-import type { DataRecord, DataResolver, UserRepository } from '@digitaltwin/shared'
-import type { StorageService } from '@digitaltwin/storage'
+import { DatabaseAdapter, type MetadataRow, mapToDataRecord } from '@cepseudo/database'
+import type { DataRecord, DataResolver, UserRepository } from '@cepseudo/shared'
+import type { StorageService } from '@cepseudo/storage'
 import { MockStorageService } from './mock_storage_service.js'
 
 export interface MockDatabaseOptions {

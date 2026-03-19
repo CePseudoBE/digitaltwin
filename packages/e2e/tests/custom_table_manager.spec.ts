@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { setupInfrastructure, type E2EInfrastructure } from './helpers/setup.js'
 import { makeAuthRequest } from './helpers/auth_helpers.js'
 import { E2ECustomTableManager } from './helpers/test_components.js'
-import { AuthConfig } from '@digitaltwin/auth'
+import { AuthConfig } from '@cepseudo/auth'
 
 test.group('CustomTableManager E2E', (group) => {
     let infra: E2EInfrastructure
@@ -152,7 +152,7 @@ test.group('CustomTableManager E2E', (group) => {
         // Enable auth and reset ALL cached configs (AuthConfig + ApisixAuthParser provider)
         delete process.env.DIGITALTWIN_DISABLE_AUTH
         AuthConfig._resetConfig()
-        const { ApisixAuthParser, UserService, AuthMiddleware: AM } = await import('@digitaltwin/auth')
+        const { ApisixAuthParser, UserService, AuthMiddleware: AM } = await import('@cepseudo/auth')
         ApisixAuthParser._resetProvider()
 
         // Create a fresh AuthMiddleware so it picks up the new config

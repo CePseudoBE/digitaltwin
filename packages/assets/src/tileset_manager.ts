@@ -1,5 +1,5 @@
 import { AssetsManager } from './assets_manager.js'
-import type { DataResponse, OpenAPIComponentSpec, HttpMethod, TypedRequest, DataRecord, MetadataRow } from '@digitaltwin/shared'
+import type { DataResponse, OpenAPIComponentSpec, HttpMethod, TypedRequest, DataRecord, MetadataRow } from '@cepseudo/shared'
 import {
     successResponse,
     errorResponse,
@@ -10,8 +10,8 @@ import {
     safeAsync,
     safeCleanup,
     Logger
-} from '@digitaltwin/shared'
-import { ApisixAuthParser } from '@digitaltwin/auth'
+} from '@cepseudo/shared'
+import { ApisixAuthParser } from '@cepseudo/auth'
 import { extractAndStoreArchive } from './utils/zip_utils.js'
 import type { AsyncUploadable } from './async_upload.js'
 import type { TilesetUploadJobData } from './upload_processor.js'

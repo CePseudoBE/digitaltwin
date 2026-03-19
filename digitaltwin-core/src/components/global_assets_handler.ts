@@ -1,2 +1,2 @@
-// Re-exported from @digitaltwin/engine for backward compatibility
-export { GlobalAssetsHandler } from '@digitaltwin/engine'
+// Re-exported from @cepseudo/engine for backward compatibility
+export { GlobalAssetsHandler } from '@cepseudo/engine'

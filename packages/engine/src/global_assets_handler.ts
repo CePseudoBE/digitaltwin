@@ -1,6 +1,6 @@
-import { Handler } from '@digitaltwin/components'
-import type { ComponentConfiguration, DataResponse, HttpMethod, TypedRequest } from '@digitaltwin/shared'
-import type { AssetsManager } from '@digitaltwin/assets'
+import { Handler } from '@cepseudo/components'
+import type { ComponentConfiguration, DataResponse, HttpMethod, TypedRequest } from '@cepseudo/shared'
+import type { AssetsManager } from '@cepseudo/assets'
 
 /**
  * Global assets handler that provides access to ALL assets across ALL asset managers.

@@ -1,5 +1,5 @@
 import { test } from '@japa/runner'
-import { KyselyDatabaseAdapter } from '@digitaltwin/database'
+import { KyselyDatabaseAdapter } from '@cepseudo/database'
 import { SubscriptionStore } from '../src/subscriptions/subscription_store.js'
 import type { SubscriptionCreate } from '../src/types/subscription.js'
 

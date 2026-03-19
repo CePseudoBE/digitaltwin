@@ -1,9 +1,9 @@
 import { Worker, type Job } from 'bullmq'
 import type { ConnectionOptions } from 'bullmq'
-import type { StorageService } from '@digitaltwin/storage'
-import type { DatabaseAdapter } from '@digitaltwin/database'
+import type { StorageService } from '@cepseudo/storage'
+import type { DatabaseAdapter } from '@cepseudo/database'
 import { extractAndStoreArchive } from './utils/zip_utils.js'
-import { safeAsync, safeCleanup, Logger } from '@digitaltwin/shared'
+import { safeAsync, safeCleanup, Logger } from '@cepseudo/shared'
 import fs from 'fs/promises'
 
 const logger = new Logger('UploadProcessor')

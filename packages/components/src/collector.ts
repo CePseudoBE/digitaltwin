@@ -7,10 +7,10 @@ import type {
     HttpMethod,
     OpenAPIDocumentable,
     OpenAPIComponentSpec
-} from '@digitaltwin/shared'
-import type { DatabaseAdapter } from '@digitaltwin/database'
-import type { StorageService } from '@digitaltwin/storage'
-import { engineEventBus, StorageError, Logger } from '@digitaltwin/shared'
+} from '@cepseudo/shared'
+import type { DatabaseAdapter } from '@cepseudo/database'
+import type { StorageService } from '@cepseudo/storage'
+import { engineEventBus, StorageError, Logger } from '@cepseudo/shared'
 
 /**
  * Abstract base class for data collection components in the Digital Twin framework.

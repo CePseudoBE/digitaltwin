@@ -1,1 +1,1 @@
-export type { AuthProvider, AuthRequest, AuthMode, AuthProviderConfig, JwtConfig } from '@digitaltwin/auth'
+export type { AuthProvider, AuthRequest, AuthMode, AuthProviderConfig, JwtConfig } from '@cepseudo/auth'

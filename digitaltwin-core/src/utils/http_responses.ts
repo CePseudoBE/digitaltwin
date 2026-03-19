@@ -1,4 +1,4 @@
-// Re-exported from @digitaltwin/shared for backward compatibility
+// Re-exported from @cepseudo/shared for backward compatibility
 export {
     HttpStatus,
     jsonResponse,
@@ -12,5 +12,5 @@ export {
     textResponse,
     fileResponse,
     multiStatusResponse
-} from '@digitaltwin/shared'
-export type { HttpStatusCode } from '@digitaltwin/shared'
+} from '@cepseudo/shared'
+export type { HttpStatusCode } from '@cepseudo/shared'

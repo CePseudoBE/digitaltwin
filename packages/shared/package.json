@@ -1,5 +1,5 @@
 {
-  "name": "@digitaltwin/shared",
+  "name": "@cepseudo/shared",
   "version": "1.0.0",
   "description": "Shared types, errors, utilities, validation, and environment helpers for Digital Twin packages",
   "license": "MIT",

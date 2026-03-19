@@ -4,8 +4,8 @@
  * Builds fake TypedRequest objects with x-user-id / x-user-roles headers.
  * Uses db.getUserRepository().findOrCreateUser() to ensure user exists in the database.
  */
-import type { DatabaseAdapter } from '@digitaltwin/database'
-import type { UserRecord } from '@digitaltwin/shared'
+import type { DatabaseAdapter } from '@cepseudo/database'
+import type { UserRecord } from '@cepseudo/shared'
 
 interface FakeRequestOverrides {
     params?: Record<string, string>

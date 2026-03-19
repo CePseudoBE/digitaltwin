@@ -1,4 +1,4 @@
-import type { DatabaseAdapter } from '@digitaltwin/database'
+import type { DatabaseAdapter } from '@cepseudo/database'
 import type { Subscription, SubscriptionCreate } from '../types/subscription.js'
 import { randomUUID } from 'crypto'
 

@@ -1,6 +1,6 @@
-# @digitaltwin/components
+# @cepseudo/components
 
-[![npm version](https://img.shields.io/npm/v/@digitaltwin/components)](https://www.npmjs.com/package/@digitaltwin/components)
+[![npm version](https://img.shields.io/npm/v/@cepseudo/components)](https://www.npmjs.com/package/@cepseudo/components)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org)
 
@@ -9,7 +9,7 @@ Core component base classes for the Digital Twin framework. Extend these to buil
 ## Installation
 
 ```bash
-pnpm add @digitaltwin/components
+pnpm add @cepseudo/components
 ```
 
 ## Components Overview
@@ -28,8 +28,8 @@ pnpm add @digitaltwin/components
 Collectors run on a cron schedule to fetch data from external APIs and persist it automatically.
 
 ```typescript
-import { Collector } from '@digitaltwin/components'
-import type { CollectorConfiguration } from '@digitaltwin/shared'
+import { Collector } from '@cepseudo/components'
+import type { CollectorConfiguration } from '@cepseudo/shared'
 
 class WeatherCollector extends Collector {
   getConfiguration(): CollectorConfiguration {
@@ -62,8 +62,8 @@ The framework stores the returned `Buffer` in object storage and indexes it in t
 Harvesters process data written by other components. They can be triggered when new source data arrives (`on-source`) or run on a fixed schedule.
 
 ```typescript
-import { Harvester } from '@digitaltwin/components'
-import type { HarvesterConfiguration, DataRecord } from '@digitaltwin/shared'
+import { Harvester } from '@cepseudo/components'
+import type { HarvesterConfiguration, DataRecord } from '@cepseudo/shared'
 
 class TemperatureAverageHarvester extends Harvester {
   getUserConfiguration(): HarvesterConfiguration {
@@ -104,9 +104,9 @@ class TemperatureAverageHarvester extends Harvester {
 Handlers expose stateless HTTP endpoints. They do not write to the database and are suited for real-time computations or proxy requests.
 
 ```typescript
-import { Handler } from '@digitaltwin/components'
-import { servableEndpoint } from '@digitaltwin/shared'
-import type { ComponentConfiguration, DataResponse } from '@digitaltwin/shared'
+import { Handler } from '@cepseudo/components'
+import { servableEndpoint } from '@cepseudo/shared'
+import type { ComponentConfiguration, DataResponse } from '@cepseudo/shared'
 
 class HealthHandler extends Handler {
   getConfiguration(): ComponentConfiguration {
@@ -135,8 +135,8 @@ class HealthHandler extends Handler {
 CustomTableManagers define structured database tables with automatic CRUD endpoints and owner-based access control.
 
 ```typescript
-import { CustomTableManager } from '@digitaltwin/components'
-import type { StoreConfiguration, DataResponse } from '@digitaltwin/shared'
+import { CustomTableManager } from '@cepseudo/components'
+import type { StoreConfiguration, DataResponse } from '@cepseudo/shared'
 
 class SensorRegistryManager extends CustomTableManager {
   getConfiguration(): StoreConfiguration {

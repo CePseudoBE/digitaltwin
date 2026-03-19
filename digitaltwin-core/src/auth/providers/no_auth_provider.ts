@@ -1,1 +1,1 @@
-export { NoAuthProvider } from '@digitaltwin/auth'
+export { NoAuthProvider } from '@cepseudo/auth'
