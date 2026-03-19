@@ -1,6 +1,6 @@
-import type { DatabaseAdapter } from '@digitaltwin/database'
+import type { DatabaseAdapter } from '@cepseudo/database'
 import type { QueueManager } from './queue_manager.js'
-import type { StorageService } from '@digitaltwin/storage'
+import type { StorageService } from '@cepseudo/storage'
 
 /**
  * Individual health check result

@@ -1,5 +1,5 @@
-import { StorageService } from '@digitaltwin/storage'
-import type { PresignedUploadResult, ObjectExistsResult } from '@digitaltwin/storage'
+import { StorageService } from '@cepseudo/storage'
+import type { PresignedUploadResult, ObjectExistsResult } from '@cepseudo/storage'
 
 export class MockStorageService extends StorageService {
     private storage: Map<string, Buffer> = new Map()

@@ -1,2 +1,2 @@
-// Re-exported from @digitaltwin/storage for backward compatibility
-export { LocalStorageService } from '@digitaltwin/storage'
+// Re-exported from @cepseudo/storage for backward compatibility
+export { LocalStorageService } from '@cepseudo/storage'

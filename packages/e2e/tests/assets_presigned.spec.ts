@@ -2,8 +2,8 @@ import { test } from '@japa/runner'
 import { setupInfrastructure, type E2EInfrastructure } from './helpers/setup.js'
 import { makeAuthRequest } from './helpers/auth_helpers.js'
 import { E2EAssetsManager } from './helpers/test_components.js'
-import { AuthConfig } from '@digitaltwin/auth'
-import type { TypedRequest } from '@digitaltwin/shared'
+import { AuthConfig } from '@cepseudo/auth'
+import type { TypedRequest } from '@cepseudo/shared'
 
 /** Helper to build a valid presigned upload request body (includes required fileSize) */
 function presignedBody(overrides: Record<string, unknown> = {}) {

@@ -3,7 +3,7 @@ import type { ConnectionOptions } from 'bullmq'
 import type { NotificationJobData, NotificationPayload } from '../types/notification.js'
 import type { SubscriptionStore } from '../subscriptions/subscription_store.js'
 import type { SubscriptionCache } from '../subscriptions/subscription_cache.js'
-import type { Logger } from '@digitaltwin/shared'
+import type { Logger } from '@cepseudo/shared'
 
 const QUEUE_NAME = 'ngsi-ld-notifications'
 

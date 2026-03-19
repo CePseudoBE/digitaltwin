@@ -1,5 +1,5 @@
 import { AssetsManager } from './assets_manager.js'
-import type { DataResponse, TypedRequest, DataRecord } from '@digitaltwin/shared'
+import type { DataResponse, TypedRequest, DataRecord } from '@cepseudo/shared'
 
 /**
  * Extended metadata for map layer assets

@@ -1,5 +1,5 @@
 import { Kysely, sql } from 'kysely'
-import type { AuthenticatedUser, UserRecord, UserRepository } from '@digitaltwin/shared'
+import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/shared'
 
 /**
  * Kysely-based implementation of UserRepository.

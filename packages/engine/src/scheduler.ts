@@ -1,9 +1,9 @@
-import { Collector, Harvester } from '@digitaltwin/components'
+import { Collector, Harvester } from '@cepseudo/components'
 import { Worker } from 'bullmq'
 import type { Queue, Job } from 'bullmq'
 import type { QueueManager } from './queue_manager.js'
-import type { HarvesterConfiguration } from '@digitaltwin/shared'
-import { Logger, LogLevel, engineEventBus } from '@digitaltwin/shared'
+import type { HarvesterConfiguration } from '@cepseudo/shared'
+import { Logger, LogLevel, engineEventBus } from '@cepseudo/shared'
 import debounce from 'lodash/debounce.js'
 
 /**

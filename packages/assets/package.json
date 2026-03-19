@@ -1,5 +1,5 @@
 {
-  "name": "@digitaltwin/assets",
+  "name": "@cepseudo/assets",
   "version": "1.0.0",
   "description": "Asset management for Digital Twin framework (AssetsManager, TilesetManager, MapManager)",
   "license": "MIT",
@@ -30,10 +30,10 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@digitaltwin/shared": "workspace:*",
-    "@digitaltwin/database": "workspace:*",
-    "@digitaltwin/storage": "workspace:*",
-    "@digitaltwin/auth": "workspace:*",
+    "@cepseudo/shared": "workspace:*",
+    "@cepseudo/database": "workspace:*",
+    "@cepseudo/storage": "workspace:*",
+    "@cepseudo/auth": "workspace:*",
     "jszip": "^3.10.1"
   },
   "peerDependencies": {

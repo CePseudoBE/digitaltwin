@@ -89,7 +89,7 @@ export DIGITALTWIN_ANONYMOUS_USER_ID=dev-user-123
 ### Using AuthProviderFactory (Recommended)
 
 ```typescript
-import { AuthProviderFactory } from '@digitaltwin/core'
+import { AuthProviderFactory } from '@cepseudo/core'
 
 // Create provider from environment variables
 const authProvider = AuthProviderFactory.fromEnv()
@@ -108,7 +108,7 @@ if (authProvider.isAdmin(req)) {
 ### Using ApisixAuthParser (Backward Compatible)
 
 ```typescript
-import { ApisixAuthParser } from '@digitaltwin/core'
+import { ApisixAuthParser } from '@cepseudo/core'
 
 // Works with any auth mode configured via environment
 const user = ApisixAuthParser.parseAuthHeaders(req.headers)
@@ -123,7 +123,7 @@ import {
     JwtAuthProvider,
     NoAuthProvider,
     AuthProviderFactory
-} from '@digitaltwin/core'
+} from '@cepseudo/core'
 
 // Gateway provider
 const gateway = new GatewayAuthProvider('admin')

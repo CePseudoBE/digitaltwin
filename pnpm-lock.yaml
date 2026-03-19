@@ -102,25 +102,25 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.981.0
         version: 3.981.0
-      '@digitaltwin/assets':
+      '@cepseudo/assets':
         specifier: workspace:*
         version: link:../packages/assets
-      '@digitaltwin/auth':
+      '@cepseudo/auth':
         specifier: workspace:*
         version: link:../packages/auth
-      '@digitaltwin/components':
+      '@cepseudo/components':
         specifier: workspace:*
         version: link:../packages/components
-      '@digitaltwin/database':
+      '@cepseudo/database':
         specifier: workspace:*
         version: link:../packages/database
-      '@digitaltwin/engine':
+      '@cepseudo/engine':
         specifier: workspace:*
         version: link:../packages/engine
-      '@digitaltwin/shared':
+      '@cepseudo/shared':
         specifier: workspace:*
         version: link:../packages/shared
-      '@digitaltwin/storage':
+      '@cepseudo/storage':
         specifier: workspace:*
         version: link:../packages/storage
       '@vinejs/vine':
@@ -211,16 +211,16 @@ importers:
 
   packages/assets:
     dependencies:
-      '@digitaltwin/auth':
+      '@cepseudo/auth':
         specifier: workspace:*
         version: link:../auth
-      '@digitaltwin/database':
+      '@cepseudo/database':
         specifier: workspace:*
         version: link:../database
-      '@digitaltwin/shared':
+      '@cepseudo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@digitaltwin/storage':
+      '@cepseudo/storage':
         specifier: workspace:*
         version: link:../storage
       bullmq:
@@ -242,7 +242,7 @@ importers:
 
   packages/auth:
     dependencies:
-      '@digitaltwin/shared':
+      '@cepseudo/shared':
         specifier: workspace:*
         version: link:../shared
       jsonwebtoken:
@@ -264,16 +264,16 @@ importers:
 
   packages/components:
     dependencies:
-      '@digitaltwin/auth':
+      '@cepseudo/auth':
         specifier: workspace:*
         version: link:../auth
-      '@digitaltwin/database':
+      '@cepseudo/database':
         specifier: workspace:*
         version: link:../database
-      '@digitaltwin/shared':
+      '@cepseudo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@digitaltwin/storage':
+      '@cepseudo/storage':
         specifier: workspace:*
         version: link:../storage
     devDependencies:
@@ -289,7 +289,7 @@ importers:
 
   packages/database:
     dependencies:
-      '@digitaltwin/shared':
+      '@cepseudo/shared':
         specifier: workspace:*
         version: link:../shared
       knex:
@@ -323,25 +323,25 @@ importers:
 
   packages/e2e:
     dependencies:
-      '@digitaltwin/assets':
+      '@cepseudo/assets':
         specifier: workspace:*
         version: link:../assets
-      '@digitaltwin/auth':
+      '@cepseudo/auth':
         specifier: workspace:*
         version: link:../auth
-      '@digitaltwin/components':
+      '@cepseudo/components':
         specifier: workspace:*
         version: link:../components
-      '@digitaltwin/database':
+      '@cepseudo/database':
         specifier: workspace:*
         version: link:../database
-      '@digitaltwin/engine':
+      '@cepseudo/engine':
         specifier: workspace:*
         version: link:../engine
-      '@digitaltwin/shared':
+      '@cepseudo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@digitaltwin/storage':
+      '@cepseudo/storage':
         specifier: workspace:*
         version: link:../storage
     devDependencies:
@@ -375,22 +375,22 @@ importers:
 
   packages/engine:
     dependencies:
-      '@digitaltwin/assets':
+      '@cepseudo/assets':
         specifier: workspace:*
         version: link:../assets
-      '@digitaltwin/auth':
+      '@cepseudo/auth':
         specifier: workspace:*
         version: link:../auth
-      '@digitaltwin/components':
+      '@cepseudo/components':
         specifier: workspace:*
         version: link:../components
-      '@digitaltwin/database':
+      '@cepseudo/database':
         specifier: workspace:*
         version: link:../database
-      '@digitaltwin/shared':
+      '@cepseudo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@digitaltwin/storage':
+      '@cepseudo/storage':
         specifier: workspace:*
         version: link:../storage
       bullmq:
@@ -445,13 +445,13 @@ importers:
 
   packages/ngsi-ld:
     dependencies:
-      '@digitaltwin/components':
+      '@cepseudo/components':
         specifier: workspace:*
         version: link:../components
-      '@digitaltwin/database':
+      '@cepseudo/database':
         specifier: workspace:*
         version: link:../database
-      '@digitaltwin/shared':
+      '@cepseudo/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -510,7 +510,7 @@ importers:
 
   packages/storage:
     dependencies:
-      '@digitaltwin/shared':
+      '@cepseudo/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:

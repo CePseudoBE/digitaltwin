@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { StorageServiceFactory } from '../src/storage_factory.js'
 import { LocalStorageService } from '../src/adapters/local_storage_service.js'
 import { OvhS3StorageService } from '../src/adapters/ovh_storage_service.js'
-import { Env } from '@digitaltwin/shared'
+import { Env } from '@cepseudo/shared'
 import fs from 'fs/promises'
 
 function mockEnv(config: Record<string, unknown>) {

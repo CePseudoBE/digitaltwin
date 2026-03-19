@@ -1,1 +1,1 @@
-export { AuthProviderFactory } from '@digitaltwin/auth'
+export { AuthProviderFactory } from '@cepseudo/auth'

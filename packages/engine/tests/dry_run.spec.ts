@@ -3,9 +3,9 @@ import { DigitalTwinEngine } from '../src/digital_twin_engine.js'
 import { TestAssetsManager } from './fixtures/mock_components.js'
 import { MockDatabaseAdapter } from './fixtures/mock_database.js'
 import { MockStorageService } from './fixtures/mock_storage.js'
-import { AssetsManager } from '@digitaltwin/assets'
-import type { ComponentConfiguration } from '@digitaltwin/shared'
-import { LogLevel } from '@digitaltwin/shared'
+import { AssetsManager } from '@cepseudo/assets'
+import type { ComponentConfiguration } from '@cepseudo/shared'
+import { LogLevel } from '@cepseudo/shared'
 
 test.group('Engine dry run and validation', () => {
     test('dry run completes without starting server or queues', async ({ assert }) => {

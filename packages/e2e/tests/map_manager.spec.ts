@@ -3,7 +3,7 @@ import { setupInfrastructure, type E2EInfrastructure } from './helpers/setup.js'
 import { makeAuthRequest } from './helpers/auth_helpers.js'
 import { E2EMapManager } from './helpers/test_components.js'
 import { sampleGeoJSON } from './helpers/fixtures.js'
-import type { TypedRequest } from '@digitaltwin/shared'
+import type { TypedRequest } from '@cepseudo/shared'
 
 test.group('MapManager E2E', (group) => {
     let infra: E2EInfrastructure

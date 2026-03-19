@@ -2,8 +2,8 @@ import { test } from '@japa/runner'
 import { MapManager } from '../src/map_manager.js'
 import { MockDatabaseAdapter } from './mocks/mock_database_adapter.js'
 import { MockStorageService } from './mocks/mock_storage_service.js'
-import { AuthConfig, ApisixAuthParser } from '@digitaltwin/auth'
-import type { AssetsManagerConfiguration } from '@digitaltwin/shared'
+import { AuthConfig, ApisixAuthParser } from '@cepseudo/auth'
+import type { AssetsManagerConfiguration } from '@cepseudo/shared'
 
 class TestMapManager extends MapManager {
     getConfiguration(): AssetsManagerConfiguration {

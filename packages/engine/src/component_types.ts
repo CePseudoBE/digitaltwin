@@ -5,8 +5,8 @@
  * dynamic registration with the DigitalTwinEngine.
  */
 
-import type { Collector, Harvester, Handler, CustomTableManager } from '@digitaltwin/components'
-import type { AssetsManager } from '@digitaltwin/assets'
+import type { Collector, Harvester, Handler, CustomTableManager } from '@cepseudo/components'
+import type { AssetsManager } from '@cepseudo/assets'
 
 /**
  * String literal union of all component type names.

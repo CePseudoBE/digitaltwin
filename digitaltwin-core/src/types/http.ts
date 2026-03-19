@@ -1,4 +1,4 @@
-// Re-exported from @digitaltwin/shared for backward compatibility
+// Re-exported from @cepseudo/shared for backward compatibility
 export type {
     DataResponse,
     MulterFile,
@@ -25,4 +25,4 @@ export type {
     TilesetUploadRequest,
     TilesetListQuery,
     TilesetListRequest
-} from '@digitaltwin/shared'
+} from '@cepseudo/shared'

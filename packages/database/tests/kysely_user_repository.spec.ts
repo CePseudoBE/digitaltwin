@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { KyselyUserRepository } from '../src/kysely_user_repository.js'
 import { sqliteKyselyFactory, postgresKyselyFactory } from './helpers/factories.js'
 import type { KyselyFactory } from './helpers/factories.js'
-import type { AuthenticatedUser } from '@digitaltwin/shared'
+import type { AuthenticatedUser } from '@cepseudo/shared'
 import type { Kysely } from 'kysely'
 
 function registerUserRepositoryTests(label: string, factory: KyselyFactory) {

@@ -3,7 +3,7 @@ import { AuthMiddleware } from '../src/auth_middleware.js'
 import { AuthConfig } from '../src/auth_config.js'
 import { ApisixAuthParser } from '../src/apisix_parser.js'
 import { UserService } from '../src/user_service.js'
-import type { AuthenticatedUser, UserRecord, UserRepository } from '@digitaltwin/shared'
+import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/shared'
 
 /** In-memory UserRepository for tests */
 function createMockUserRepository(): UserRepository {

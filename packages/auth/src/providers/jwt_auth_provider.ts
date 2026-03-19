@@ -15,7 +15,7 @@
 
 import jwt from 'jsonwebtoken'
 import type { AuthProvider, AuthRequest, AuthProviderConfig } from '../auth_provider.js'
-import type { AuthenticatedUser } from '@digitaltwin/shared'
+import type { AuthenticatedUser } from '@cepseudo/shared'
 
 /**
  * Authentication provider for JWT token validation.

@@ -9,7 +9,7 @@ import type { AuthenticatedUser, UserRecord } from './auth.js'
  *
  * @example
  * ```typescript
- * // Production: KnexUserRepository from @digitaltwin/database
+ * // Production: KnexUserRepository from @cepseudo/database
  * const repo = new KnexUserRepository(knex)
  *
  * // Testing: in-memory implementation

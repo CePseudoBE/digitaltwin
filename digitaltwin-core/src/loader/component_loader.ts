@@ -1,3 +1,3 @@
-// Re-exported from @digitaltwin/engine for backward compatibility
-export { loadComponents } from '@digitaltwin/engine'
-export type { LoadComponentsOptions, LoadComponentsResult } from '@digitaltwin/engine'
+// Re-exported from @cepseudo/engine for backward compatibility
+export { loadComponents } from '@cepseudo/engine'
+export type { LoadComponentsOptions, LoadComponentsResult } from '@cepseudo/engine'

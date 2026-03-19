@@ -1,1 +1,1 @@
-export { ApisixAuthParser, type HeadersLike } from '@digitaltwin/auth'
+export { ApisixAuthParser, type HeadersLike } from '@cepseudo/auth'

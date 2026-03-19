@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
 import { mapToDataRecord } from '../src/map_to_data_record.js'
-import type { DataResolver } from '@digitaltwin/shared'
+import type { DataResolver } from '@cepseudo/shared'
 
 function createMockResolver(): { resolver: DataResolver; storedData: Map<string, Buffer> } {
     const storedData = new Map<string, Buffer>()

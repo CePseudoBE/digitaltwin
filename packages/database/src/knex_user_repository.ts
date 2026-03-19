@@ -1,5 +1,5 @@
 import type { Knex } from 'knex'
-import type { AuthenticatedUser, UserRecord, UserRepository } from '@digitaltwin/shared'
+import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/shared'
 
 /**
  * Knex-based implementation of UserRepository.

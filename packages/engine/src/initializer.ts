@@ -5,11 +5,11 @@
  * including database table creation and dependency injection.
  */
 
-import type { Collector, Harvester } from '@digitaltwin/components'
-import type { AssetsManager } from '@digitaltwin/assets'
-import type { DatabaseAdapter } from '@digitaltwin/database'
-import type { StorageService } from '@digitaltwin/storage'
-import type { AuthMiddleware } from '@digitaltwin/auth'
+import type { Collector, Harvester } from '@cepseudo/components'
+import type { AssetsManager } from '@cepseudo/assets'
+import type { DatabaseAdapter } from '@cepseudo/database'
+import type { StorageService } from '@cepseudo/storage'
+import type { AuthMiddleware } from '@cepseudo/auth'
 
 /**
  * Initializes data collection and processing components with required dependencies.

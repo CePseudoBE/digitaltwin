@@ -1,5 +1,5 @@
 {
-  "name": "@digitaltwin/database",
+  "name": "@cepseudo/database",
   "version": "1.0.0",
   "description": "Database abstraction layer for Digital Twin framework (Kysely/Knex, PostgreSQL/SQLite)",
   "license": "MIT",
@@ -30,7 +30,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@digitaltwin/shared": "workspace:*"
+    "@cepseudo/shared": "workspace:*"
   },
   "peerDependencies": {
     "knex": ">=3.0.0",

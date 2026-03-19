@@ -1,6 +1,6 @@
-import type { StorageService } from '@digitaltwin/storage'
-import type { DatabaseAdapter } from '@digitaltwin/database'
-import { safeAsync, Logger } from '@digitaltwin/shared'
+import type { StorageService } from '@cepseudo/storage'
+import type { DatabaseAdapter } from '@cepseudo/database'
+import { safeAsync, Logger } from '@cepseudo/shared'
 
 const logger = new Logger('UploadReconciler')
 

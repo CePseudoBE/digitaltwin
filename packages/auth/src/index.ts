@@ -10,4 +10,4 @@ export { AuthConfig } from './auth_config.js'
 export { AuthMiddleware } from './auth_middleware.js'
 
 // Types (re-exported from shared for convenience)
-export type { AuthenticatedUser, UserRecord, AuthContext, AuthenticatedRequest, AuthResult, UserRepository } from '@digitaltwin/shared'
+export type { AuthenticatedUser, UserRecord, AuthContext, AuthenticatedRequest, AuthResult, UserRepository } from '@cepseudo/shared'

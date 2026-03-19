@@ -1,4 +1,4 @@
-import type { AuthenticatedUser, UserRecord, UserRepository } from '@digitaltwin/shared'
+import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/shared'
 import { AuthConfig } from './auth_config.js'
 
 /**

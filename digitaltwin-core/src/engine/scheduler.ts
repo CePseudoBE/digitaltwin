@@ -1,2 +1,2 @@
-// Re-exported from @digitaltwin/engine for backward compatibility
-export { scheduleComponents } from '@digitaltwin/engine'
+// Re-exported from @cepseudo/engine for backward compatibility
+export { scheduleComponents } from '@cepseudo/engine'

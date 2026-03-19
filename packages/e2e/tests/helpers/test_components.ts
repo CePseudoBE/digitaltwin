@@ -4,9 +4,9 @@
  * These provide real (non-mocked) behavior to verify the full pipeline
  * from component → database → storage and back.
  */
-import { Collector, Harvester, Handler, CustomTableManager } from '@digitaltwin/components'
-import { AssetsManager, TilesetManager, MapManager } from '@digitaltwin/assets'
-import { servableEndpoint } from '@digitaltwin/shared'
+import { Collector, Harvester, Handler, CustomTableManager } from '@cepseudo/components'
+import { AssetsManager, TilesetManager, MapManager } from '@cepseudo/assets'
+import { servableEndpoint } from '@cepseudo/shared'
 import type {
     CollectorConfiguration,
     HarvesterConfiguration,
@@ -16,7 +16,7 @@ import type {
     DataResponse,
     DataRecord,
     TypedRequest,
-} from '@digitaltwin/shared'
+} from '@cepseudo/shared'
 
 // ── Collector ────────────────────────────────────────────────────────────────
 

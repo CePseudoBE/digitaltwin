@@ -1,4 +1,4 @@
-import type { DataRecord, DataResolver, MetadataRow } from '@digitaltwin/shared'
+import type { DataRecord, DataResolver, MetadataRow } from '@cepseudo/shared'
 
 /**
  * Convert a DB metadata row to a full DataRecord with lazy-loaded blob.
