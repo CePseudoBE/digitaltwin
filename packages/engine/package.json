@@ -71,5 +71,8 @@
   "bugs": {
     "url": "https://github.com/CePseudoBE/digitaltwin/issues"
   },
-  "homepage": "https://github.com/CePseudoBE/digitaltwin#readme"
+  "homepage": "https://github.com/CePseudoBE/digitaltwin#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }
