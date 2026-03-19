@@ -174,7 +174,7 @@ test.group('initializeComponents', () => {
     // Mock all tables to exist
     database.doesTableExists = async (tableName: string) => true
     
-    let initializationOrder: string[] = []
+    const initializationOrder: string[] = []
     
     collector.setDependencies = (db, st) => {
       initializationOrder.push('collector')

@@ -1,0 +1,75 @@
+{
+  "name": "@digitaltwin/engine",
+  "version": "1.0.0",
+  "description": "Core engine for Digital Twin framework (Engine, Scheduler, Queues, Loader, OpenAPI)",
+  "license": "MIT",
+  "author": "Axel Hoffmann",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "test": "node -r ./bin/set-test-env.cjs --import ts-node-maintained/register/esm --enable-source-maps bin/test.ts",
+    "lint": "eslint src tests --no-error-on-unmatched-pattern",
+    "lint:fix": "eslint src tests --fix --no-error-on-unmatched-pattern"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@digitaltwin/shared": "workspace:*",
+    "@digitaltwin/database": "workspace:*",
+    "@digitaltwin/storage": "workspace:*",
+    "@digitaltwin/auth": "workspace:*",
+    "@digitaltwin/assets": "workspace:*",
+    "@digitaltwin/components": "workspace:*",
+    "bullmq": "^5.56.5",
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "ioredis": "^5.6.1",
+    "lodash": "^4.17.23",
+    "multer": "^2.0.2",
+    "ultimate-express": "^2.0.9"
+  },
+  "devDependencies": {
+    "@japa/assert": "^4.1.0",
+    "@japa/runner": "^4.3.0",
+    "@testcontainers/redis": "^11.3.1",
+    "@types/compression": "^1.7.5",
+    "@types/cors": "^2.8.19",
+    "@types/lodash": "^4.17.20",
+    "@types/multer": "^2.0.0",
+    "testcontainers": "^11.3.1",
+    "ts-node-maintained": "^10.9.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
+    "directory": "packages/engine"
+  },
+  "keywords": [
+    "digitaltwin",
+    "engine",
+    "scheduler",
+    "bullmq",
+    "openapi",
+    "health-check"
+  ],
+  "bugs": {
+    "url": "https://github.com/CePseudoBE/digitaltwin/issues"
+  },
+  "homepage": "https://github.com/CePseudoBE/digitaltwin#readme"
+}

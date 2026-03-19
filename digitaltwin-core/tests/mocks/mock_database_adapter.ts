@@ -1,5 +1,6 @@
 import {DatabaseAdapter, MetadataRow} from '../../src/database/database_adapter.js'
 import {DataRecord} from '../../src/types/data_record.js'
+import type {DataResolver, UserRepository} from '@digitaltwin/shared'
 import {StorageService} from '../../src/storage/storage_service.js'
 import {mapToDataRecord} from '../../src/utils/map_to_data_record.js'
 import {MockStorageService} from "./mock_storage_service.js";
@@ -7,7 +8,9 @@ import {MockStorageService} from "./mock_storage_service.js";
 export interface MockDatabaseOptions {
     /** Données pré-stockées dans le mock */
     initialData?: DataRecord[]
-    /** Service de stockage à utiliser pour les DataRecord */
+    /** Data resolver callback for DataRecord lazy loading */
+    dataResolver?: DataResolver
+    /** Service de stockage à utiliser pour les DataRecord (converted to DataResolver) */
     storage?: StorageService
     /** Comportement des méthodes (pour tester les erreurs) */
     shouldThrow?: {
@@ -28,7 +31,7 @@ export interface MockDatabaseOptions {
 
 export class MockDatabaseAdapter extends DatabaseAdapter {
     private records: Map<string, DataRecord> = new Map()
-    private storage: StorageService
+    private dataResolver: DataResolver
     private shouldThrow: Required<NonNullable<MockDatabaseOptions['shouldThrow']>>
     private mockKnex: any
 
@@ -42,8 +45,13 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
             })
         }
 
-        // Service de stockage par défaut (mock simple)
-        this.storage = options.storage || new MockStorageService()
+        // Data resolver: use explicit resolver, or wrap storage, or use mock
+        if (options.dataResolver) {
+            this.dataResolver = options.dataResolver
+        } else {
+            const storage = options.storage || new MockStorageService()
+            this.dataResolver = (url) => storage.retrieve(url)
+        }
 
         // Configuration des erreurs (toutes les nouvelles méthodes)
         this.shouldThrow = {
@@ -80,11 +88,11 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
         const createQueryBuilder = (tableName: string) => {
             let whereConditions: Record<string, any> = {}
-            let whereInConditions: Array<{ column: string; values: any[] }> = []
+            const whereInConditions: Array<{ column: string; values: any[] }> = []
             let insertData: any = null
             let updateData: any = null
             let selectedColumns: string[] = ['*']
-            let joins: Array<{ type: string; table: string; col1: string; col2: string }> = []
+            const joins: Array<{ type: string; table: string; col1: string; col2: string }> = []
 
             const queryBuilder: any = {
                 select: (...cols: string[]) => {
@@ -315,10 +323,6 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
         return knex
     }
 
-    getKnex(): any {
-        return this.mockKnex
-    }
-
     // Reset mock state (useful between tests)
     resetMockState(): void {
         this.users.clear()
@@ -340,7 +344,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
         // Use counter to ensure unique IDs in rapid succession
         const id = meta.id ?? (Date.now() + this.idCounter++)
-        const record = mapToDataRecord({ ...meta, id }, this.storage)
+        const record = mapToDataRecord({ ...meta, id }, this.dataResolver)
         this.records.set(id.toString(), record)
         return record
     }
@@ -579,7 +583,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
             type: 'application/json',
             url: `${name}/${id}.json`,
             date
-        }, this.storage)
+        }, this.dataResolver)
 
         this.records.set(id.toString(), record)
         return record
@@ -629,6 +633,8 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
     async createTableWithColumns(name: string, columns: Record<string, string>): Promise<void> {
         // Mock implementation - tables exist automatically
     }
+
+    async ensureColumns(_tableName: string, _columns: Record<string, string>): Promise<void> {}
 
     async findByConditions(tableName: string, conditions: Record<string, any>): Promise<DataRecord[]> {
         // Filter records by table name and conditions
@@ -711,5 +717,50 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
         return Array.from(this.records.values())
             .filter(record => record.name === name)
             .sort((a, b) => b.date.getTime() - a.date.getTime())
+    }
+
+    getUserRepository(): UserRepository {
+        const users = this.users
+        const roles = this.roles
+        const userRoles = this.userRoles
+        const self = this
+
+        return {
+            async initializeTables(): Promise<void> {
+                // No-op for mock
+            },
+            async findOrCreateUser(authUser) {
+                // Find existing user by keycloak_id
+                for (const user of users.values()) {
+                    if (user.keycloak_id === authUser.id) {
+                        return {
+                            id: user.id,
+                            keycloak_id: user.keycloak_id,
+                            roles: authUser.roles,
+                            created_at: user.created_at,
+                            updated_at: user.updated_at
+                        }
+                    }
+                }
+                // Create new user
+                const id = self.userIdCounter++
+                const now = new Date()
+                users.set(id, { id, keycloak_id: authUser.id, created_at: now, updated_at: now })
+                return { id, keycloak_id: authUser.id, roles: authUser.roles, created_at: now, updated_at: now }
+            },
+            async getUserById(id: number) {
+                const user = users.get(id)
+                if (!user) return undefined
+                return { id: user.id, keycloak_id: user.keycloak_id, roles: [], created_at: user.created_at, updated_at: user.updated_at }
+            },
+            async getUserByKeycloakId(keycloakId: string) {
+                for (const user of users.values()) {
+                    if (user.keycloak_id === keycloakId) {
+                        return { id: user.id, keycloak_id: user.keycloak_id, roles: [], created_at: user.created_at, updated_at: user.updated_at }
+                    }
+                }
+                return undefined
+            }
+        }
     }
 }

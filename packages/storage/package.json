@@ -1,0 +1,71 @@
+{
+  "name": "@digitaltwin/storage",
+  "version": "1.0.0",
+  "description": "Storage service abstraction for Digital Twin framework (local filesystem, OVH S3)",
+  "license": "MIT",
+  "author": "Axel Hoffmann",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "test": "node -r ./bin/set-test-env.cjs --import ts-node-maintained/register/esm --enable-source-maps bin/test.ts",
+    "lint": "eslint src tests --no-error-on-unmatched-pattern",
+    "lint:fix": "eslint src tests --fix --no-error-on-unmatched-pattern"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@digitaltwin/shared": "workspace:*"
+  },
+  "peerDependencies": {
+    "@aws-sdk/client-s3": ">=3.0.0",
+    "@aws-sdk/s3-request-presigner": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@aws-sdk/client-s3": {
+      "optional": true
+    },
+    "@aws-sdk/s3-request-presigner": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1002.0",
+    "@aws-sdk/s3-request-presigner": "^3.1002.0",
+    "@japa/assert": "^4.1.0",
+    "@japa/runner": "^4.3.0",
+    "testcontainers": "^10.0.0",
+    "ts-node-maintained": "^10.9.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CePseudoBE/digitaltwin.git",
+    "directory": "packages/storage"
+  },
+  "keywords": [
+    "digitaltwin",
+    "storage",
+    "s3",
+    "ovh",
+    "presigned-url"
+  ],
+  "bugs": {
+    "url": "https://github.com/CePseudoBE/digitaltwin/issues"
+  },
+  "homepage": "https://github.com/CePseudoBE/digitaltwin#readme"
+}
