@@ -21,7 +21,8 @@
     "@cepseudo/auth": "workspace:*",
     "@cepseudo/components": "workspace:*",
     "@cepseudo/assets": "workspace:*",
-    "@cepseudo/engine": "workspace:*"
+    "@cepseudo/engine": "workspace:*",
+    "@cepseudo/ngsi-ld": "workspace:*"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1002.0",
@@ -29,6 +30,8 @@
     "@japa/assert": "^4.1.0",
     "@japa/runner": "^4.3.0",
     "@testcontainers/redis": "^11.3.1",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.0.0",
     "jszip": "^3.10.1",
     "pg": "^8.16.0",
     "testcontainers": "^10.0.0",
