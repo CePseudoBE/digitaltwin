@@ -338,6 +338,9 @@ importers:
       '@cepseudo/engine':
         specifier: workspace:*
         version: link:../engine
+      '@cepseudo/ngsi-ld':
+        specifier: workspace:*
+        version: link:../ngsi-ld
       '@cepseudo/shared':
         specifier: workspace:*
         version: link:../shared
@@ -360,6 +363,12 @@ importers:
       '@testcontainers/redis':
         specifier: ^11.3.1
         version: 11.11.0
+      bullmq:
+        specifier: ^5.0.0
+        version: 5.66.5
+      ioredis:
+        specifier: ^5.0.0
+        version: 5.9.1
       jszip:
         specifier: ^3.10.1
         version: 3.10.1

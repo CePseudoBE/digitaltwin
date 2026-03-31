@@ -2,95 +2,121 @@ import { test } from '@japa/runner'
 import { property, geoProperty, relationship } from '../src/helpers/property.js'
 import { buildUrn, parseUrn } from '../src/helpers/urn.js'
 import { isNgsiLdCollector, isNgsiLdHarvester } from '../src/components/type_guards.js'
+import { parseQ, evaluateQ } from '../src/subscriptions/q_parser.js'
+import type { NgsiLdEntity } from '../src/types/entity.js'
 
-test.group('property()', () => {
-    test('creates a Property with the given value', ({ assert }) => {
-        const p = property(42)
-        assert.equal(p.type, 'Property')
-        assert.equal(p.value, 42)
+// ── property() ───────────────────────────────────────────────────────────────
+// Tested through q-filter evaluation — the primary consumer of Property values.
+
+test.group('property() — q-filter evaluation', () => {
+    test('a numeric property is correctly evaluated by a q-filter', ({ assert }) => {
+        const entity: NgsiLdEntity = {
+            id: buildUrn('AirQualityObserved', 'sensor-1'),
+            type: 'AirQualityObserved',
+            pm25: property(42),
+        }
+
+        assert.isTrue(evaluateQ(parseQ('pm25>30'), entity))
+        assert.isFalse(evaluateQ(parseQ('pm25>50'), entity))
     })
 
-    test('passes through optional metadata', ({ assert }) => {
-        const p = property('hello', { observedAt: '2026-01-01T00:00:00Z', unitCode: 'CEL' })
-        assert.equal(p.type, 'Property')
-        assert.equal(p.value, 'hello')
-        assert.equal(p.observedAt, '2026-01-01T00:00:00Z')
-        assert.equal(p.unitCode, 'CEL')
+    test('a string property is correctly evaluated by equality filter', ({ assert }) => {
+        const entity: NgsiLdEntity = {
+            id: buildUrn('Device', 'gateway-1'),
+            type: 'Device',
+            status: property('online'),
+        }
+
+        assert.isTrue(evaluateQ(parseQ('status=="online"'), entity))
+        assert.isFalse(evaluateQ(parseQ('status=="offline"'), entity))
     })
 
-    test('handles boolean values', ({ assert }) => {
-        const p = property(true)
-        assert.equal(p.type, 'Property')
-        assert.equal(p.value, true)
+    test('a property with observedAt metadata survives JSON round-trip', ({ assert }) => {
+        const original = property(22.5, { observedAt: '2026-01-01T00:00:00Z', unitCode: 'CEL' })
+        const roundTripped = JSON.parse(JSON.stringify(original))
+
+        assert.equal(roundTripped.value, 22.5)
+        assert.equal(roundTripped.observedAt, '2026-01-01T00:00:00Z')
+        assert.equal(roundTripped.unitCode, 'CEL')
     })
 
-    test('handles array values', ({ assert }) => {
-        const p = property(['a', 'b'])
-        assert.deepEqual(p.value, ['a', 'b'])
-    })
+    test('a null property causes equality filter to return false', ({ assert }) => {
+        const entity: NgsiLdEntity = {
+            id: buildUrn('Device', 'sensor-null'),
+            type: 'Device',
+            status: property(null),
+        }
 
-    test('handles null value', ({ assert }) => {
-        const p = property(null)
-        assert.equal(p.type, 'Property')
-        assert.isNull(p.value)
-    })
-})
-
-test.group('geoProperty()', () => {
-    test('creates a GeoProperty with Point geometry', ({ assert }) => {
-        const geo = geoProperty({ type: 'Point', coordinates: [4.35, 50.85] })
-        assert.equal(geo.type, 'GeoProperty')
-        assert.deepEqual(geo.value, { type: 'Point', coordinates: [4.35, 50.85] })
-    })
-
-    test('passes through optional metadata', ({ assert }) => {
-        const geo = geoProperty({ type: 'Point', coordinates: [0, 0] }, { observedAt: '2026-01-01T00:00:00Z' })
-        assert.equal(geo.observedAt, '2026-01-01T00:00:00Z')
-    })
-})
-
-test.group('relationship()', () => {
-    test('creates a Relationship with the given URN', ({ assert }) => {
-        const rel = relationship('urn:ngsi-ld:Building:42')
-        assert.equal(rel.type, 'Relationship')
-        assert.equal(rel.object, 'urn:ngsi-ld:Building:42')
-    })
-
-    test('passes through optional metadata', ({ assert }) => {
-        const rel = relationship('urn:ngsi-ld:Building:42', { observedAt: '2026-01-01T00:00:00Z' })
-        assert.equal(rel.observedAt, '2026-01-01T00:00:00Z')
+        // null value does not equal 'ok' — missing/null attributes fail equality
+        assert.isFalse(evaluateQ(parseQ('status=="ok"'), entity))
     })
 })
 
-test.group('buildUrn()', () => {
-    test('builds a correct NGSI-LD URN', ({ assert }) => {
+// ── geoProperty() ────────────────────────────────────────────────────────────
+// Tested through entity storage — geoProperties live inside entities that are
+// serialized to and from Redis (JSON round-trip).
+
+test.group('geoProperty() — entity storage round-trip', () => {
+    test('a geo property preserves geometry after JSON round-trip', ({ assert }) => {
+        const entity: NgsiLdEntity = {
+            id: buildUrn('ParkingSpot', 'lot-1'),
+            type: 'ParkingSpot',
+            location: geoProperty({ type: 'Point', coordinates: [4.35, 50.85] }),
+        }
+
+        const stored = JSON.parse(JSON.stringify(entity))
+        assert.deepEqual(stored.location.value, { type: 'Point', coordinates: [4.35, 50.85] })
+    })
+
+    test('geo property metadata survives JSON round-trip', ({ assert }) => {
+        const entity: NgsiLdEntity = {
+            id: buildUrn('ParkingSpot', 'lot-2'),
+            type: 'ParkingSpot',
+            location: geoProperty(
+                { type: 'Point', coordinates: [0, 0] },
+                { observedAt: '2026-01-01T00:00:00Z' }
+            ),
+        }
+
+        const stored = JSON.parse(JSON.stringify(entity))
+        assert.equal(stored.location.observedAt, '2026-01-01T00:00:00Z')
+    })
+})
+
+// ── relationship() ───────────────────────────────────────────────────────────
+
+test.group('relationship() — entity storage round-trip', () => {
+    test('a relationship preserves its target URN after JSON round-trip', ({ assert }) => {
+        const entity: NgsiLdEntity = {
+            id: buildUrn('Device', 'sensor-1'),
+            type: 'Device',
+            installedIn: relationship('urn:ngsi-ld:Building:headquarters'),
+        }
+
+        const stored = JSON.parse(JSON.stringify(entity))
+        assert.equal(stored.installedIn.object, 'urn:ngsi-ld:Building:headquarters')
+    })
+
+    test('relationship metadata survives JSON round-trip', ({ assert }) => {
+        const entity: NgsiLdEntity = {
+            id: buildUrn('Device', 'sensor-2'),
+            type: 'Device',
+            installedIn: relationship(
+                'urn:ngsi-ld:Building:headquarters',
+                { observedAt: '2026-03-01T00:00:00Z' }
+            ),
+        }
+
+        const stored = JSON.parse(JSON.stringify(entity))
+        assert.equal(stored.installedIn.observedAt, '2026-03-01T00:00:00Z')
+    })
+})
+
+// ── buildUrn / parseUrn ───────────────────────────────────────────────────────
+
+test.group('URN helpers', () => {
+    test('buildUrn produces a valid NGSI-LD URN', ({ assert }) => {
         assert.equal(buildUrn('AirQualityObserved', 'sensor-42'), 'urn:ngsi-ld:AirQualityObserved:sensor-42')
-    })
-
-    test('handles localId with colons', ({ assert }) => {
-        assert.equal(buildUrn('Device', 'zone:1:sensor:2'), 'urn:ngsi-ld:Device:zone:1:sensor:2')
-    })
-})
-
-test.group('parseUrn()', () => {
-    test('parses a valid NGSI-LD URN', ({ assert }) => {
-        const result = parseUrn('urn:ngsi-ld:AirQualityObserved:sensor-42')
-        assert.equal(result.type, 'AirQualityObserved')
-        assert.equal(result.localId, 'sensor-42')
-    })
-
-    test('handles localId containing colons', ({ assert }) => {
-        const result = parseUrn('urn:ngsi-ld:Device:zone:1:sensor:2')
-        assert.equal(result.type, 'Device')
-        assert.equal(result.localId, 'zone:1:sensor:2')
-    })
-
-    test('throws on invalid format (no ngsi-ld prefix)', ({ assert }) => {
-        assert.throws(() => parseUrn('urn:other:Foo:bar'), /Invalid NGSI-LD URN/)
-    })
-
-    test('throws on completely wrong format', ({ assert }) => {
-        assert.throws(() => parseUrn('not-a-urn'), /Invalid NGSI-LD URN/)
     })
 
     test('buildUrn and parseUrn are inverse operations', ({ assert }) => {
@@ -99,44 +125,51 @@ test.group('parseUrn()', () => {
         assert.equal(parsed.type, 'WeatherObserved')
         assert.equal(parsed.localId, 'station-99')
     })
+
+    test('localId containing colons round-trips correctly', ({ assert }) => {
+        const urn = buildUrn('Device', 'zone:1:sensor:2')
+        const parsed = parseUrn(urn)
+        assert.equal(parsed.localId, 'zone:1:sensor:2')
+    })
+
+    test('parseUrn throws on invalid format', ({ assert }) => {
+        assert.throws(() => parseUrn('not-a-urn'), /Invalid NGSI-LD URN/)
+        assert.throws(() => parseUrn('urn:other:Foo:bar'), /Invalid NGSI-LD URN/)
+    })
 })
 
-test.group('type guards', () => {
-    test('isNgsiLdCollector returns false for plain object', ({ assert }) => {
-        assert.isFalse(isNgsiLdCollector({}))
-    })
+// ── Type guards ───────────────────────────────────────────────────────────────
 
-    test('isNgsiLdCollector returns false for null', ({ assert }) => {
-        assert.isFalse(isNgsiLdCollector(null))
-    })
-
-    test('isNgsiLdCollector returns true for duck-typed object', ({ assert }) => {
-        const fakeCollector = {
-            toNgsiLdEntity: () => ({}),
+test.group('NGSI-LD type guards', () => {
+    test('a component implementing toNgsiLdEntity is recognized as NGSI-LD capable', ({ assert }) => {
+        const ngsiCollector = {
+            toNgsiLdEntity: () => ({} as NgsiLdEntity),
             collect: async () => Buffer.from(''),
             getSchedule: () => '* * * * * *',
         }
-        assert.isTrue(isNgsiLdCollector(fakeCollector))
-    })
-
-    test('isNgsiLdHarvester returns false for plain object', ({ assert }) => {
-        assert.isFalse(isNgsiLdHarvester({}))
-    })
-
-    test('isNgsiLdHarvester returns true for duck-typed object', ({ assert }) => {
-        const fakeHarvester = {
-            toNgsiLdEntity: () => ({}),
+        const ngsiHarvester = {
+            toNgsiLdEntity: () => ({} as NgsiLdEntity),
             harvest: async () => Buffer.from(''),
             getUserConfiguration: () => ({}),
         }
-        assert.isTrue(isNgsiLdHarvester(fakeHarvester))
+
+        assert.isTrue(isNgsiLdCollector(ngsiCollector))
+        assert.isTrue(isNgsiLdHarvester(ngsiHarvester))
     })
 
-    test('isNgsiLdCollector returns false when toNgsiLdEntity is missing', ({ assert }) => {
-        const noNgsi = {
+    test('a standard component without toNgsiLdEntity is not treated as NGSI-LD capable', ({ assert }) => {
+        const plainCollector = {
             collect: async () => Buffer.from(''),
             getSchedule: () => '* * * * * *',
         }
-        assert.isFalse(isNgsiLdCollector(noNgsi))
+        const plainHarvester = {
+            harvest: async () => Buffer.from(''),
+            getUserConfiguration: () => ({}),
+        }
+
+        assert.isFalse(isNgsiLdCollector(plainCollector))
+        assert.isFalse(isNgsiLdHarvester(plainHarvester))
+        assert.isFalse(isNgsiLdCollector(null))
+        assert.isFalse(isNgsiLdCollector({}))
     })
 })

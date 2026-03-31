@@ -5,6 +5,8 @@
  * from component → database → storage and back.
  */
 import { Collector, Harvester, Handler, CustomTableManager } from '@cepseudo/components'
+import { NgsiLdCollector, buildWeatherObserved } from '@cepseudo/ngsi-ld'
+import type { NgsiLdEntity } from '@cepseudo/ngsi-ld'
 import { AssetsManager, TilesetManager, MapManager } from '@cepseudo/assets'
 import { servableEndpoint } from '@cepseudo/shared'
 import type {
@@ -150,6 +152,38 @@ export class E2EMapManager extends MapManager {
             endpoint: 'e2e-maps',
             extension: '.json',
         }
+    }
+}
+
+// ── NgsiLdCollector ──────────────────────────────────────────────────────────
+
+export class NgsiLdWeatherCollector extends NgsiLdCollector {
+    getConfiguration(): CollectorConfiguration {
+        return {
+            name: 'e2e_ngsi_weather',
+            description: 'E2E NGSI-LD weather collector',
+            contentType: 'application/json',
+            endpoint: 'e2e-ngsi-weather',
+        }
+    }
+
+    getSchedule(): string {
+        return '0 */15 * * * *'
+    }
+
+    async collect(): Promise<Buffer> {
+        const data = { temperature: 18.5, humidity: 72, windSpeed: 4.2 }
+        return Buffer.from(JSON.stringify(data))
+    }
+
+    toNgsiLdEntity(data: unknown): NgsiLdEntity {
+        const d = data as { temperature: number; humidity: number; windSpeed: number }
+        return buildWeatherObserved({
+            localId: 'e2e-station-1',
+            temperature: d.temperature,
+            relativeHumidity: d.humidity,
+            windSpeed: d.windSpeed,
+        })
     }
 }
 
