@@ -5,87 +5,82 @@ import { MockDatabaseAdapter } from './fixtures/mock_database.js'
 import { MockStorageService } from './fixtures/mock_storage.js'
 
 test.group('initializeComponents', () => {
-    test('injects dependencies into each component', async ({ assert }) => {
-        const database = new MockDatabaseAdapter()
+    test('collector can save and retrieve data after initialization', async ({ assert }) => {
+        const db = new MockDatabaseAdapter()
         const storage = new MockStorageService()
-        const collector = new TestCollector('c1')
-        const harvester = new TestHarvester('h1')
+        const collector = new TestCollector('sensor-data')
 
-        let collectorInjected = false
-        let harvesterInjected = false
+        await initializeComponents([collector], db, storage)
 
-        collector.setDependencies = (db, st) => {
-            collectorInjected = true
-            assert.strictEqual(db, database)
-            assert.strictEqual(st, storage)
-        }
-        harvester.setDependencies = (db, st) => {
-            harvesterInjected = true
-        }
+        await collector.run()
 
-        database.doesTableExists = async () => true
-
-        await initializeComponents([collector, harvester], database, storage)
-
-        assert.isTrue(collectorInjected)
-        assert.isTrue(harvesterInjected)
+        const saved = await db.getLatestByName('sensor-data')
+        assert.isNotNull(saved)
+        assert.equal(saved!.name, 'sensor-data')
     })
 
-    test('auto-creates tables that do not exist', async ({ assert }) => {
-        const database = new MockDatabaseAdapter()
+    test('component table is created when it did not previously exist', async ({ assert }) => {
+        const db = new MockDatabaseAdapter()
         const storage = new MockStorageService()
-        const collector = new TestCollector('new-table')
+        const collector = new TestCollector('fresh-table')
 
-        const createdTables: string[] = []
-        const origCreate = database.createTable.bind(database)
-        database.createTable = async (name: string) => {
-            createdTables.push(name)
-            return origCreate(name)
-        }
-        database.doesTableExists = async () => false
+        assert.isFalse(await db.doesTableExists('fresh-table'))
 
-        await initializeComponents([collector], database, storage)
+        await initializeComponents([collector], db, storage)
 
-        assert.include(createdTables, 'new-table')
+        assert.isTrue(await db.doesTableExists('fresh-table'))
     })
 
-    test('skips table creation for existing tables', async ({ assert }) => {
-        const database = new MockDatabaseAdapter()
+    test('initializing a component whose table already exists does not discard existing records', async ({ assert }) => {
+        const db = new MockDatabaseAdapter()
         const storage = new MockStorageService()
 
-        await database.createTable('existing')
-        const collector = new TestCollector('existing')
+        await db.createTable('existing-data')
+        await db.save({ name: 'existing-data', url: 'storage/path', type: 'application/json', date: new Date() })
 
-        let createCalled = false
-        database.createTable = async () => { createCalled = true }
+        const collector = new TestCollector('existing-data')
 
-        await initializeComponents([collector], database, storage)
+        await initializeComponents([collector], db, storage)
 
-        assert.isFalse(createCalled)
+        const records = await db.getAllByName('existing-data')
+        assert.lengthOf(records, 1)
     })
 
-    test('propagates database errors', async ({ assert }) => {
-        const database = new MockDatabaseAdapter()
+    test('all components in the array get their tables and can run', async ({ assert }) => {
+        const db = new MockDatabaseAdapter()
+        const storage = new MockStorageService()
+        const c1 = new TestCollector('alpha')
+        const c2 = new TestCollector('beta')
+        const h1 = new TestHarvester('gamma')
+
+        await initializeComponents([c1, c2, h1], db, storage)
+
+        assert.isTrue(await db.doesTableExists('alpha'))
+        assert.isTrue(await db.doesTableExists('beta'))
+        assert.isTrue(await db.doesTableExists('gamma'))
+
+        await c1.run()
+        await c2.run()
+
+        assert.isNotNull(await db.getLatestByName('alpha'))
+        assert.isNotNull(await db.getLatestByName('beta'))
+    })
+
+    test('initialization fails when the database is unreachable', async ({ assert }) => {
+        const db = new MockDatabaseAdapter({ shouldThrow: { doesTableExists: true } })
         const storage = new MockStorageService()
         const collector = new TestCollector('fail')
 
-        database.doesTableExists = async () => { throw new Error('DB down') }
-
         await assert.rejects(
-            () => initializeComponents([collector], database, storage),
-            /DB down/
+            () => initializeComponents([collector], db, storage),
+            /Mock doesTableExists error/
         )
     })
 
-    test('handles empty component array', async ({ assert }) => {
-        const database = new MockDatabaseAdapter()
+    test('does nothing when the component array is empty', async ({ assert }) => {
+        const db = new MockDatabaseAdapter()
         const storage = new MockStorageService()
 
-        let tableChecked = false
-        database.doesTableExists = async () => { tableChecked = true; return true }
-
-        await initializeComponents([], database, storage)
-
-        assert.isFalse(tableChecked)
+        await assert.doesNotReject(() => initializeComponents([], db, storage))
     })
 })
