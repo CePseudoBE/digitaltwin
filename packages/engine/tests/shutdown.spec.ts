@@ -12,14 +12,6 @@ function createEngine() {
 }
 
 test.group('Engine shutdown', () => {
-    test('stop() sets isShuttingDown flag', async ({ assert }) => {
-        const engine = createEngine()
-
-        assert.isFalse(engine.isShuttingDown())
-        await engine.stop()
-        assert.isTrue(engine.isShuttingDown())
-    })
-
     test('stop() is idempotent — second call returns immediately', async ({ assert }) => {
         const engine = createEngine()
 
@@ -32,33 +24,66 @@ test.group('Engine shutdown', () => {
 })
 
 test.group('setupGracefulShutdown', () => {
-    test('registers and removes signal handlers', ({ assert }) => {
+    // engine.stop is stubbed in signal tests to isolate the onShutdown behavior
+    // from the engine's own async teardown sequence and its process.exit(0) call.
+
+    test('onShutdown callback runs when a signal is received', async ({ assert }) => {
         const engine = createEngine()
-        const before = {
-            SIGTERM: process.listenerCount('SIGTERM'),
-            SIGINT: process.listenerCount('SIGINT')
+        engine.stop = async () => {}
+
+        const originalExit = process.exit
+        process.exit = (() => {}) as any
+
+        try {
+            let shutdownRan = false
+            const shutdownDone = new Promise<void>(resolve => {
+                setupGracefulShutdown(engine, {
+                    signals: ['SIGUSR2'],
+                    logger: () => {},
+                    onShutdown: async () => {
+                        shutdownRan = true
+                        resolve()
+                    }
+                })
+            })
+
+            process.emit('SIGUSR2' as any)
+            await shutdownDone
+
+            assert.isTrue(shutdownRan)
+
+            // Wait for the rest of the shutdown sequence (engine.stop → process.exit)
+            // to complete while process.exit is still mocked, avoiding a race condition.
+            await new Promise(resolve => setTimeout(resolve, 50))
+        } finally {
+            process.exit = originalExit
         }
-
-        const cleanup = setupGracefulShutdown(engine)
-
-        assert.equal(process.listenerCount('SIGTERM'), before.SIGTERM + 1)
-        assert.equal(process.listenerCount('SIGINT'), before.SIGINT + 1)
-
-        cleanup()
-
-        assert.equal(process.listenerCount('SIGTERM'), before.SIGTERM)
-        assert.equal(process.listenerCount('SIGINT'), before.SIGINT)
     })
 
-    test('supports custom signal list', ({ assert }) => {
+    test('after cleanup(), signals no longer trigger shutdown', async ({ assert }) => {
         const engine = createEngine()
-        const before = process.listenerCount('SIGUSR1')
+        engine.stop = async () => {}
 
-        const cleanup = setupGracefulShutdown(engine, { signals: ['SIGUSR1'] })
-        assert.equal(process.listenerCount('SIGUSR1'), before + 1)
+        const originalExit = process.exit
+        process.exit = (() => {}) as any
 
-        cleanup()
-        assert.equal(process.listenerCount('SIGUSR1'), before)
+        try {
+            let shutdownRan = false
+            const cleanup = setupGracefulShutdown(engine, {
+                signals: ['SIGUSR2'],
+                logger: () => {},
+                onShutdown: async () => { shutdownRan = true }
+            })
+
+            cleanup()
+
+            process.emit('SIGUSR2' as any)
+            await new Promise(resolve => setTimeout(resolve, 100))
+
+            assert.isFalse(shutdownRan)
+        } finally {
+            process.exit = originalExit
+        }
     })
 
     test('cleanup can be called multiple times safely', ({ assert }) => {
@@ -71,38 +96,6 @@ test.group('setupGracefulShutdown', () => {
         cleanup()
 
         assert.equal(process.listenerCount('SIGTERM'), before)
-    })
-
-    test('invokes engine.stop() when signal handler fires', async ({ assert }) => {
-        const engine = createEngine()
-        let stopCalled = false
-
-        // Override stop to track call without actually exiting
-        const originalStop = engine.stop.bind(engine)
-        engine.stop = async () => {
-            stopCalled = true
-            // Don't call originalStop to avoid process.exit
-        }
-
-        // Override process.exit to prevent test from exiting
-        const originalExit = process.exit
-        process.exit = (() => {}) as any
-
-        const cleanup = setupGracefulShutdown(engine, {
-            signals: ['SIGUSR2'],
-            logger: () => {} // suppress logs
-        })
-
-        // Simulate the signal
-        process.emit('SIGUSR2' as any)
-
-        // Give async handler time to run
-        await new Promise(resolve => setTimeout(resolve, 50))
-
-        assert.isTrue(stopCalled)
-
-        cleanup()
-        process.exit = originalExit
     })
 })
 

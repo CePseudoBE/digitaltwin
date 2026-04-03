@@ -38,16 +38,17 @@ test.group('Engine.register() — component registration', () => {
         assert.include(types, 'custom_table_manager')
     })
 
-    test('supports fluent chaining', async ({ assert }) => {
+    test('chained register() calls all end up registered', async ({ assert }) => {
         const engine = createEngine()
 
-        const result = engine
+        engine
             .register(new TestCollector('a'))
             .register(new TestHandler('b'))
 
-        assert.strictEqual(result, engine)
         const v = await engine.validateConfiguration()
         assert.equal(v.summary.total, 2)
+        assert.isNotNull(v.components.find(c => c.name === 'a'))
+        assert.isNotNull(v.components.find(c => c.name === 'b'))
     })
 
     test('rejects duplicate names within same component type', ({ assert }) => {

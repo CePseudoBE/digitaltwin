@@ -6,7 +6,13 @@ import { QueueManager } from '../src/queue_manager.js'
 import { MockDatabaseAdapter } from './fixtures/mock_database.js'
 import { MockStorageService } from './fixtures/mock_storage.js'
 import { TestCollector, TestHarvester } from './fixtures/mock_components.js'
-import { engineEventBus } from '@cepseudo/shared'
+
+function waitForWorkerEvent(worker: { on: (event: string, cb: (...args: any[]) => void) => void }, event: string, timeoutMs = 10000): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`Timed out waiting for worker '${event}' event`)), timeoutMs)
+        worker.on(event, () => { clearTimeout(timer); resolve() })
+    })
+}
 
 test.group('Scheduler (Redis integration)', (group) => {
     let redisContainer: any
@@ -33,42 +39,40 @@ test.group('Scheduler (Redis integration)', (group) => {
         await redisContainer.stop()
     })
 
-    test('creates workers for scheduled collectors and harvesters', async ({ assert }) => {
+    test('collector job is processed and data is persisted in the database', async ({ assert }) => {
         const collector = new TestCollector('c1')
-        const harvester = new TestHarvester('h1')
         collector.setDependencies(db, storage)
-        harvester.setDependencies(db, storage)
 
-        const workers = await scheduleComponents([collector, harvester], queueManager, true)
+        const workers = await scheduleComponents([collector], queueManager, true)
+        const collectorWorker = workers[0]
 
-        assert.isAbove(workers.length, 0)
-        assert.isTrue(workers.every(w => typeof w.close === 'function'))
+        await queueManager.collectorQueue.add('c1', { type: 'collector', triggeredBy: 'schedule' })
+        await waitForWorkerEvent(collectorWorker, 'completed')
+
+        const saved = await db.getLatestByName('c1')
+        assert.isNotNull(saved)
+        assert.equal(saved!.name, 'c1')
 
         for (const w of workers) await w.close()
     })
 
-    test('event-triggered harvester fires on collector completion', async ({ assert }) => {
+    test('event-triggered harvester produces output when source collector completes', async ({ assert }) => {
         const collector = new TestCollector('source')
-        const harvester = new TestHarvester('triggered', [], 'source', 'on-source')
+        const harvester = new TestHarvester('processed', [], 'source', 'on-source')
         collector.setDependencies(db, storage)
         harvester.setDependencies(db, storage)
 
-        let triggered = false
-        const origRun = harvester.run.bind(harvester)
-        harvester.run = async () => { triggered = true; await origRun(); return true }
-
         const workers = await scheduleComponents([collector, harvester], queueManager, true)
+        const harvesterWorker = workers[1]
 
-        engineEventBus.emit('component:event', {
-            type: 'collector:completed',
-            componentName: 'source',
-            timestamp: new Date(),
-            data: { success: true },
-        })
+        // Collect source data — also emits collector:completed which triggers the harvester
+        await collector.run()
 
-        // Wait for event processing
-        await new Promise(res => setTimeout(res, 200))
-        assert.isTrue(triggered)
+        await waitForWorkerEvent(harvesterWorker, 'completed')
+
+        const processed = await db.getLatestByName('processed')
+        assert.isNotNull(processed)
+        assert.equal(processed!.name, 'processed')
 
         for (const w of workers) await w.close()
     })

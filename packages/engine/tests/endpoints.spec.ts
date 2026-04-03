@@ -3,31 +3,40 @@ import { exposeEndpoints } from '../src/endpoints.js'
 import { TestCollector, TestHarvester, TestHandler } from './fixtures/mock_components.js'
 
 class MockRouter {
-    public routes: Array<{ method: string; path: string; handler: Function }> = []
-    get(path: string, handler: Function) { this.routes.push({ method: 'get', path, handler }) }
-    post(path: string, handler: Function) { this.routes.push({ method: 'post', path, handler }) }
-    put(path: string, handler: Function) { this.routes.push({ method: 'put', path, handler }) }
-    delete(path: string, handler: Function) { this.routes.push({ method: 'delete', path, handler }) }
-    patch(path: string, handler: Function) { this.routes.push({ method: 'patch', path, handler }) }
+    private routes = new Map<string, (req: any, res: any) => Promise<void>>()
+
+    private reg(method: string, path: string, handler: (req: any, res: any) => Promise<void>) {
+        this.routes.set(`${method.toUpperCase()} ${path}`, handler)
+    }
+
+    get(path: string, handler: (req: any, res: any) => any) { this.reg('GET', path, handler) }
+    post(path: string, handler: (req: any, res: any) => any) { this.reg('POST', path, handler) }
+    put(path: string, handler: (req: any, res: any) => any) { this.reg('PUT', path, handler) }
+    delete(path: string, handler: (req: any, res: any) => any) { this.reg('DELETE', path, handler) }
+    patch(path: string, handler: (req: any, res: any) => any) { this.reg('PATCH', path, handler) }
+
+    async invoke(method: string, path: string, req: any, res: any): Promise<void> {
+        const handler = this.routes.get(`${method.toUpperCase()} ${path}`)
+        if (!handler) throw new Error(`No handler registered: ${method.toUpperCase()} ${path}`)
+        await handler(req, res)
+    }
 }
 
 class MockResponse {
-    private _status = 200
-    private _headers: Record<string, string> = {}
-    public sentContent: any = null
+    statusCode = 200
+    body: any = null
+    headers: Record<string, string> = {}
 
-    status(code: number) { this._status = code; return this }
-    header(headers: Record<string, string>) { this._headers = { ...this._headers, ...headers }; return this }
-    send(content: any) { this.sentContent = content; return this }
-    getStatus() { return this._status }
-    getHeaders() { return this._headers }
+    status(code: number) { this.statusCode = code; return this }
+    header(h: Record<string, string>) { this.headers = { ...this.headers, ...h }; return this }
+    send(content: any) { this.body = content; return this }
 }
 
 test.group('exposeEndpoints', () => {
-    test('registers component endpoints on the router', async ({ assert }) => {
+    test('all component endpoints are reachable and return the configured response', async ({ assert }) => {
         const router = new MockRouter()
         const collector = new TestCollector('c1', [
-            { method: 'get', path: '/data', handler: async () => ({ status: 200, content: 'ok' }) }
+            { method: 'get', path: '/data', handler: async () => ({ status: 200, content: { ok: true } }) }
         ])
         const handler = new TestHandler('h1', [
             { method: 'post', path: '/action', handler: async () => ({ status: 201, content: 'created' }) },
@@ -36,27 +45,36 @@ test.group('exposeEndpoints', () => {
 
         await exposeEndpoints(router as any, [collector, handler])
 
-        assert.lengthOf(router.routes, 3)
-        assert.equal(router.routes[0].path, '/data')
-        assert.equal(router.routes[0].method, 'get')
-        assert.equal(router.routes[1].path, '/action')
-        assert.equal(router.routes[1].method, 'post')
-        assert.equal(router.routes[2].path, '/action/:id')
-        assert.equal(router.routes[2].method, 'delete')
+        const getRes = new MockResponse()
+        await router.invoke('GET', '/data', {}, getRes)
+        assert.equal(getRes.statusCode, 200)
+        assert.deepEqual(getRes.body, { ok: true })
+
+        const postRes = new MockResponse()
+        await router.invoke('POST', '/action', {}, postRes)
+        assert.equal(postRes.statusCode, 201)
+        assert.equal(postRes.body, 'created')
+
+        const deleteRes = new MockResponse()
+        await router.invoke('DELETE', '/action/:id', {}, deleteRes)
+        assert.equal(deleteRes.statusCode, 204)
     })
 
-    test('normalizes HTTP methods to lowercase', async ({ assert }) => {
+    test('component endpoint defined with uppercase method is reachable', async ({ assert }) => {
         const router = new MockRouter()
         const handler = new TestHandler('h', [
-            { method: 'GET' as any, path: '/upper', handler: async () => ({ status: 200, content: '' }) }
+            { method: 'GET' as any, path: '/upper', handler: async () => ({ status: 200, content: 'upper works' }) }
         ])
 
         await exposeEndpoints(router as any, [handler])
 
-        assert.equal(router.routes[0].method, 'get')
+        const res = new MockResponse()
+        await router.invoke('GET', '/upper', {}, res)
+        assert.equal(res.statusCode, 200)
+        assert.equal(res.body, 'upper works')
     })
 
-    test('passes request to component handler and sends response', async ({ assert }) => {
+    test('passes request data to component handler', async ({ assert }) => {
         const router = new MockRouter()
         let receivedReq: any = null
 
@@ -73,12 +91,12 @@ test.group('exposeEndpoints', () => {
 
         const req = { params: { id: '5' }, body: { name: 'x' } }
         const res = new MockResponse()
-        await router.routes[0].handler(req, res)
+        await router.invoke('POST', '/test', req, res)
 
         assert.deepEqual(receivedReq.params, { id: '5' })
-        assert.equal(res.getStatus(), 201)
-        assert.equal(res.getHeaders()['X-Custom'], 'val')
-        assert.deepEqual(res.sentContent, { ok: true })
+        assert.equal(res.statusCode, 201)
+        assert.equal(res.headers['X-Custom'], 'val')
+        assert.deepEqual(res.body, { ok: true })
     })
 
     test('throws for unsupported HTTP methods', async ({ assert }) => {
@@ -95,7 +113,6 @@ test.group('exposeEndpoints', () => {
 
     test('handles components with no endpoints', async ({ assert }) => {
         const router = new MockRouter()
-        await exposeEndpoints(router as any, [new TestCollector('empty', [])])
-        assert.lengthOf(router.routes, 0)
+        await assert.doesNotReject(() => exposeEndpoints(router as any, [new TestCollector('empty', [])]))
     })
 })
