@@ -698,6 +698,14 @@ export class DigitalTwinEngine {
     }
 
     /**
+     * Returns the auth middleware built during start(), for plugins registered by hand.
+     * Undefined before start().
+     */
+    getAuthMiddleware(): AuthMiddleware | undefined {
+        return this.#authMiddleware
+    }
+
+    /**
      * Returns the Redis connection configuration extracted from engine options.
      * Falls back to localhost:6379 when no Redis config was provided.
      */

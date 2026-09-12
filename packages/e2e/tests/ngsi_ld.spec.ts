@@ -114,6 +114,8 @@ test.group('NGSI-LD E2E — engine + real HTTP', group => {
             redis: redisConfig,
             components: engine.getAllComponents(),
             logger: new Logger('ngsi-ld'),
+            authMiddleware: engine.getAuthMiddleware(),
+            allowPrivateWebhooks: true, // the webhook receiver below listens on 127.0.0.1
         })
 
         baseUrl = `http://localhost:${ENGINE_PORT}`
