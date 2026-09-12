@@ -22,6 +22,7 @@ import {
     multiStatusResponse,
     HttpStatus,
     safeAsync,
+    parseBoolean,
     Logger,
     validateAssetUpdate,
     validateIdParam,
@@ -438,7 +439,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
         return {
             description: body?.description as string,
             source: body?.source as string,
-            is_public: body?.is_public as boolean | undefined,
+            is_public: parseBoolean(body?.is_public, 'is_public'),
             filePath: req.file?.path,
             fileBuffer: req.file?.buffer,
             filename: req.file?.originalname || (body?.filename as string | undefined)
@@ -483,7 +484,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
                 filePath: data.filePath,
                 fileBuffer: data.fileBuffer,
                 filename: data.filename,
-                is_public: data.is_public !== undefined ? Boolean(data.is_public) : true
+                is_public: data.is_public ?? true
             }
         }
     }
@@ -1223,7 +1224,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             const updates: UpdateAssetRequest = {}
             if (description !== undefined) updates.description = description
             if (source !== undefined) updates.source = source
-            if (is_public !== undefined) updates.is_public = Boolean(is_public)
+            if (is_public !== undefined) updates.is_public = parseBoolean(is_public, 'is_public')
 
             await this.updateAssetMetadata(validatedParams.id.toString(), updates)
 
@@ -1446,7 +1447,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
                     owner_id: ownerId,
                     filename: request.filename,
                     file: Buffer.from(request.file, 'base64'),
-                    is_public: request.is_public !== undefined ? Boolean(request.is_public) : true
+                    is_public: parseBoolean(request.is_public, 'is_public') ?? true
                 })
                 results.push({ success: true, filename: request.filename })
             } catch (error) {

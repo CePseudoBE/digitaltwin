@@ -9,7 +9,8 @@ import {
     forbiddenResponse,
     safeAsync,
     safeCleanup,
-    Logger
+    Logger,
+    parseBoolean
 } from '@cepseudo/shared'
 import { ApisixAuthParser } from '@cepseudo/auth'
 import { extractAndStoreArchive } from './utils/zip_utils.js'
@@ -146,7 +147,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
             }
 
             const config = this.getConfiguration()
-            const isPublic = body.is_public !== undefined ? Boolean(body.is_public) : true
+            const isPublic = parseBoolean(body.is_public, 'is_public') ?? true
 
             // Route to async or sync based on file size and queue availability
             if (this.uploadQueue && filePath && fileSize >= ASYNC_UPLOAD_THRESHOLD) {

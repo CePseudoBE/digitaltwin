@@ -691,3 +691,30 @@ test.group('TilesetManager — async upload queue', () => {
         assert.isTrue(manager.hasUploadQueue())
     })
 })
+
+test.group('TilesetManager - is_public from multipart form fields', (group) => {
+    group.setup(() => enableAuth())
+    group.teardown(() => disableAuth())
+
+    test('the string "false" stores a private tileset', async ({ assert }) => {
+        const manager = new TestTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-tileset-private')
+        manager.setDependencies(db, storage)
+
+        const zipPath = await createTestTilesetZip({ 'tileset.json': createTilesetJson() })
+        try {
+            const response = await manager.handleUpload({
+                body: { description: 'Private tileset', is_public: 'false' },
+                file: { path: zipPath, originalname: 'private.zip' },
+                headers: authHeaders()
+            })
+
+            assert.equal(response.status, 200)
+            assert.isFalse(db.getAllRecords()[0].is_public)
+        } finally {
+            await fs.unlink(zipPath).catch(() => {})
+            await fs.rm('.test-tileset-private', { recursive: true, force: true }).catch(() => {})
+        }
+    })
+})
