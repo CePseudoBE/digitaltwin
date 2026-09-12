@@ -144,7 +144,12 @@ test.group('Scheduler with Redis container', (group) => {
       data: { success: true },
     })
 
-    await new Promise((res) => setTimeout(res, 150))
+    // The trigger is debounced (100 ms) and then goes through a BullMQ round trip, so a fixed
+    // sleep is a race on a slow runner. Poll until the harvester ran, with a generous ceiling.
+    const deadline = Date.now() + 5000
+    while (!triggered && Date.now() < deadline) {
+      await new Promise((res) => setTimeout(res, 25))
+    }
     assert.isTrue(triggered)
 
     for (const worker of workers) {
