@@ -12,14 +12,15 @@ The roadmap is tracked in **GitHub Issues and Milestones**, not in this file:
 | # | Milestone | Outcome |
 |---|-----------|---------|
 | 0 | Stabilize | Blocking bugs and security holes from the September 2026 audit fixed. No breaking changes. |
-| 1 | Auth 2.0 (OIDC) | Async `AuthProvider`, `OidcAuthProvider` with JWKS discovery, generic opt-in trusted-headers mode, fail-closed defaults, `keycloak_id` → `subject`. |
-| 2 | Provider-neutral naming | `OvhStorageService` → `S3StorageService`, `S3_*` env vars, no APISIX / OVH / Keycloak / ULB assumptions anywhere. |
-| 3 | Remove legacy | `digitaltwin-core` shim, Knex adapter, hand-rolled YAML and other dead code deleted. |
-| 4 | Onboarding experience | `docker-compose.dev.yml` with a demo Keycloak realm, `examples/smart-city`, README and CONTRIBUTING rewritten for strangers, scaffolder generating 2.0 projects, e2e OIDC test. |
-| 5 | Release 2.0 | Migration guide, changelog, working publish pipeline, `2.0.0` on npm. |
+| 1 | HTTP layer (Fastify) | `ultimate-express` replaced by Fastify 5 + TypeBox per [ADR 0001](docs/adr/0001-http-framework.md): framework-neutral `TypedRequest`, official plugins for multipart, CORS, compression and OpenAPI, VineJS replaced by TypeBox. |
+| 2 | Auth 2.0 (OIDC) | Async `AuthProvider`, `OidcAuthProvider` with JWKS discovery, generic opt-in trusted-headers mode, fail-closed defaults, `keycloak_id` → `subject`. |
+| 3 | Provider-neutral naming | `OvhStorageService` → `S3StorageService`, `S3_*` env vars, no APISIX / OVH / Keycloak / ULB assumptions anywhere. |
+| 4 | Remove legacy | `digitaltwin-core` shim, Knex adapter, hand-rolled YAML and other dead code deleted. |
+| 5 | Onboarding experience | `docker-compose.dev.yml` with a demo Keycloak realm, `examples/smart-city`, README and CONTRIBUTING rewritten for strangers, scaffolder generating 2.0 projects, e2e OIDC test, development mode without Redis. |
+| 6 | Release 2.0 | Migration guide, changelog, working publish pipeline, `2.0.0` on npm. |
 | — | Backlog | Real bugs and improvements that do not block the 2.0 line. |
 
-Milestones are worked in order. Inside a milestone, issues are independent unless their body says `Depends on:`.
+Architecture decisions that shape a milestone are recorded in `docs/adr/`. Milestones are worked in order. Inside a milestone, issues are independent unless their body says `Depends on:`.
 
 ## Process
 
