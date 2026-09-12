@@ -16,15 +16,8 @@ const MINIO_USER = 'minioadmin'
 const MINIO_PASSWORD = 'minioadmin'
 const BUCKET = 'test-bucket'
 
-/**
- * Uses the MinIO service from the environment when TEST_MINIO_ENDPOINT is set
- * (CI job service), otherwise starts a throwaway container via testcontainers.
- * Image pinned on quay.io: the Docker Hub `minio/minio` repository is gone.
- */
-async function startMinio(): Promise<{ container?: StartedTestContainer; endpoint: string }> {
-    const fromEnv = process.env.TEST_MINIO_ENDPOINT
-    if (fromEnv) return { endpoint: fromEnv }
-
+// Image pinned on quay.io: the Docker Hub `minio/minio` repository is gone.
+async function startMinio(): Promise<{ container: StartedTestContainer; endpoint: string }> {
     const container = await new GenericContainer('quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z.hotfix.7aa24e772')
         .withEnvironment({
             MINIO_ROOT_USER: MINIO_USER,
@@ -51,13 +44,7 @@ async function createBucket(endpoint: string): Promise<void> {
         requestChecksumCalculation: 'WHEN_REQUIRED',
         responseChecksumValidation: 'WHEN_REQUIRED',
     })
-    try {
-        await s3.send(new CreateBucketCommand({ Bucket: BUCKET }))
-    } catch (err) {
-        // Bucket may already exist when a shared MinIO service is used
-        const name = err instanceof Error ? err.name : ''
-        if (name !== 'BucketAlreadyOwnedByYou' && name !== 'BucketAlreadyExists') throw err
-    }
+    await s3.send(new CreateBucketCommand({ Bucket: BUCKET }))
     await s3.destroy()
 }
 
@@ -73,7 +60,7 @@ function makeStorage(endpoint: string): OvhS3StorageService {
 }
 
 test.group('OvhS3StorageService (MinIO integration)', group => {
-    let container: StartedTestContainer | undefined
+    let container: StartedTestContainer
     let endpoint: string
     let storage: OvhS3StorageService
 
@@ -86,7 +73,7 @@ test.group('OvhS3StorageService (MinIO integration)', group => {
     })
 
     group.teardown(async () => {
-        await container?.stop()
+        await container.stop()
     })
 
     // ── save / retrieve ────────────────────────────────────────────────────

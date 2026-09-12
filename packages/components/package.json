@@ -1,6 +1,6 @@
 {
   "name": "@cepseudo/components",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Core component base classes for Digital Twin framework (Collector, Harvester, Handler, CustomTableManager)",
   "license": "MIT",
   "author": "Axel Hoffmann",

@@ -1,6 +1,6 @@
 {
   "name": "@cepseudo/storage",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Storage service abstraction for Digital Twin framework (local filesystem, OVH S3)",
   "license": "MIT",
   "author": "Axel Hoffmann",
