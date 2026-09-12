@@ -5,6 +5,8 @@ import type { AssetsManagerConfiguration, DataResponse } from '@cepseudo/shared'
 import { MockDatabaseAdapter } from './mocks/mock_database_adapter.js'
 import { MockStorageService } from './mocks/mock_storage_service.js'
 import { AuthConfig, ApisixAuthParser } from '@cepseudo/auth'
+import { LocalStorageService } from '@cepseudo/storage'
+import fs from 'node:fs/promises'
 
 class TestAssetsManager extends AssetsManager {
     getConfiguration(): AssetsManagerConfiguration {
@@ -377,10 +379,31 @@ test.group('AssetsManager — delete', (group) => {
         const db = new MockDatabaseAdapter({ storage, initialData: [recordToDelete] })
         const manager = new TestAssetsManager()
         manager.setDependencies(db, storage)
+        await storage.saveWithPath(Buffer.from('content'), recordToDelete.url)
 
         assert.isTrue(db.hasRecord('123'))
         await manager.deleteAssetById('123')
         assert.isFalse(db.hasRecord('123'))
+        assert.isFalse(storage.has(recordToDelete.url), 'stored object must be gone too')
+    })
+
+    test('deleteAssetById() keeps the row and surfaces the error when storage fails', async ({ assert }) => {
+        class FailingStorage extends MockStorageService {
+            override async delete(): Promise<void> { throw new Error('bucket unreachable') }
+        }
+        const storage = new FailingStorage()
+        const record = {
+            id: 124, name: 'test_assets', contentType: 'application/octet-stream',
+            url: 'test_assets/124/keep.bin', date: new Date(),
+            data: async () => Buffer.from('content'),
+            description: 'Survives', source: 'https://example.com', owner_id: 'user123', filename: 'keep.bin'
+        }
+        const db = new MockDatabaseAdapter({ storage, initialData: [record] })
+        const manager = new TestAssetsManager()
+        manager.setDependencies(db, storage)
+
+        await assert.rejects(() => manager.deleteAssetById('124'), /bucket unreachable/)
+        assert.isTrue(db.hasRecord('124'))
     })
 
     test('handleDeleteBatch() reports per-item success/failure', async ({ assert }) => {
@@ -472,5 +495,32 @@ test.group('AssetsManager - client filenames never shape the storage key', () =>
         const url = db.getAllRecords()[0].url
         assert.notInclude(url, '..')
         assert.match(url, /\.evil\.bin$/)
+    })
+})
+
+test.group('AssetsManager - delete with the local storage adapter', (group) => {
+    const baseDir = '.test-assets-delete'
+    group.setup(() => disableAuth())
+    group.teardown(async () => { await fs.rm(baseDir, { recursive: true, force: true }) })
+
+    test('the file on disk is removed together with the record', async ({ assert }) => {
+        const storage = new LocalStorageService(baseDir)
+        const db = new MockDatabaseAdapter({ storage })
+        const manager = new TestAssetsManager()
+        manager.setDependencies(db, storage)
+
+        const response = await manager.handleUpload({
+            body: { description: 'On disk', source: 'https://example.com', filename: 'disk.bin' },
+            file: { buffer: Buffer.from('bytes') }
+        })
+        assert.equal(response.status, 200)
+        const record = db.getAllRecords()[0]
+        const filePath = storage.getPublicUrl(record.url)
+        await fs.access(filePath)
+
+        await manager.deleteAssetById(String(record.id))
+
+        assert.isFalse(db.hasRecord(String(record.id)))
+        await assert.rejects(() => fs.access(filePath))
     })
 })

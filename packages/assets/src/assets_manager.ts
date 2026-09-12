@@ -24,6 +24,7 @@ import {
     safeAsync,
     parseBoolean,
     sanitizeFilename,
+    StorageError,
     Logger,
     validateAssetUpdate,
     validateIdParam,
@@ -873,7 +874,27 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             throw new Error(`Asset ${id} does not belong to component ${config.name}`)
         }
 
+        // Storage first: a row without its object is an error, an object without its row is an orphan
+        await this.deleteStoredObject(record)
         await this.db.delete(id, this.getConfiguration().name)
+    }
+
+    /**
+     * Removes what the record points to in storage. Managers whose records own more than
+     * one object (tilesets) override this. A storage failure is surfaced, never swallowed,
+     * so the database row stays and the delete can be retried.
+     *
+     * @throws {StorageError} When the storage backend fails
+     */
+    protected async deleteStoredObject(record: DataRecord): Promise<void> {
+        if (!record.url) return
+        try {
+            await this.storage.delete(record.url)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            logger.error(`Failed to delete stored object ${record.url} for asset ${record.id}: ${message}`)
+            throw new StorageError(`Failed to delete stored object for asset ${record.id}: ${message}`, { id: record.id, key: record.url })
+        }
     }
 
     /**
@@ -893,7 +914,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
         const record = await this.db.getLatestByName(config.name)
 
         if (record) {
-            await this.db.delete(record.id.toString(), this.getConfiguration().name)
+            await this.deleteAssetById(record.id.toString())
         }
     }
 

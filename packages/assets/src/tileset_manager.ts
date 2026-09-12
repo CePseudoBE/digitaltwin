@@ -528,6 +528,24 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
     }
 
     /**
+     * A tileset record owns a whole folder of extracted files (url = basePath), or a list of
+     * files in the legacy file_index format, so the base class's single-object delete is replaced.
+     */
+    protected override async deleteStoredObject(record: DataRecord): Promise<void> {
+        const legacyFileIndex = (record as DataRecord & { file_index?: { files?: Array<{ path: string }>; root_file?: string } }).file_index
+
+        if (legacyFileIndex?.files && legacyFileIndex.files.length > 0) {
+            logger.info(`Deleting ${legacyFileIndex.files.length} files (legacy format)`)
+            for (const file of legacyFileIndex.files) {
+                await safeAsync(() => this.storage.delete(file.path), `delete legacy file ${file.path}`, logger)
+            }
+        } else if (record.url) {
+            const deletedCount = await this.storage.deleteByPrefix(record.url)
+            logger.info(`Deleted ${deletedCount} files from ${record.url}`)
+        }
+    }
+
+    /**
      * Delete tileset and all files from storage.
      */
     override async handleDelete(req: TypedRequest): Promise<DataResponse> {
@@ -563,23 +581,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 }
             }
 
-            // Delete all files from storage
-            // Support both new format (url = basePath) and legacy format (file_index.files)
-            const legacyFileIndex = (asset as DataRecord & { file_index?: { files?: Array<{ path: string }>; root_file?: string } }).file_index
-
-            if (legacyFileIndex?.files && legacyFileIndex.files.length > 0) {
-                // Legacy format: delete individual files from file_index
-                logger.info(`Deleting ${legacyFileIndex.files.length} files (legacy format)`)
-                for (const file of legacyFileIndex.files) {
-                    await safeAsync(() => this.storage.delete(file.path), `delete legacy file ${file.path}`, logger)
-                }
-            } else if (asset.url) {
-                // New format: url contains basePath, use deleteByPrefix
-                const deletedCount = await this.storage.deleteByPrefix(asset.url)
-                logger.info(`Deleted ${deletedCount} files from ${asset.url}`)
-            }
-
-            // Delete database record
+            // Storage (all extracted files) then the database record, see deleteStoredObject()
             await this.deleteAssetById(id)
 
             return successResponse({ message: 'Tileset deleted successfully' })
