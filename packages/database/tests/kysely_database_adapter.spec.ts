@@ -23,6 +23,21 @@ function registerAdapterTests(label: string, factory: AdapterFactory) {
             assert.isTrue(await db.doesTableExists(`${label}_basic`))
         })
 
+        test('createTable adds created_at/updated_at so updateById works on a fresh table', async ({ assert }) => {
+            const table = `${label}_fresh`
+            await db.createTable(table)
+            const record = await db.save({ name: table, type: 'application/json', url: '', date: new Date() })
+            await db.updateById(table, record.id, { upload_status: 'pending' })
+            const row = await db.getKysely()
+                .selectFrom(table)
+                .select(['upload_status', 'created_at', 'updated_at'])
+                .where('id', '=', record.id)
+                .executeTakeFirstOrThrow()
+            assert.equal(row.upload_status, 'pending')
+            assert.isNotNull(row.created_at)
+            assert.isNotNull(row.updated_at)
+        })
+
         test('save inserts a record and returns it with ID', async ({ assert }) => {
             await db.createTable(`${label}_save`)
             const record = await db.save({ name: `${label}_save`, type: 'application/json', url: '/test/file.json', date: new Date() })

@@ -309,6 +309,8 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
             .addColumn('upload_job_id', 'varchar(100)')
             .addColumn('presigned_key', 'text')
             .addColumn('presigned_expires_at', this.#timestampType())
+            .addColumn('created_at', this.#timestampType(), col => col.defaultTo(sql`CURRENT_TIMESTAMP`).notNull())
+            .addColumn('updated_at', this.#timestampType(), col => col.defaultTo(sql`CURRENT_TIMESTAMP`).notNull())
             .execute()
 
         // Create indexes
@@ -318,6 +320,8 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
         await this.#db.schema.createIndex(`${name}_idx_date_name`).on(name).columns(['date', 'name']).execute()
         await this.#db.schema.createIndex(`${name}_idx_owner_id`).on(name).column('owner_id').execute()
         await this.#db.schema.createIndex(`${name}_idx_is_public`).on(name).column('is_public').execute()
+        await this.#db.schema.createIndex(`${name}_idx_created_at`).on(name).column('created_at').execute()
+        await this.#db.schema.createIndex(`${name}_idx_updated_at`).on(name).column('updated_at').execute()
     }
 
     async createTableWithColumns(name: string, columns: Record<string, string>): Promise<void> {
