@@ -9,13 +9,14 @@ The package split (phases 1–4 of the original migration) is done: all implemen
 Current work is the **2.0 roadmap**, tracked in GitHub Issues + Milestones (see `ROADMAP.md`):
 
 0. Stabilize (audit bugs, no breaking changes)
-1. Auth 2.0 — OIDC Bearer resource server, async `AuthProvider`, generic trusted-headers mode, fail-closed defaults
-2. Provider-neutral naming (OVH → S3, keycloak_id → subject, no APISIX)
-3. Remove legacy (`digitaltwin-core`, Knex adapter, dead code)
-4. Onboarding experience (docker-compose, example app, docs, scaffolder)
-5. Release 2.0
+1. HTTP layer — Fastify 5 + TypeBox replaces ultimate-express, framework-neutral `TypedRequest` (see `docs/adr/0001-http-framework.md`)
+2. Auth 2.0 — OIDC Bearer resource server, async `AuthProvider`, generic trusted-headers mode, fail-closed defaults
+3. Provider-neutral naming (OVH → S3, keycloak_id → subject, no APISIX)
+4. Remove legacy (`digitaltwin-core`, Knex adapter, dead code)
+5. Onboarding experience (docker-compose, example app, docs, scaffolder, dev mode without Redis)
+6. Release 2.0
 
-Pick issues from the earliest open milestone. Milestones are worked in order; within a milestone, follow `Depends on:` lines in issue bodies. Breaking changes are allowed on the 2.0 line and must be listed in the issue and the PR.
+Pick issues from the earliest open milestone. Milestones are worked in order; within a milestone, follow `Depends on:` lines in issue bodies. Breaking changes are allowed on the 2.0 line and must be listed in the issue and the PR. Decisions with lasting consequences (framework, validation library, runtime) are recorded as ADRs in `docs/adr/`; read them before proposing an alternative.
 
 ## Working With the Maintainer
 
