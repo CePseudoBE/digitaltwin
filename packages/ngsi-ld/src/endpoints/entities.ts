@@ -1,4 +1,5 @@
 import type { Router, Request, Response } from 'ultimate-express'
+import type { RouteGuards } from '../auth.js'
 import type { EntityCache } from '../cache/entity_cache.js'
 import type { NgsiLdEntity } from '../types/entity.js'
 import type { SubscriptionStore } from '../subscriptions/subscription_store.js'
@@ -22,13 +23,14 @@ export function registerEntityEndpoints(
     router: Router,
     entityCache: EntityCache,
     _subscriptionStore: SubscriptionStore,
-    _subscriptionCache: SubscriptionCache
+    _subscriptionCache: SubscriptionCache,
+    guards: RouteGuards
 ): void {
     /**
      * GET /ngsi-ld/v1/entities
      * Query entities by type, q-filter, attributes, pagination.
      */
-    router.get('/ngsi-ld/v1/entities', async (req: Request, res: Response) => {
+    router.get('/ngsi-ld/v1/entities', guards.read(async (req: Request, res: Response) => {
         const type = req.query['type'] as string | undefined
         const q = req.query['q'] as string | undefined
         const attrs = req.query['attrs'] as string | undefined
@@ -68,13 +70,13 @@ export function registerEntityEndpoints(
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 
     /**
      * POST /ngsi-ld/v1/entities
      * Create or replace an entity in the cache.
      */
-    router.post('/ngsi-ld/v1/entities', async (req: Request, res: Response) => {
+    router.post('/ngsi-ld/v1/entities', guards.write(async (req: Request, res: Response) => {
         const body = req.body as NgsiLdEntity
 
         if (!body || !body.id || !body.type) {
@@ -89,12 +91,12 @@ export function registerEntityEndpoints(
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 
     /**
      * GET /ngsi-ld/v1/entities/:entityId
      */
-    router.get('/ngsi-ld/v1/entities/:entityId', async (req: Request, res: Response) => {
+    router.get('/ngsi-ld/v1/entities/:entityId', guards.read(async (req: Request, res: Response) => {
         const entityId = decodeURIComponent(req.params['entityId'] as string)
         const attrs = req.query['attrs'] as string | undefined
 
@@ -121,13 +123,13 @@ export function registerEntityEndpoints(
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 
     /**
      * PATCH /ngsi-ld/v1/entities/:entityId
      * Merge-patch an entity.
      */
-    router.patch('/ngsi-ld/v1/entities/:entityId', async (req: Request, res: Response) => {
+    router.patch('/ngsi-ld/v1/entities/:entityId', guards.write(async (req: Request, res: Response) => {
         const entityId = decodeURIComponent(req.params['entityId'] as string)
 
         try {
@@ -144,12 +146,12 @@ export function registerEntityEndpoints(
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 
     /**
      * DELETE /ngsi-ld/v1/entities/:entityId
      */
-    router.delete('/ngsi-ld/v1/entities/:entityId', async (req: Request, res: Response) => {
+    router.delete('/ngsi-ld/v1/entities/:entityId', guards.write(async (req: Request, res: Response) => {
         const entityId = decodeURIComponent(req.params['entityId'] as string)
 
         try {
@@ -164,5 +166,5 @@ export function registerEntityEndpoints(
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 }

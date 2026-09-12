@@ -1,16 +1,17 @@
 import type { Router, Request, Response } from 'ultimate-express'
+import type { RouteGuards } from '../auth.js'
 import type { EntityCache } from '../cache/entity_cache.js'
 import { NGSI_LD_CORE_CONTEXT } from '../types/context.js'
 
 /**
  * Registers the NGSI-LD types endpoint on the provided router.
  */
-export function registerTypesEndpoints(router: Router, entityCache: EntityCache): void {
+export function registerTypesEndpoints(router: Router, entityCache: EntityCache, guards: RouteGuards): void {
     /**
      * GET /ngsi-ld/v1/types
      * Returns a summary of all known entity types.
      */
-    router.get('/ngsi-ld/v1/types', async (_req: Request, res: Response) => {
+    router.get('/ngsi-ld/v1/types', guards.read(async (_req: Request, res: Response) => {
         try {
             const types = await entityCache.listTypes()
 
@@ -46,5 +47,5 @@ export function registerTypesEndpoints(router: Router, entityCache: EntityCache)
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 }

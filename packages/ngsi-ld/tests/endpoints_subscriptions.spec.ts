@@ -4,6 +4,8 @@ import { SubscriptionStore } from '../src/subscriptions/subscription_store.js'
 import { registerSubscriptionEndpoints } from '../src/endpoints/subscriptions.js'
 import type { Subscription, SubscriptionCreate } from '../src/types/subscription.js'
 import type { SubscriptionCache } from '../src/subscriptions/subscription_cache.js'
+import { createRouteGuards } from '../src/auth.js'
+import type { NgsiLdAuthenticator } from '../src/auth.js'
 
 const dataResolver = async (_url: string): Promise<Buffer> => Buffer.alloc(0)
 
@@ -114,6 +116,20 @@ function makeInput(overrides: Partial<SubscriptionCreate> = {}): SubscriptionCre
     }
 }
 
+// --- Auth doubles ---
+
+const allowAll: NgsiLdAuthenticator = {
+    async authenticate() {
+        return { success: true, userRecord: { id: 1, keycloak_id: 'tester', roles: [], created_at: new Date(), updated_at: new Date() } }
+    },
+}
+
+const denyAll: NgsiLdAuthenticator = {
+    async authenticate() {
+        return { success: false, response: { status: 401, content: JSON.stringify({ error: 'Authentication required' }) } }
+    },
+}
+
 // --- Tests ---
 
 test.group('Subscription endpoints', group => {
@@ -128,7 +144,7 @@ test.group('Subscription endpoints', group => {
         await store.runMigration()
         cache = new MockSubscriptionCache()
         router = new MockRouter()
-        registerSubscriptionEndpoints(router as any, store, cache as unknown as SubscriptionCache)
+        registerSubscriptionEndpoints(router as any, store, cache as unknown as SubscriptionCache, createRouteGuards(allowAll, true), { allowPrivateWebhooks: true })
     })
 
     group.each.teardown(async () => {
@@ -282,5 +298,97 @@ test.group('Subscription endpoints', group => {
         assert.equal(res.statusCode, 404)
         const body = res.body as { type: string }
         assert.include(body.type, 'ResourceNotFound')
+    })
+})
+
+test.group('Subscription endpoints - authentication and webhook safety', group => {
+    let db: KyselyDatabaseAdapter
+    let store: SubscriptionStore
+    let cache: MockSubscriptionCache
+
+    group.each.setup(async () => {
+        db = await KyselyDatabaseAdapter.forSQLite({ filename: ':memory:', enableForeignKeys: false }, dataResolver)
+        store = new SubscriptionStore(db)
+        await store.runMigration()
+        cache = new MockSubscriptionCache()
+    })
+
+    group.each.teardown(async () => {
+        await db.close()
+    })
+
+    function routerWith(auth: NgsiLdAuthenticator | undefined, publicRead = true, allowPrivateWebhooks = false) {
+        const router = new MockRouter()
+        registerSubscriptionEndpoints(router as any, store, cache as unknown as SubscriptionCache, createRouteGuards(auth, publicRead), { allowPrivateWebhooks })
+        return router
+    }
+
+    test('POST without valid credentials returns 401 and creates nothing', async ({ assert }) => {
+        const router = routerWith(denyAll)
+        const res = makeRes()
+        await router.invoke('POST', '/ngsi-ld/v1/subscriptions', makeReq({ body: makeInput() }), res)
+        assert.equal(res.statusCode, 401)
+        assert.include((res.body as { type: string }).type, 'Unauthorized')
+        assert.lengthOf(await store.findAll(), 0)
+    })
+
+    test('writes are refused when no authenticator is configured', async ({ assert }) => {
+        const router = routerWith(undefined)
+        const res = makeRes()
+        await router.invoke('POST', '/ngsi-ld/v1/subscriptions', makeReq({ body: makeInput() }), res)
+        assert.equal(res.statusCode, 401)
+    })
+
+    test('GET stays public by default, even with a denying authenticator', async ({ assert }) => {
+        const router = routerWith(denyAll)
+        const res = makeRes()
+        await router.invoke('GET', '/ngsi-ld/v1/subscriptions', makeReq(), res)
+        assert.equal(res.statusCode, 200)
+    })
+
+    test('GET requires credentials when publicRead is false', async ({ assert }) => {
+        const router = routerWith(denyAll, false)
+        const res = makeRes()
+        await router.invoke('GET', '/ngsi-ld/v1/subscriptions', makeReq(), res)
+        assert.equal(res.statusCode, 401)
+    })
+
+    test('POST rejects webhooks on loopback, link-local and private ranges', async ({ assert }) => {
+        const router = routerWith(allowAll)
+        for (const uri of ['http://127.0.0.1:6379/', 'http://169.254.169.254/latest/meta-data/', 'http://10.0.0.5/hook', 'http://localhost/hook']) {
+            const res = makeRes()
+            await router.invoke('POST', '/ngsi-ld/v1/subscriptions', makeReq({ body: makeInput({ notification: { endpoint: { uri } } }) }), res)
+            assert.equal(res.statusCode, 400, uri)
+            assert.include((res.body as { type: string }).type, 'BadRequestData')
+        }
+        assert.lengthOf(await store.findAll(), 0)
+    })
+
+    test('POST rejects non-http schemes', async ({ assert }) => {
+        const router = routerWith(allowAll)
+        const res = makeRes()
+        await router.invoke('POST', '/ngsi-ld/v1/subscriptions', makeReq({ body: makeInput({ notification: { endpoint: { uri: 'ftp://203.0.113.7/x' } } }) }), res)
+        assert.equal(res.statusCode, 400)
+        assert.include((res.body as { title: string }).title, 'http or https')
+    })
+
+    test('PATCH cannot move an existing subscription to a private webhook', async ({ assert }) => {
+        const router = routerWith(allowAll)
+        const created = makeRes()
+        await router.invoke('POST', '/ngsi-ld/v1/subscriptions', makeReq({ body: makeInput({ notification: { endpoint: { uri: 'https://203.0.113.7/notify' } } }) }), created)
+        assert.equal(created.statusCode, 201)
+        const id = (created.body as Subscription).id
+
+        const res = makeRes()
+        await router.invoke('PATCH', '/ngsi-ld/v1/subscriptions/:subscriptionId', makeReq({ params: { subscriptionId: id }, body: { notification: { endpoint: { uri: 'http://192.168.1.10/' } } } }), res)
+        assert.equal(res.statusCode, 400)
+        assert.equal((await store.findById(id))?.notificationEndpoint, 'https://203.0.113.7/notify')
+    })
+
+    test('allowPrivateWebhooks accepts loopback for development', async ({ assert }) => {
+        const router = routerWith(allowAll, true, true)
+        const res = makeRes()
+        await router.invoke('POST', '/ngsi-ld/v1/subscriptions', makeReq({ body: makeInput({ notification: { endpoint: { uri: 'http://127.0.0.1:4000/hook' } } }) }), res)
+        assert.equal(res.statusCode, 201)
     })
 })

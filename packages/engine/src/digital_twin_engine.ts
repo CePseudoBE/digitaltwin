@@ -141,6 +141,13 @@ export interface EngineOptions {
     }
     /** Dry run mode - validate configuration without persisting data (default: false) */
     dryRun?: boolean
+    /** Options forwarded to the optional NGSI-LD plugin when it is installed */
+    ngsiLd?: {
+        /** Serve NGSI-LD GET endpoints without authentication (default: true) */
+        publicRead?: boolean
+        /** Deliver notifications to loopback/private networks. Development only. */
+        allowPrivateWebhooks?: boolean
+    }
     /**
      * Enable automatic schema migration for existing tables (default: true)
      *
@@ -192,6 +199,8 @@ export class DigitalTwinEngine {
     readonly #app: ReturnType<typeof express>
     readonly #router: ExpressRouter
     readonly #options: EngineOptions
+    /** Built in start(); shared with optional plugins such as NGSI-LD */
+    #authMiddleware?: AuthMiddleware
     #queueManager: QueueManager | null
     readonly #uploadProcessor: UploadProcessor | null
     readonly #uploadReconciler: UploadReconciler
@@ -472,6 +481,7 @@ export class DigitalTwinEngine {
         const userService = new UserService(userRepository)
         await userService.initializeTables()
         const authMiddleware = new AuthMiddleware(userService)
+        this.#authMiddleware = authMiddleware
 
         // Get autoMigration setting (default: true)
         const autoMigration = this.#options.autoMigration ?? true
@@ -644,6 +654,8 @@ export class DigitalTwinEngine {
                 redis: this.getRedisConfig(),
                 components: this.getAllComponents(),
                 logger: new Logger('ngsi-ld'),
+                authMiddleware: this.#authMiddleware,
+                ...this.#options.ngsiLd,
             })
         } catch {
             // Package not installed — skip silently
@@ -683,6 +695,14 @@ export class DigitalTwinEngine {
      */
     getDatabase(): DatabaseAdapter {
         return this.#database
+    }
+
+    /**
+     * Returns the auth middleware built during start(), for plugins registered by hand.
+     * Undefined before start().
+     */
+    getAuthMiddleware(): AuthMiddleware | undefined {
+        return this.#authMiddleware
     }
 
     /**
