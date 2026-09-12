@@ -24,7 +24,7 @@ export interface E2EInfrastructure {
 }
 
 async function startMinio(): Promise<{ container: StartedTestContainer; endpoint: string }> {
-    const container = await new GenericContainer('minio/minio')
+    const container = await new GenericContainer('quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z.hotfix.7aa24e772')
         .withEnvironment({
             MINIO_ROOT_USER: MINIO_USER,
             MINIO_ROOT_PASSWORD: MINIO_PASSWORD,

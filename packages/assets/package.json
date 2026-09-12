@@ -1,6 +1,6 @@
 {
   "name": "@cepseudo/assets",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Asset management for Digital Twin framework (AssetsManager, TilesetManager, MapManager)",
   "license": "MIT",
   "author": "Axel Hoffmann",
