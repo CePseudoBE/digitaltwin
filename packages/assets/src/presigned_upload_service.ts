@@ -167,8 +167,8 @@ export class PresignedUploadService {
                 return ownershipError
             }
 
-            // Check status
-            if (asset.upload_status !== 'pending') {
+            // Check status: 'uploaded' means the reconciler already saw the object
+            if (asset.upload_status !== 'pending' && asset.upload_status !== 'uploaded') {
                 return {
                     status: 409,
                     content: JSON.stringify({ error: `Upload is not pending (current status: ${asset.upload_status || 'completed'})` }),

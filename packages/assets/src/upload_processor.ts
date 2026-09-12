@@ -24,7 +24,27 @@ export interface TilesetUploadJobData {
 }
 
 export type UploadJobData = TilesetUploadJobData
-export type UploadStatus = 'pending' | 'processing' | 'completed' | 'failed'
+/**
+ * Lifecycle of a presigned or asynchronous upload, stored in `upload_status`.
+ *
+ * ```
+ * pending ──(object seen on storage: reconciler or confirm)──▶ uploaded
+ *    │                                                            │
+ *    └─(URL expired, no object: reconciler)──▶ expired            │
+ *                                                                 ▼
+ *          plain assets: confirm ────────────────────────────▶ completed
+ *          post-processed assets (tilesets): confirm ──▶ processing ──▶ completed | failed
+ * ```
+ *
+ * Owners:
+ * - `pending`: written when the presigned URL is issued.
+ * - `uploaded`: written by the reconciler when the object exists; also accepted by confirm. The reconciler
+ *   never goes further, because only the manager knows whether post-processing is needed.
+ * - `processing`: written by the manager *before* the job is enqueued, so a fast worker cannot be overwritten.
+ * - `completed` / `failed`: written by the manager (plain assets) or the upload worker (post-processed assets).
+ * - `expired`: written by the reconciler; the row is kept for diagnostics.
+ */
+export type UploadStatus = 'pending' | 'uploaded' | 'processing' | 'completed' | 'failed' | 'expired'
 
 /**
  * Background worker for processing large file uploads (tileset extraction).

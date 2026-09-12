@@ -64,7 +64,7 @@ For large files (3D assets, tilesets). The file goes directly from the client to
 
 The `UploadReconciler` runs on a configurable interval (default: 5 minutes) to handle edge cases:
 
-- Pending upload + file exists on S3 --> mark `completed`
+- Pending upload + file exists on S3 --> mark `uploaded` (confirm, or the tileset worker, takes it to `completed`)
 - Pending upload + presigned URL expired + no file --> mark `expired`
 
 ### Async Tileset Processing

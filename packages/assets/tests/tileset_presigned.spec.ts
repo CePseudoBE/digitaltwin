@@ -144,3 +144,72 @@ test.group('TilesetManager — presigned upload', (group) => {
         assert.equal(confirmRes.status, 500)
     })
 })
+
+test.group('TilesetManager — upload_status state machine', (group) => {
+    group.setup(() => disableAuth())
+
+    async function pendingUpload(manager: TestTilesetManager, storage: MockStorageService) {
+        const uploadRes = await manager.handlePresignedUploadRequest(makeReq({
+            fileName: 'tileset.zip', fileSize: 1024, contentType: 'application/zip', description: 'race'
+        }))
+        const { fileId, key } = JSON.parse(uploadRes.content as string)
+        storage.setObjectExists(key, true)
+        return { fileId: Number(fileId), key }
+    }
+
+    test('reconciler before confirm: the row is uploaded, confirm still queues extraction', async ({ assert }) => {
+        const { manager, db, storage } = createManager()
+        const queued: unknown[] = []
+        manager.setUploadQueue({ add: async (name: string, data: unknown) => { queued.push(data); return { id: name } } } as any)
+        const { fileId } = await pendingUpload(manager, storage)
+
+        // What the reconciler does when it wins the race
+        await db.updateById('test_tilesets', fileId, { upload_status: 'uploaded' })
+
+        const res = await manager.handleUploadConfirm(makeReq({}, { fileId: String(fileId) }))
+        assert.equal(res.status, 202)
+        assert.lengthOf(queued, 1)
+        assert.equal((await db.getById(String(fileId)))!.upload_status, 'processing')
+    })
+
+    test('confirm before the worker: processing is written before the job is enqueued and a fast worker is not overwritten', async ({ assert }) => {
+        const { manager, db, storage } = createManager()
+        const { fileId } = await pendingUpload(manager, storage)
+
+        let statusWhenEnqueued: string | undefined
+        manager.setUploadQueue({
+            add: async (name: string) => {
+                statusWhenEnqueued = (await db.getById(String(fileId)))!.upload_status
+                // A worker that finishes before add() even returns
+                await db.updateById('test_tilesets', fileId, { upload_status: 'completed', tileset_url: 'x/tileset.json' })
+                return { id: name }
+            }
+        } as any)
+
+        const res = await manager.handleUploadConfirm(makeReq({}, { fileId: String(fileId) }))
+        assert.equal(res.status, 202)
+        assert.equal(statusWhenEnqueued, 'processing')
+        assert.equal((await db.getById(String(fileId)))!.upload_status, 'completed')
+    })
+
+    test('a failed enqueue puts the row back to uploaded', async ({ assert }) => {
+        const { manager, db, storage } = createManager()
+        const { fileId } = await pendingUpload(manager, storage)
+        manager.setUploadQueue({ add: async () => { throw new Error('redis down') } } as any)
+
+        const res = await manager.handleUploadConfirm(makeReq({}, { fileId: String(fileId) }))
+        assert.equal(res.status, 500)
+        assert.equal((await db.getById(String(fileId)))!.upload_status, 'uploaded')
+    })
+
+    test('confirm refuses rows that are already processing or completed', async ({ assert }) => {
+        const { manager, db, storage } = createManager()
+        manager.setUploadQueue({ add: async (name: string) => ({ id: name }) } as any)
+        const { fileId } = await pendingUpload(manager, storage)
+        for (const status of ['processing', 'completed', 'failed', 'expired']) {
+            await db.updateById('test_tilesets', fileId, { upload_status: status })
+            const res = await manager.handleUploadConfirm(makeReq({}, { fileId: String(fileId) }))
+            assert.equal(res.status, 409, status)
+        }
+    })
+})

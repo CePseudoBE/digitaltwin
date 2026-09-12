@@ -44,7 +44,7 @@ async function createPendingRecord(
 }
 
 test.group('UploadReconciler', () => {
-    test('marks as completed when expired but file exists', async ({ assert }) => {
+    test('marks as uploaded when expired but file exists', async ({ assert }) => {
         const { reconciler, db, storage } = createReconciler()
 
         const record = await createPendingRecord(db, {
@@ -55,10 +55,10 @@ test.group('UploadReconciler', () => {
 
         const result = await reconciler.reconcileTable('test_reconcile')
         assert.equal(result.checked, 1)
-        assert.equal(result.completed, 1)
+        assert.equal(result.uploaded, 1)
 
         const updated = await db.getById(String(record.id))
-        assert.equal(updated!.upload_status, 'completed')
+        assert.equal(updated!.upload_status, 'uploaded')
         assert.equal(updated!.url, 'test_reconcile/expired-exists.bin')
     })
 
@@ -79,7 +79,7 @@ test.group('UploadReconciler', () => {
         assert.equal(updated!.upload_status, 'expired')
     })
 
-    test('marks as completed when not expired and file exists (early upload)', async ({ assert }) => {
+    test('marks as uploaded when not expired and file exists (early upload)', async ({ assert }) => {
         const { reconciler, db, storage } = createReconciler()
 
         const record = await createPendingRecord(db, {
@@ -90,10 +90,10 @@ test.group('UploadReconciler', () => {
 
         const result = await reconciler.reconcileTable('test_reconcile')
         assert.equal(result.checked, 1)
-        assert.equal(result.completed, 1)
+        assert.equal(result.uploaded, 1)
 
         const updated = await db.getById(String(record.id))
-        assert.equal(updated!.upload_status, 'completed')
+        assert.equal(updated!.upload_status, 'uploaded')
     })
 
     test('skips when not expired and no file (still waiting)', async ({ assert }) => {
@@ -135,7 +135,7 @@ test.group('UploadReconciler', () => {
 
         const result = await reconciler.reconcileTable('test_reconcile')
         assert.equal(result.checked, 3)
-        assert.equal(result.completed, 1)
+        assert.equal(result.uploaded, 1)
         assert.equal(result.expired, 1)
         assert.equal(result.skipped, 1)
     })
@@ -185,7 +185,7 @@ test.group('UploadReconciler', () => {
 
         const result = await reconciler.reconcile()
         assert.equal(result.checked, 2)
-        assert.equal(result.completed, 1) // table_a
+        assert.equal(result.uploaded, 1) // table_a
         assert.equal(result.expired, 1)   // table_b
     })
 
