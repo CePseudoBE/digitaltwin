@@ -25,14 +25,21 @@ pnpm lint
 ## Project Structure
 
 ```
-digitaltwin/
-├── digitaltwin-core/      # Main framework
-├── digitaltwin-cli/       # CLI code generator
-├── create-digitaltwin/    # Project scaffolding
-├── TODO/                  # Task tracking (pending)
-├── VERIF/                 # Tasks awaiting verification
-└── DONE/                  # Completed tasks
+packages/
+├── shared/       # Types, errors, utils, validation, env (layer 0)
+├── database/     # DatabaseAdapter + Kysely implementation (layer 1)
+├── storage/      # StorageService: local filesystem, S3 (layer 1)
+├── auth/         # AuthProvider, UserService, AuthMiddleware (layer 1)
+├── components/   # Collector, Harvester, Handler, CustomTableManager (layer 2)
+├── assets/       # AssetsManager, TilesetManager, MapManager (layer 2)
+├── ngsi-ld/      # Optional NGSI-LD plugin (layer 2)
+├── engine/       # DigitalTwinEngine, scheduler, queues, loader (layer 3)
+└── e2e/          # Integration tests against real Postgres / MinIO / Redis
+digitaltwin-cli/      # Component generator
+create-digitaltwin/   # Project scaffolding
 ```
+
+A package may only import from lower layers. See `ROADMAP.md` for what is being worked on and in which order.
 
 ## Making Changes
 
@@ -89,7 +96,9 @@ type(scope): description
 | `auth` | Authentication system |
 | `storage` | Storage services |
 | `queue` | BullMQ / Redis |
-| `db` | Database / Knex |
+| `db` | Database / Kysely |
+| `ngsi-ld` | NGSI-LD plugin |
+| `shared` | Shared types and utils |
 
 ### Examples
 
@@ -104,18 +113,13 @@ perf(engine): optimize parallel initialization
 
 ## Branch Naming
 
-Format: `type/todo-XX-description` or `type/description`
-
-Examples:
-- `feature/todo-12-performance-optimizations`
-- `fix/null-pointer-handler`
-- `docs/api-documentation`
+Git Flow: `feat/<slug>` or `fix/<slug>` off `develop`, `release/x.y` for releases, `hotfix/<slug>` off `main`. Never commit directly to `main` or `develop`.
 
 ## Pull Request Guidelines
 
 - Target `develop` branch (not `main`)
 - Include a clear description of changes
-- Reference related TODO if applicable
+- Reference the issue it closes (`Closes #<n>`); roadmap work is tracked in GitHub milestones
 - Ensure all tests pass
 - Keep PRs focused and reasonably sized
 
@@ -132,6 +136,27 @@ Examples:
 - Test files: `*.spec.ts`
 - Run tests: `pnpm test`
 - Aim for meaningful tests that verify behavior, not implementation
+
+## AI-Assisted Contributions
+
+We use AI coding tools on this project ourselves and you are welcome to use them too. Two things do not change because a tool wrote the first draft: you are the author, and reviewer time is the scarcest resource we have.
+
+**You own every line.** You must be able to explain what your change does, why it is correct, and how it interacts with the rest of the framework without asking the tool. If you cannot, the change is not ready. Reviewers will ask you, not your tool.
+
+**The decisions are yours.** Where a fix belongs, whether an abstraction is worth it, what a test should prove: make those calls yourself and state them in the PR description. A PR that reads as "the tool suggested this" will be sent back.
+
+**Verify before asking for review.** Build, test and lint the packages you touched. Read the whole diff as if a stranger had written it. Remove anything the tool added that the issue did not ask for.
+
+**Disclose.** Tick the box in the PR template and say which tool you used and roughly how much it did (a few lines, most of the code, most of the tests). This is not held against the PR; it tells reviewers where to look harder. Commit messages and code comments stay tool-free: the author is you.
+
+**Not accepted:**
+
+- PRs opened by an agent without a human having read the full diff.
+- Issues, bug reports or security reports written by a tool and not reproduced by you.
+- AI tools on issues labelled `good first issue`. Those exist for people to learn the codebase.
+- Generated media (images, audio, diagrams rendered as images).
+
+Rule of thumb, borrowed from the curl and LLVM policies: a contribution must be worth more to the project than the time it takes to review it.
 
 ## Questions?
 
