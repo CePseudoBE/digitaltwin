@@ -220,3 +220,19 @@ test.group('Presigned Upload — confirm', (group) => {
         assert.equal(confirmRes.status, 403)
     })
 })
+
+test.group('PresignedUploadService — reconciler ran first', () => {
+    test('confirm accepts a row the reconciler already moved to uploaded', async ({ assert }) => {
+        const { manager, db, storage } = createManager()
+        const uploadRes = await manager.handlePresignedUploadRequest(makeReq({
+            fileName: 'model.bin', fileSize: 1024, contentType: 'application/octet-stream', description: 'Test model', source: 'https://example.com'
+        }))
+        const { fileId, key } = JSON.parse(uploadRes.content as string)
+        storage.setObjectExists(key, true)
+        await db.updateById('test_presigned', Number(fileId), { upload_status: 'uploaded', url: key })
+
+        const confirmRes = await manager.handleUploadConfirm(makeReq({}, { fileId: String(fileId) }))
+        assert.equal(confirmRes.status, 200)
+        assert.equal((await db.getById(String(fileId)))!.upload_status, 'completed')
+    })
+})

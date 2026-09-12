@@ -143,9 +143,10 @@ export interface DataRecord {
      * - 'processing': Job is running
      * - 'completed': Job finished successfully
      * - 'failed': Job failed with error
+     * - 'uploaded': Object seen on storage, not yet confirmed or post-processed
      * - 'expired': Presigned URL expired without upload
      */
-    upload_status?: 'pending' | 'processing' | 'completed' | 'failed' | 'expired' | null
+    upload_status?: 'pending' | 'uploaded' | 'processing' | 'completed' | 'failed' | 'expired' | null
 
     /**
      * Error message if upload failed.

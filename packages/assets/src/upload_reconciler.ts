@@ -6,7 +6,8 @@ const logger = new Logger('UploadReconciler')
 
 export interface ReconciliationResult {
     checked: number
-    completed: number
+    /** Rows moved from pending to uploaded because the object exists on storage */
+    uploaded: number
     expired: number
     skipped: number
 }
@@ -75,7 +76,7 @@ export class UploadReconciler {
     async reconcile(): Promise<ReconciliationResult> {
         const totals: ReconciliationResult = {
             checked: 0,
-            completed: 0,
+            uploaded: 0,
             expired: 0,
             skipped: 0
         }
@@ -87,14 +88,14 @@ export class UploadReconciler {
         for (const tableName of this.tableNames) {
             const result = await this.reconcileTable(tableName)
             totals.checked += result.checked
-            totals.completed += result.completed
+            totals.uploaded += result.uploaded
             totals.expired += result.expired
             totals.skipped += result.skipped
         }
 
         if (totals.checked > 0) {
             logger.info(
-                `Reconciliation totals: checked=${totals.checked}, completed=${totals.completed}, expired=${totals.expired}, skipped=${totals.skipped}`
+                `Reconciliation totals: checked=${totals.checked}, uploaded=${totals.uploaded}, expired=${totals.expired}, skipped=${totals.skipped}`
             )
         }
 
@@ -107,7 +108,7 @@ export class UploadReconciler {
     async reconcileTable(tableName: string): Promise<ReconciliationResult> {
         const result: ReconciliationResult = {
             checked: 0,
-            completed: 0,
+            uploaded: 0,
             expired: 0,
             skipped: 0
         }
@@ -137,13 +138,14 @@ export class UploadReconciler {
                     const existsResult = await this.storage.objectExists(record.presigned_key)
 
                     if (existsResult.exists) {
-                        // File uploaded — mark completed
+                        // Object present: the upload happened, but only the manager knows whether
+                        // post-processing (tileset extraction) is still needed, so stop at 'uploaded'
                         await this.db.updateById(tableName, record.id, {
-                            upload_status: 'completed',
+                            upload_status: 'uploaded',
                             url: record.presigned_key
                         })
-                        result.completed++
-                        logger.info(`Reconciled record ${record.id}: completed (file found)`)
+                        result.uploaded++
+                        logger.info(`Reconciled record ${record.id}: uploaded (file found)`)
                     } else if (isExpired) {
                         // URL expired and no file — mark expired
                         await this.db.updateById(tableName, record.id, {
@@ -163,7 +165,7 @@ export class UploadReconciler {
 
             if (result.checked > 0) {
                 logger.info(
-                    `Reconciliation for ${tableName}: checked=${result.checked}, completed=${result.completed}, expired=${result.expired}, skipped=${result.skipped}`
+                    `Reconciliation for ${tableName}: checked=${result.checked}, uploaded=${result.uploaded}, expired=${result.expired}, skipped=${result.skipped}`
                 )
             }
         } catch (error) {

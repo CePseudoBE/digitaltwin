@@ -22,7 +22,7 @@ export interface TilesetManagerConfiguration extends AssetsManagerConfiguration 
     extraction?: ZipLimits
 }
 import type { AsyncUploadable } from './async_upload.js'
-import type { TilesetUploadJobData } from './upload_processor.js'
+import type { TilesetUploadJobData, UploadStatus } from './upload_processor.js'
 import type { Queue } from 'bullmq'
 import fs from 'fs/promises'
 
@@ -48,7 +48,7 @@ export interface TilesetMetadataRow {
     filename: string
     owner_id: number | null
     is_public?: boolean
-    upload_status?: 'pending' | 'processing' | 'completed' | 'failed'
+    upload_status?: UploadStatus
     upload_job_id?: string
     upload_error?: string
 }
@@ -411,8 +411,8 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 return ownershipError
             }
 
-            // Check status
-            if (asset.upload_status !== 'pending') {
+            // Check status: 'uploaded' means the reconciler already saw the object
+            if (asset.upload_status !== 'pending' && asset.upload_status !== 'uploaded') {
                 return {
                     status: 409,
                     content: JSON.stringify({ error: `Upload is not pending (current status: ${asset.upload_status || 'completed'})` }),
@@ -447,18 +447,26 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 presignedKey: asset.presigned_key
             }
 
-            const job = await this.uploadQueue.add(`tileset-presigned-${asset.id}`, jobData, {
-                jobId: `tileset-presigned-${asset.id}`
-            })
-
-            if (!job) {
-                return errorResponse('Failed to queue extraction job')
-            }
-
+            // The job id is deterministic, so the status can be written before the job exists.
+            // Writing it after would race a fast worker and overwrite its 'completed'.
+            const jobId = `tileset-presigned-${asset.id}`
             await this.db.updateById(config.name, asset.id, {
                 upload_status: 'processing',
-                upload_job_id: job.id
+                upload_job_id: jobId
             })
+
+            let job: { id?: string } | null = null
+            try {
+                job = await this.uploadQueue.add(jobId, jobData, { jobId })
+            } catch (queueError) {
+                await this.db.updateById(config.name, asset.id, { upload_status: 'uploaded' })
+                throw queueError
+            }
+
+            if (!job) {
+                await this.db.updateById(config.name, asset.id, { upload_status: 'uploaded' })
+                return errorResponse('Failed to queue extraction job')
+            }
 
             return {
                 status: 202,
@@ -547,7 +555,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
             }
 
             // Block deletion while upload in progress
-            if (asset.upload_status === 'pending' || asset.upload_status === 'processing') {
+            if (asset.upload_status === 'pending' || asset.upload_status === 'uploaded' || asset.upload_status === 'processing') {
                 return {
                     status: 409,
                     content: JSON.stringify({ error: 'Cannot delete tileset while upload is in progress' }),
@@ -760,7 +768,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                                                 id: { type: 'integer' },
                                                 status: {
                                                     type: 'string',
-                                                    enum: ['pending', 'processing', 'completed', 'failed']
+                                                    enum: ['pending', 'uploaded', 'processing', 'completed', 'failed', 'expired']
                                                 },
                                                 tileset_url: { type: 'string' },
                                                 error: { type: 'string' }
@@ -827,7 +835,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                         owner_id: { type: 'integer', nullable: true },
                         is_public: { type: 'boolean' },
                         tileset_url: { type: 'string', description: 'Public URL to load in Cesium' },
-                        upload_status: { type: 'string', enum: ['pending', 'processing', 'completed', 'failed'] }
+                        upload_status: { type: 'string', enum: ['pending', 'uploaded', 'processing', 'completed', 'failed', 'expired'] }
                     }
                 }
             }
