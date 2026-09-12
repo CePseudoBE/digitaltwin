@@ -62,17 +62,32 @@ export interface ServableEndpointConfig {
  * }
  * ```
  */
-export function servableEndpoint(config: ServableEndpointConfig) {
-    return function (target: any, propertyKey: string | symbol, descriptor?: PropertyDescriptor): any {
-        const ctor = target.constructor as any
+/** Endpoint metadata recorded on the class constructor by the decorator. */
+export interface ServableEndpointMeta {
+    method: string
+    path: string
+    responseType?: string
+    handlerName: string
+}
 
-        // Initialize endpoints array if it doesn't exist
-        if (!ctor.__endpoints) {
-            ctor.__endpoints = []
+interface DecoratedConstructor {
+    __endpoints?: ServableEndpointMeta[]
+}
+
+export function servableEndpoint(config: ServableEndpointConfig) {
+    return function (target: object, propertyKey: string | symbol, descriptor?: PropertyDescriptor): PropertyDescriptor | undefined {
+        const ctor = target.constructor as DecoratedConstructor
+
+        // `__endpoints` is looked up through the static prototype chain, so a subclass would
+        // otherwise push into its parent's array. Give every decorated class its own array,
+        // seeded with what it inherits so parent endpoints are still served once.
+        if (!Object.prototype.hasOwnProperty.call(ctor, '__endpoints')) {
+            ctor.__endpoints = [...(ctor.__endpoints ?? [])]
         }
+        const endpoints = ctor.__endpoints as ServableEndpointMeta[]
 
         // Add endpoint configuration to the constructor metadata
-        ctor.__endpoints.push({
+        endpoints.push({
             method: (config.method || 'get').toUpperCase(),
             path: config.path,
             responseType: config.responseType,

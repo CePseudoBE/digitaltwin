@@ -91,7 +91,7 @@ export { safeAsync, tryAsync, safeCleanup, retryAsync } from './utils/safe_async
 export { parseBoolean } from './utils/parse_boolean.js'
 export { sanitizeFilename } from './utils/sanitize_filename.js'
 export { servableEndpoint } from './utils/servable_endpoint.js'
-export type { ServableEndpointConfig } from './utils/servable_endpoint.js'
+export type { ServableEndpointConfig, ServableEndpointMeta } from './utils/servable_endpoint.js'
 export {
     HttpStatus,
     jsonResponse,
