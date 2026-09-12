@@ -1,5 +1,4 @@
 import { test } from '@japa/runner'
-import { createServer } from 'node:net'
 import { Queue } from 'bullmq'
 import { RedisContainer } from '@testcontainers/redis'
 import type { StartedRedisContainer } from '@testcontainers/redis'
@@ -8,6 +7,7 @@ import { DigitalTwinEngine } from '../src/digital_twin_engine.js'
 import { TestCollector, TestAssetsManager, TestCustomTableManager } from './fixtures/mock_components.js'
 import { MockDatabaseAdapter } from './fixtures/mock_database.js'
 import { MockStorageService } from './fixtures/mock_storage.js'
+import { freePort } from './fixtures/free_port.js'
 
 /** Records which tables the engine asked for, whichever adapter method it used. */
 class RecordingDatabase extends MockDatabaseAdapter {
@@ -22,16 +22,6 @@ class RecordingDatabase extends MockDatabaseAdapter {
         this.requested.push(name)
         await super.createTableWithColumns(name, columns)
     }
-}
-
-function freePort(): Promise<number> {
-    return new Promise(resolve => {
-        const probe = createServer()
-        probe.listen(0, () => {
-            const { port } = probe.address() as { port: number }
-            probe.close(() => resolve(port))
-        })
-    })
 }
 
 test.group('Engine.start() with components added after construction', group => {

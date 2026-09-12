@@ -36,6 +36,7 @@ import {
     createRedisCheck,
     createStorageCheck,
     livenessCheck,
+    withTimeout,
     type HealthCheckFn
 } from './health.js'
 
@@ -141,6 +142,11 @@ export interface EngineOptions {
     }
     /** Dry run mode - validate configuration without persisting data (default: false) */
     dryRun?: boolean
+    /** Health check behaviour */
+    health?: {
+        /** A check that has not answered after this delay is reported down (default: 3000 ms) */
+        checkTimeoutMs?: number
+    }
     /** Options forwarded to the optional NGSI-LD plugin when it is installed */
     ngsiLd?: {
         /** Serve NGSI-LD GET endpoints without authentication (default: true) */
@@ -210,7 +216,7 @@ export class DigitalTwinEngine {
     #isShuttingDown = false
     #isStarted = false
     #shutdownTimeout = 30000
-    readonly #healthChecker = new HealthChecker()
+    readonly #healthChecker: HealthChecker
 
     // Mutable arrays for dynamically registered components
     readonly #dynamicCollectors: Collector[] = []
@@ -290,6 +296,7 @@ export class DigitalTwinEngine {
         this.#customTableManagers = this.#options.customTableManagers ?? []
         this.#storage = this.#options.storage
         this.#database = this.#options.database
+        this.#healthChecker = new HealthChecker({ checkTimeoutMs: this.#options.health?.checkTimeoutMs })
         this.#app = express()
         this.#router = express.Router()
         this.#queueManager = this.#createQueueManager()
@@ -390,7 +397,11 @@ export class DigitalTwinEngine {
         this.#healthChecker.registerCheck('database', createDatabaseCheck(this.#database))
 
         if (this.#queueManager) {
-            this.#healthChecker.registerCheck('redis', createRedisCheck(this.#queueManager))
+            // Without Redis no collector or harvester can run, so Redis decides readiness
+            // as soon as there is something to schedule; otherwise it only degrades the status
+            this.#healthChecker.registerCheck('redis', createRedisCheck(this.#queueManager), {
+                critical: this.#activeComponents.length > 0
+            })
         }
 
         this.#healthChecker.registerCheck('storage', createStorageCheck(this.#storage))
@@ -1034,7 +1045,7 @@ export class DigitalTwinEngine {
 
         if (this.#uploadProcessor) {
             try {
-                await this.#uploadProcessor.stop()
+                await withTimeout(this.#uploadProcessor.stop(), Math.min(this.#shutdownTimeout / 3, 10000), "Upload processor stop")
             } catch (error) {
                 errors.push(this.#wrapError('Upload processor', error))
             }
@@ -1082,7 +1093,10 @@ export class DigitalTwinEngine {
 
         while (Date.now() - startTime < timeout) {
             try {
-                const stats = await this.#queueManager.getQueueStats()
+                // ioredis queues commands while disconnected, so a stats call would hang forever
+                // if Redis is gone; bound it by what is left of the drain window
+                const remaining = Math.max(1, timeout - (Date.now() - startTime))
+                const stats = await withTimeout(this.#queueManager.getQueueStats(), Math.min(3000, remaining), 'Queue stats')
                 const totalActive = Object.values(stats).reduce((sum, q) => sum + (q.active || 0), 0)
 
                 if (totalActive === 0) break
@@ -1111,8 +1125,10 @@ export class DigitalTwinEngine {
                         )
                     ])
                 } catch {
+                    // The graceful close did not finish; disconnect hangs too when Redis is gone,
+                    // so it gets a short bound of its own before the shutdown moves on
                     try {
-                        await worker.disconnect()
+                        await withTimeout(worker.disconnect(), 1000, "Worker disconnect")
                     } catch (disconnectError) {
                         errors.push(this.#wrapError('Worker disconnect', disconnectError))
                     }

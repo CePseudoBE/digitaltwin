@@ -6,6 +6,7 @@ import {
     livenessCheck
 } from '../src/health.js'
 import { MockDatabaseAdapter } from './fixtures/mock_database.js'
+import { withTimeout } from '../src/health.js'
 
 test.group('HealthChecker', () => {
     test('reports healthy when all checks pass', async ({ assert }) => {
@@ -121,5 +122,44 @@ test.group('performHealthCheck', () => {
         assert.equal(result.status, 'healthy')
         assert.isDefined(result.checks['database'])
         assert.equal(result.components?.collectors, 5)
+    })
+})
+
+test.group('HealthChecker - timeouts and critical checks', () => {
+    test('a check that never answers is reported down after the timeout', async ({ assert }) => {
+        const checker = new HealthChecker({ checkTimeoutMs: 50 })
+        checker.registerCheck('database', async () => ({ status: 'up' }))
+        checker.registerCheck('stuck', () => new Promise(() => {}))
+
+        const started = Date.now()
+        const result = await checker.performCheck()
+
+        assert.isBelow(Date.now() - started, 1000)
+        assert.equal(result.checks['stuck'].status, 'down')
+        assert.include(result.checks['stuck'].error ?? '', 'timed out after 50 ms')
+        assert.equal(result.status, 'degraded')
+    })
+
+    test('a critical check that is down makes the status unhealthy', async ({ assert }) => {
+        const checker = new HealthChecker()
+        checker.registerCheck('database', async () => ({ status: 'up' }))
+        checker.registerCheck('redis', async () => ({ status: 'down', error: 'ECONNREFUSED' }), { critical: true })
+
+        assert.equal((await checker.performCheck()).status, 'unhealthy')
+    })
+
+    test('the same check registered as non-critical only degrades the status', async ({ assert }) => {
+        const checker = new HealthChecker()
+        checker.registerCheck('database', async () => ({ status: 'up' }))
+        checker.registerCheck('redis', async () => ({ status: 'down', error: 'ECONNREFUSED' }))
+
+        assert.equal((await checker.performCheck()).status, 'degraded')
+        checker.setCritical('redis', true)
+        assert.equal((await checker.performCheck()).status, 'unhealthy')
+    })
+
+    test('withTimeout rejects a hanging promise and passes a fast one through', async ({ assert }) => {
+        await assert.rejects(() => withTimeout(new Promise(() => {}), 20, 'Hang'), /Hang timed out after 20 ms/)
+        assert.equal(await withTimeout(Promise.resolve(42), 20, 'Fast'), 42)
     })
 })
