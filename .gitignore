@@ -2,8 +2,8 @@
 # Project-specific
 # ===================
 
-# Claude Code instructions (local only)
-CLAUDE.md
+# Agent instructions: AGENTS.md and CLAUDE.md are versioned; local notes and skills are not
+CLAUDE.local.md
 .claude*
 claude.json
 .claude/
