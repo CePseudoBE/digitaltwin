@@ -202,7 +202,7 @@ export class DigitalTwinEngine {
     /** Built in start(); shared with optional plugins such as NGSI-LD */
     #authMiddleware?: AuthMiddleware
     #queueManager: QueueManager | null
-    readonly #uploadProcessor: UploadProcessor | null
+    #uploadProcessor: UploadProcessor | null
     readonly #uploadReconciler: UploadReconciler
     /** uWebSockets.js TemplatedApp - has close() method to shut down all connections */
     #server?: { close(): unknown }
@@ -337,11 +337,10 @@ export class DigitalTwinEngine {
     }
 
     #createQueueManager(): QueueManager | null {
-        // Create queue manager if we have collectors, harvesters, OR assets managers that may need async uploads
-        // Note: At construction time, only constructor-provided components are available
-        // Dynamic components registered via register() will be handled at start() time
-        const hasActiveComponents = this.#collectors.length > 0 || this.#harvesters.length > 0
-        const hasAssetsManagers = this.#assetsManagers.length > 0
+        // Create queue manager if we have collectors, harvesters, OR assets managers that may need async uploads.
+        // Called from the constructor and again from start(), so it must see components added with register().
+        const hasActiveComponents = this.#allCollectors.length > 0 || this.#allHarvesters.length > 0
+        const hasAssetsManagers = this.#allAssetsManagers.length > 0
 
         if (!hasActiveComponents && !hasAssetsManagers) {
             return null
@@ -360,7 +359,7 @@ export class DigitalTwinEngine {
      * @private
      */
     async #initializeCustomTableManagers(authMiddleware?: AuthMiddleware): Promise<void> {
-        for (const customTableManager of this.#customTableManagers) {
+        for (const customTableManager of this.#allCustomTableManagers) {
             // Inject dependencies
             customTableManager.setDependencies(this.#database, authMiddleware)
 
@@ -468,12 +467,20 @@ export class DigitalTwinEngine {
             return
         }
 
+        if (this.#isStarted) {
+            throw new Error('DigitalTwinEngine.start() was called twice')
+        }
+
         // Mark as started to prevent component registration
         this.#isStarted = true
 
-        // Recreate queue manager if we have new components registered after construction
-        if (!this.#queueManager && (this.#collectors.length > 0 || this.#harvesters.length > 0 || this.#assetsManagers.length > 0)) {
+        // Components added with register() may need the queue manager and upload processor
+        // that the constructor skipped because it saw no components yet
+        if (!this.#queueManager) {
             this.#queueManager = this.#createQueueManager()
+        }
+        if (!this.#uploadProcessor) {
+            this.#uploadProcessor = this.#createUploadProcessor()
         }
 
         // Normal startup - initialize user management tables and auth middleware
@@ -490,19 +497,19 @@ export class DigitalTwinEngine {
         await initializeComponents(this.#activeComponents, this.#database, this.#storage, autoMigration)
 
         // Initialize assets managers and create their tables if needed
-        await initializeAssetsManagers(this.#assetsManagers, this.#database, this.#storage, autoMigration, authMiddleware)
+        await initializeAssetsManagers(this.#allAssetsManagers, this.#database, this.#storage, autoMigration, authMiddleware)
 
         // Initialize store managers and create their tables if needed
         await this.#initializeCustomTableManagers(authMiddleware)
 
         // Initialize handlers (inject dependencies if needed)
-        for (const handler of this.#handlers) {
+        for (const handler of this.#allHandlers) {
             if ('setDependencies' in handler && typeof handler.setDependencies === 'function') {
                 handler.setDependencies(this.#database, this.#storage)
             }
             // If it's a GlobalAssetsHandler, inject the AssetsManager instances
             if ('setAssetsManagers' in handler && typeof handler.setAssetsManagers === 'function') {
-                handler.setAssetsManagers(this.#assetsManagers)
+                handler.setAssetsManagers(this.#allAssetsManagers)
             }
         }
 
