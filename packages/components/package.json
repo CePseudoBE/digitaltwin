@@ -30,14 +30,15 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@cepseudo/shared": "workspace:*",
+    "@cepseudo/auth": "workspace:*",
     "@cepseudo/database": "workspace:*",
-    "@cepseudo/storage": "workspace:*",
-    "@cepseudo/auth": "workspace:*"
+    "@cepseudo/shared": "workspace:*",
+    "@cepseudo/storage": "workspace:*"
   },
   "devDependencies": {
     "@japa/assert": "^4.1.0",
     "@japa/runner": "^4.3.0",
+    "better-sqlite3": "^12.6.0",
     "ts-node-maintained": "^10.9.5"
   },
   "repository": {

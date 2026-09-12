@@ -15,8 +15,12 @@ import {
     validateCustomRecordUpdate,
     validateData,
     validateParams,
-    DigitalTwinError
+    DigitalTwinError,
+    ValidationError
 } from '@cepseudo/shared'
+
+/** Columns the framework manages itself; silently dropped from request bodies. */
+const RESERVED_FIELDS = new Set(['id', 'owner_id', 'created_at', 'updated_at', 'date'])
 
 /**
  * Helper to create error response with proper status code for DigitalTwinError
@@ -156,6 +160,36 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
      * ```
      */
     abstract getConfiguration(): StoreConfiguration
+
+    /**
+     * Keeps only the columns declared in the configuration.
+     *
+     * Reserved columns (id, owner_id, timestamps) are dropped so a client
+     * cannot reassign ownership or pick its own primary key. Unknown columns
+     * are rejected before they reach the database and surface as a SQL error.
+     *
+     * @throws {ValidationError} When the body contains undeclared columns
+     */
+    protected sanitizeBody(body: Record<string, unknown>): Record<string, unknown> {
+        const declared = new Set(Object.keys(this.getConfiguration().columns))
+        const data: Record<string, unknown> = {}
+        const unknown: string[] = []
+
+        for (const [key, value] of Object.entries(body)) {
+            if (RESERVED_FIELDS.has(key)) continue
+            if (!declared.has(key)) {
+                unknown.push(key)
+                continue
+            }
+            data[key] = value
+        }
+
+        if (unknown.length > 0) {
+            throw new ValidationError(`Unknown column(s): ${unknown.join(', ')}`, { unknown })
+        }
+
+        return data
+    }
 
     /**
      * Initialize the database table with custom columns.
@@ -1022,9 +1056,9 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 'Record data'
             )
 
-            // Add owner_id to the data
+            // Only declared columns get through; ownership is set by the server
             const dataWithOwner = {
-                ...validatedBody,
+                ...this.sanitizeBody(validatedBody),
                 owner_id: userRecord.id
             }
 
@@ -1109,7 +1143,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                 }
             }
 
-            await this.update(validatedParams.id, validatedBody)
+            await this.update(validatedParams.id, this.sanitizeBody(validatedBody))
             return {
                 status: 200,
                 content: JSON.stringify({ message: 'Record updated successfully' }),
