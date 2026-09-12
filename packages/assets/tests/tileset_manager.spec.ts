@@ -718,3 +718,37 @@ test.group('TilesetManager - is_public from multipart form fields', (group) => {
         }
     })
 })
+
+test.group('TilesetManager — extraction limits', (group) => {
+    group.setup(() => enableAuth())
+    group.teardown(() => disableAuth())
+
+    class TinyTilesetManager extends TestTilesetManager {
+        override getConfiguration() {
+            return { ...super.getConfiguration(), extraction: { maxEntries: 1 } }
+        }
+    }
+
+    test('sync upload above the configured limits answers 413 and stores nothing', async ({ assert }) => {
+        const manager = new TinyTilesetManager()
+        const db = new MockDatabaseAdapter()
+        const storage = new LocalStorageService('.test-tileset-limits')
+        manager.setDependencies(db, storage)
+
+        const zipPath = await createTestTilesetZip({ 'tileset.json': createTilesetJson(), 'tiles/tile_0.b3dm': 'data' })
+        try {
+            const response = await manager.handleUpload({
+                body: { description: 'Too many files' },
+                file: { path: zipPath, originalname: 'big.zip' },
+                headers: authHeaders()
+            })
+
+            assert.equal(response.status, 413)
+            assert.include(JSON.parse(response.content as string).error, 'limit is 1')
+            assert.equal(db.getRecordCount(), 0)
+        } finally {
+            await fs.unlink(zipPath).catch(() => {})
+            await fs.rm('.test-tileset-limits', { recursive: true, force: true }).catch(() => {})
+        }
+    })
+})

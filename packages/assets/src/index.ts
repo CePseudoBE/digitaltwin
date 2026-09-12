@@ -33,4 +33,5 @@ export {
     detectTilesetRootFile,
     normalizeArchivePaths
 } from './utils/zip_utils.js'
-export type { ExtractedArchiveResult } from './utils/zip_utils.js'
+export type { ExtractedArchiveResult, ZipLimits } from './utils/zip_utils.js'
+export { ZipLimitError, DEFAULT_ZIP_LIMITS } from './utils/zip_utils.js'

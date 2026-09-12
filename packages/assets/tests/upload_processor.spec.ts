@@ -191,3 +191,42 @@ test.group('UploadProcessor — presigned key path', () => {
         assert.isFalse(storage.has(presignedKey))
     })
 })
+
+test.group('UploadProcessor — extraction limits', () => {
+    test('marks the record failed with the limit message and stores nothing', async ({ assert }) => {
+        const { processor, db, storage } = createProcessor()
+        const zipBuffer = await createValidTilesetZip()
+        const presignedKey = 'test_component/presigned/limited.zip'
+        await storage.saveWithPath(zipBuffer, presignedKey)
+
+        const record = await db.save({
+            name: 'test_component',
+            type: 'application/json',
+            url: '',
+            date: new Date(),
+            description: 'limited tileset',
+            owner_id: 1,
+            filename: 'limited.zip',
+            presigned_key: presignedKey
+        })
+        await db.updateById('test_component', record.id, { upload_status: 'pending' })
+
+        const job = mockJob({
+            type: 'tileset',
+            recordId: record.id,
+            tempFilePath: '',
+            componentName: 'test_component',
+            userId: 1,
+            filename: 'limited.zip',
+            description: 'limited tileset',
+            presignedKey,
+            extraction: { maxEntries: 1 }
+        })
+
+        await assert.rejects(() => processor.processTilesetUpload(job), /limit is 1/)
+
+        const updated = await db.getById(String(record.id))
+        assert.equal(updated!.upload_status, 'failed')
+        assert.include(updated!.upload_error ?? '', 'limit is 1')
+    })
+})
