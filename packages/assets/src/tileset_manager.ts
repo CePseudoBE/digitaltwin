@@ -1,5 +1,5 @@
 import { AssetsManager } from './assets_manager.js'
-import type { DataResponse, OpenAPIComponentSpec, HttpMethod, TypedRequest, DataRecord, MetadataRow } from '@cepseudo/shared'
+import type { DataResponse, OpenAPIComponentSpec, HttpMethod, TypedRequest, DataRecord, MetadataRow, AssetsManagerConfiguration } from '@cepseudo/shared'
 import {
     successResponse,
     errorResponse,
@@ -14,6 +14,13 @@ import {
 } from '@cepseudo/shared'
 import { ApisixAuthParser } from '@cepseudo/auth'
 import { extractAndStoreArchive } from './utils/zip_utils.js'
+import type { ZipLimits } from './utils/zip_utils.js'
+
+/** Tileset manager configuration: an assets manager plus bounds on ZIP extraction. */
+export interface TilesetManagerConfiguration extends AssetsManagerConfiguration {
+    /** Limits applied before inflating an archive; see DEFAULT_ZIP_LIMITS for the defaults */
+    extraction?: ZipLimits
+}
 import type { AsyncUploadable } from './async_upload.js'
 import type { TilesetUploadJobData } from './upload_processor.js'
 import type { Queue } from 'bullmq'
@@ -90,6 +97,8 @@ export interface TilesetMetadataRow {
  * ```
  */
 export abstract class TilesetManager extends AssetsManager implements AsyncUploadable {
+    abstract override getConfiguration(): TilesetManagerConfiguration
+
     /** Upload queue for async processing (injected by engine) */
     protected uploadQueue: Queue | null = null
 
@@ -151,10 +160,10 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
 
             // Route to async or sync based on file size and queue availability
             if (this.uploadQueue && filePath && fileSize >= ASYNC_UPLOAD_THRESHOLD) {
-                return this.handleAsyncUpload(userId, filePath, filename, description, isPublic, config)
+                return await this.handleAsyncUpload(userId, filePath, filename, description, isPublic, config)
             }
 
-            return this.handleSyncUpload(userId, filePath, fileBuffer, filename, description, isPublic, config)
+            return await this.handleSyncUpload(userId, filePath, fileBuffer, filename, description, isPublic, config)
         } catch (error) {
             if (req.file?.path) await safeAsync(() => fs.unlink(req.file!.path!), 'cleanup temp file on error', logger)
             return errorResponse(error)
@@ -209,6 +218,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 recordId,
                 tempFilePath: filePath,
                 componentName: config.name,
+                extraction: config.extraction,
                 userId,
                 filename,
                 description
@@ -278,7 +288,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
             const basePath = `${config.name}/${Date.now()}`
 
             // Extract ZIP and upload all files to storage
-            const extractResult = await extractAndStoreArchive(zipBuffer, this.storage, basePath)
+            const extractResult = await extractAndStoreArchive(zipBuffer, this.storage, basePath, config.extraction)
 
             if (!extractResult.root_file) {
                 // Clean up uploaded files
@@ -430,6 +440,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 recordId: asset.id,
                 tempFilePath: '', // Not used for presigned uploads
                 componentName: config.name,
+                extraction: config.extraction,
                 userId,
                 filename: asset.filename || 'tileset.zip',
                 description: asset.description || '',

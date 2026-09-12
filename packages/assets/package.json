@@ -30,11 +30,11 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@cepseudo/shared": "workspace:*",
-    "@cepseudo/database": "workspace:*",
-    "@cepseudo/storage": "workspace:*",
     "@cepseudo/auth": "workspace:*",
-    "jszip": "^3.10.1"
+    "@cepseudo/database": "workspace:*",
+    "@cepseudo/shared": "workspace:*",
+    "@cepseudo/storage": "workspace:*",
+    "yauzl": "^3.4.0"
   },
   "peerDependencies": {
     "bullmq": ">=5.0.0"
@@ -47,6 +47,8 @@
   "devDependencies": {
     "@japa/assert": "^4.1.0",
     "@japa/runner": "^4.3.0",
+    "@types/yauzl": "^3.4.0",
+    "jszip": "^3.10.1",
     "ts-node-maintained": "^10.9.5"
   },
   "repository": {

@@ -3,6 +3,7 @@ import type { ConnectionOptions } from 'bullmq'
 import type { StorageService } from '@cepseudo/storage'
 import type { DatabaseAdapter } from '@cepseudo/database'
 import { extractAndStoreArchive } from './utils/zip_utils.js'
+import type { ZipLimits } from './utils/zip_utils.js'
 import { safeAsync, safeCleanup, Logger } from '@cepseudo/shared'
 import fs from 'fs/promises'
 
@@ -16,6 +17,8 @@ export interface TilesetUploadJobData {
     userId: number
     filename: string
     description: string
+    /** Extraction bounds from the manager configuration (defaults apply when absent) */
+    extraction?: ZipLimits
     /** S3 key for presigned uploads (when set, download from S3 instead of reading temp file) */
     presignedKey?: string
 }
@@ -97,7 +100,7 @@ export class UploadProcessor {
             basePath = `${componentName}/${Date.now()}`
 
             // Extract and upload all files to storage
-            const extractResult = await extractAndStoreArchive(zipBuffer, this.storage, basePath)
+            const extractResult = await extractAndStoreArchive(zipBuffer, this.storage, basePath, job.data.extraction)
             await job.updateProgress(80)
 
             // Validate tileset.json exists

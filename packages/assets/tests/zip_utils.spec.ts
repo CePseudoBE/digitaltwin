@@ -5,7 +5,9 @@ import {
     zipToDict,
     detectTilesetRootFile,
     normalizeArchivePaths,
-    extractAndStoreArchive
+    extractAndStoreArchive,
+    ZipLimitError,
+    DEFAULT_ZIP_LIMITS
 } from '../src/utils/zip_utils.js'
 import { MockStorageService } from './mocks/mock_storage_service.js'
 
@@ -240,5 +242,61 @@ test.group('extractAndStoreArchive', () => {
 
         assert.equal(result.file_count, 2)
         assert.isUndefined(result.root_file)
+    })
+})
+
+test.group('extraction limits', () => {
+    test('defaults are the documented ones', ({ assert }) => {
+        assert.equal(DEFAULT_ZIP_LIMITS.maxEntries, 10_000)
+        assert.equal(DEFAULT_ZIP_LIMITS.maxTotalBytes, 2 * 1024 ** 3)
+        assert.equal(DEFAULT_ZIP_LIMITS.maxEntryBytes, 500 * 1024 ** 2)
+    })
+
+    test('too many entries is refused before anything is stored', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const zipBuffer = await createTestZip({ 'a.txt': 'a', 'b.txt': 'b', 'c.txt': 'c' })
+
+        await assert.rejects(() => extractAndStoreArchive(zipBuffer, storage, 'x', { maxEntries: 2 }), ZipLimitError)
+        await assert.rejects(() => extractAndStoreArchive(zipBuffer, storage, 'x', { maxEntries: 2 }), /3 files, limit is 2/)
+        assert.isFalse(storage.has('x/a.txt'))
+    })
+
+    test('an entry above maxEntryBytes is refused', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const zipBuffer = await createTestZip({ 'small.txt': 'ok', 'big.bin': Buffer.alloc(100, 1) })
+
+        await assert.rejects(() => extractAndStoreArchive(zipBuffer, storage, 'x', { maxEntryBytes: 50 }), /big\.bin.*limit is 50/)
+        assert.isFalse(storage.has('x/small.txt'))
+    })
+
+    test('a total above maxTotalBytes is refused even when each entry fits', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const zipBuffer = await createTestZip({ 'one.bin': Buffer.alloc(60, 1), 'two.bin': Buffer.alloc(60, 2) })
+
+        await assert.rejects(() => extractAndStoreArchive(zipBuffer, storage, 'x', { maxTotalBytes: 100, maxEntryBytes: 80 }), /more than 100 bytes/)
+        assert.isFalse(storage.has('x/one.bin'))
+    })
+
+    test('the streaming API applies the same limits', async ({ assert }) => {
+        const zipBuffer = await createTestZip({ 'a.txt': 'a', 'b.txt': 'b' })
+        await assert.rejects(async () => {
+            for await (const _entry of extractZipContentStream(zipBuffer, { maxEntries: 1 })) {
+                // never reached
+            }
+        }, ZipLimitError)
+    })
+
+    test('an archive within the limits extracts normally', async ({ assert }) => {
+        const storage = new MockStorageService()
+        const zipBuffer = await createTestZip({ 'tileset.json': '{}', 'tiles/t.b3dm': Buffer.alloc(10, 1) })
+
+        const result = await extractAndStoreArchive(zipBuffer, storage, 'x', { maxEntries: 2, maxEntryBytes: 10, maxTotalBytes: 12 })
+        assert.equal(result.file_count, 2)
+    })
+
+    test('the error carries a 413 status for HTTP callers', ({ assert }) => {
+        const err = new ZipLimitError('too big')
+        assert.equal(err.statusCode, 413)
+        assert.equal(err.code, 'ZIP_LIMIT_EXCEEDED')
     })
 })
