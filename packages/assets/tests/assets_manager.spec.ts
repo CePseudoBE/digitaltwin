@@ -460,3 +460,17 @@ test.group('AssetsManager - is_public from multipart form fields', () => {
         assert.equal(db.getRecordCount(), 0)
     })
 })
+
+test.group('AssetsManager - client filenames never shape the storage key', () => {
+    test('a traversal filename is reduced to its base name in the key', async ({ assert }) => {
+        const { manager, db } = createManager()
+        const response = await manager.handleUpload({
+            body: { description: 'Evil upload', source: 'https://example.com', filename: '../../../../evil.bin' },
+            file: { buffer: Buffer.from('content') }
+        })
+        assert.equal(response.status, 200)
+        const url = db.getAllRecords()[0].url
+        assert.notInclude(url, '..')
+        assert.match(url, /\.evil\.bin$/)
+    })
+})

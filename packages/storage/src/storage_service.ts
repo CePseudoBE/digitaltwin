@@ -187,6 +187,21 @@ export abstract class StorageService {
     abstract deleteByPrefix(prefix: string): Promise<number>
 
     /**
+     * Rejects prefixes that would match the whole store (empty, `.`, `/`, `./`).
+     * Adapters call this first in deleteByPrefix(); a bad record url must never wipe every file.
+     *
+     * @returns The prefix without leading `./` or `/`
+     * @throws Error when the prefix designates the root
+     */
+    protected assertDeletablePrefix(prefix: string): string {
+        const trimmed = prefix.trim().replace(/^(\.\/|\/)+/, '')
+        if (trimmed === '' || trimmed === '.') {
+            throw new Error(`deleteByPrefix() refuses "${prefix}": it would delete the whole store`)
+        }
+        return trimmed
+    }
+
+    /**
      * Whether this storage backend supports presigned URLs for direct uploads.
      * Override in subclasses that support presigned URLs (e.g., S3-compatible storage).
      */

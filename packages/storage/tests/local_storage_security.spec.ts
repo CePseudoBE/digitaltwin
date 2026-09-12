@@ -74,3 +74,45 @@ test.group('LocalStorageService - Path Traversal Protection', (group) => {
         await storage.delete(savedPath)
     })
 })
+
+test.group('LocalStorageService - save() and deleteByPrefix() guards', (group) => {
+    const baseDir = '.test_security_save_tmp'
+    let storage: LocalStorageService
+
+    group.setup(async () => {
+        storage = new LocalStorageService(baseDir)
+        await fs.mkdir(baseDir, { recursive: true })
+    })
+
+    group.teardown(async () => {
+        await fs.rm(baseDir, { recursive: true, force: true })
+    })
+
+    test('save() blocks traversal through the extension argument', async ({ assert }) => {
+        await assert.rejects(() => storage.save(Buffer.from('x'), 'col', '../../../escaped.txt'), /path traversal detected/)
+    })
+
+    test('save() blocks traversal through the collector name', async ({ assert }) => {
+        await assert.rejects(() => storage.save(Buffer.from('x'), '../outside', 'txt'), /path traversal detected/)
+    })
+
+    test('save() returns forward-slash keys that retrieve() accepts', async ({ assert }) => {
+        const key = await storage.save(Buffer.from('payload'), 'col', 'json')
+        assert.notInclude(key, '\\')
+        assert.match(key, /^col\/[^/]+\.json$/)
+        assert.equal((await storage.retrieve(key)).toString(), 'payload')
+    })
+
+    test('deleteByPrefix() refuses the storage root in every spelling', async ({ assert }) => {
+        await storage.save(Buffer.from('keep'), 'col', 'txt')
+        for (const prefix of ['', ' ', '.', '/', './', 'col/..', '..']) {
+            await assert.rejects(() => storage.deleteByPrefix(prefix), /refuses|path traversal/)
+        }
+        assert.isTrue((await fs.readdir(`${baseDir}/col`)).length > 0)
+    })
+
+    test('deleteByPrefix() still deletes a real folder', async ({ assert }) => {
+        await storage.save(Buffer.from('a'), 'gone', 'txt')
+        assert.equal(await storage.deleteByPrefix('gone'), 1)
+    })
+})

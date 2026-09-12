@@ -199,7 +199,8 @@ export class OvhS3StorageService extends StorageService {
         let continuationToken: string | undefined
 
         // Ensure prefix ends with '/' to avoid partial matches
-        const normalizedPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`
+        const safePrefix = this.assertDeletablePrefix(prefix)
+        const normalizedPrefix = safePrefix.endsWith('/') ? safePrefix : `${safePrefix}/`
 
         do {
             // List objects with prefix (max 1000 per request)
