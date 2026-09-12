@@ -1,6 +1,12 @@
 // Plugin entry point
 export { registerNgsiLd } from './plugin.js'
 export type { NgsiLdPluginOptions } from './plugin.js'
+export { createRouteGuards } from './auth.js'
+export type { NgsiLdAuthenticator, RouteGuards } from './auth.js'
+export { assertSafeWebhookUrl, isPrivateAddress, WebhookUrlError } from './notifications/webhook_url.js'
+export type { WebhookUrlOptions } from './notifications/webhook_url.js'
+export type { NotificationWorkerOptions } from './notifications/notification_worker.js'
+export type { SubscriptionEndpointOptions } from './endpoints/subscriptions.js'
 
 // Types
 export type { NgsiLdEntity, NgsiLdProperty, NgsiLdGeoProperty, NgsiLdRelationship, GeoJsonGeometry } from './types/entity.js'

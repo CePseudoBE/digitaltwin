@@ -1,11 +1,20 @@
-import { Worker } from 'bullmq'
+import { Worker, UnrecoverableError } from 'bullmq'
 import type { ConnectionOptions } from 'bullmq'
 import type { NotificationJobData, NotificationPayload } from '../types/notification.js'
 import type { SubscriptionStore } from '../subscriptions/subscription_store.js'
 import type { SubscriptionCache } from '../subscriptions/subscription_cache.js'
 import type { Logger } from '@cepseudo/shared'
+import { assertSafeWebhookUrl, WebhookUrlError } from './webhook_url.js'
 
 const QUEUE_NAME = 'ngsi-ld-notifications'
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000
+
+export interface NotificationWorkerOptions {
+    /** Deliver to loopback and private networks (development only). */
+    allowPrivateWebhooks?: boolean
+    /** Abort the webhook request after this delay (default 10 s). */
+    requestTimeoutMs?: number
+}
 
 /**
  * Starts the BullMQ worker that delivers NGSI-LD notifications.
@@ -22,7 +31,8 @@ export function startNotificationWorker(
     redis: ConnectionOptions,
     store: SubscriptionStore,
     cache: SubscriptionCache,
-    logger: Logger
+    logger: Logger,
+    options: NotificationWorkerOptions = {}
 ): Worker<NotificationJobData> {
     const worker = new Worker<NotificationJobData>(
         QUEUE_NAME,
@@ -39,6 +49,14 @@ export function startNotificationWorker(
 
             let success = false
             try {
+                try {
+                    await assertSafeWebhookUrl(sub.notificationEndpoint, { allowPrivate: options.allowPrivateWebhooks })
+                } catch (err) {
+                    // A forbidden destination never becomes valid by retrying
+                    if (err instanceof WebhookUrlError) throw new UnrecoverableError(err.message)
+                    throw err
+                }
+
                 const response = await fetch(sub.notificationEndpoint, {
                     method: 'POST',
                     headers: {
@@ -46,6 +64,8 @@ export function startNotificationWorker(
                         'Accept': 'application/json',
                     },
                     body: JSON.stringify(payload),
+                    redirect: 'manual', // a redirect could point back inside the network
+                    signal: AbortSignal.timeout(options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
                 })
 
                 if (!response.ok) {

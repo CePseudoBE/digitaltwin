@@ -141,7 +141,7 @@ test.group('notification worker (integration)', group => {
         store = makeMockStore()
         cache = makeMockCache()
         const logger = makeMockLogger()
-        worker = startNotificationWorker(connection, store as any, cache as any, logger as any)
+        worker = startNotificationWorker(connection, store as any, cache as any, logger as any, { allowPrivateWebhooks: true })
     })
 
     group.each.teardown(async () => {
@@ -226,6 +226,46 @@ test.group('notification worker (integration)', group => {
         // store.recordNotification called with success = false
         assert.lengthOf(store.calls, 1)
         assert.equal(store.calls[0].id, sub.id)
+        assert.isFalse(store.calls[0].success)
+    })
+})
+
+test.group('notification worker - destination safety', group => {
+    let redisContainer: Awaited<ReturnType<ReturnType<typeof RedisContainer.prototype.start>['constructor']>>
+    let queue: Queue<NotificationJobData>
+    let worker: Worker<NotificationJobData>
+    let store: ReturnType<typeof makeMockStore>
+
+    group.each.setup(async () => {
+        redisContainer = await new RedisContainer('redis:7-alpine').start()
+        const connection = { host: (redisContainer as any).getHost() as string, port: (redisContainer as any).getPort() as number }
+        queue = new Queue<NotificationJobData>(QUEUE_NAME, { connection })
+        store = makeMockStore()
+        worker = startNotificationWorker(connection, store as any, makeMockCache() as any, makeMockLogger() as any)
+    })
+
+    group.each.teardown(async () => {
+        await worker.close()
+        await queue.close()
+        await (redisContainer as any).stop()
+    })
+
+    test('a private webhook fails permanently without any retry', async ({ assert }) => {
+        const failure = new Promise<{ attemptsMade: number; message: string }>(resolve => {
+            worker.on('failed', (job, err) => resolve({ attemptsMade: job?.attemptsMade ?? 0, message: err.message }))
+        })
+
+        await queue.add('notify', {
+            subscription: makeSub('http://127.0.0.1:9/webhook'),
+            entity: makeEntity(),
+            notificationId: randomUUID(),
+            notifiedAt: new Date().toISOString(),
+        }, { attempts: 3 })
+
+        const result = await failure
+        assert.include(result.message, 'private or reserved')
+        assert.equal(result.attemptsMade, 1)
+        assert.lengthOf(store.calls, 1)
         assert.isFalse(store.calls[0].success)
     })
 })

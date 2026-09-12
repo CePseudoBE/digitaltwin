@@ -3,7 +3,9 @@ import type { ConnectionOptions } from 'bullmq'
 import { Redis } from 'ioredis'
 import type { Router } from 'ultimate-express'
 import type { DatabaseAdapter } from '@cepseudo/database'
-import { Logger, engineEventBus } from '@cepseudo/shared'
+import { Logger, engineEventBus, parseBoolean } from '@cepseudo/shared'
+import { createRouteGuards } from './auth.js'
+import type { NgsiLdAuthenticator } from './auth.js'
 import type { NotificationJobData } from './types/notification.js'
 import { EntityCache } from './cache/entity_cache.js'
 import { SubscriptionStore } from './subscriptions/subscription_store.js'
@@ -31,6 +33,12 @@ export interface NgsiLdPluginOptions {
     components: unknown[]
     /** Logger instance */
     logger: Logger
+    /** Engine auth middleware. Without it every write endpoint answers 401. */
+    authMiddleware?: NgsiLdAuthenticator
+    /** Serve GET endpoints without authentication (default true). */
+    publicRead?: boolean
+    /** Accept webhooks on loopback and private networks. Development only; also NGSI_LD_ALLOW_PRIVATE_WEBHOOKS=true. */
+    allowPrivateWebhooks?: boolean
 }
 
 /**
@@ -45,7 +53,14 @@ export interface NgsiLdPluginOptions {
  * 6. Listens to engineEventBus for component completion events
  */
 export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<void> {
-    const { router, db, redis: redisConfig, components, logger } = options
+    const { router, db, redis: redisConfig, components, logger, authMiddleware } = options
+    const publicRead = options.publicRead ?? true
+    const allowPrivateWebhooks =
+        options.allowPrivateWebhooks ?? parseBoolean(process.env.NGSI_LD_ALLOW_PRIVATE_WEBHOOKS, 'NGSI_LD_ALLOW_PRIVATE_WEBHOOKS') ?? false
+    const guards = createRouteGuards(authMiddleware, publicRead)
+
+    if (!authMiddleware) logger.warn('NGSI-LD plugin started without an auth middleware: write endpoints will answer 401')
+    if (allowPrivateWebhooks) logger.warn('NGSI-LD notifications may target private networks (allowPrivateWebhooks); not for production')
 
     // Connect to Redis
     const redisConnection = new Redis({
@@ -84,13 +99,13 @@ export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<void
     })
 
     // Register HTTP endpoints
-    registerEntityEndpoints(router, entityCache, subscriptionStore, subscriptionCache)
-    registerAttrsEndpoints(router, entityCache)
-    registerSubscriptionEndpoints(router, subscriptionStore, subscriptionCache)
-    registerTypesEndpoints(router, entityCache)
+    registerEntityEndpoints(router, entityCache, subscriptionStore, subscriptionCache, guards)
+    registerAttrsEndpoints(router, entityCache, guards)
+    registerSubscriptionEndpoints(router, subscriptionStore, subscriptionCache, guards, { allowPrivateWebhooks })
+    registerTypesEndpoints(router, entityCache, guards)
 
     // Start notification delivery worker
-    startNotificationWorker(bullmqConnection, subscriptionStore, subscriptionCache, logger)
+    startNotificationWorker(bullmqConnection, subscriptionStore, subscriptionCache, logger, { allowPrivateWebhooks })
 
     // Listen to engine events for NGSI-LD-aware components
     engineEventBus.on('component:event', async event => {

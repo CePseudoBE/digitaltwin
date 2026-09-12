@@ -3,6 +3,19 @@ import { Redis } from 'ioredis'
 import { RedisContainer } from '@testcontainers/redis'
 import { EntityCache } from '../src/cache/entity_cache.js'
 import { registerEntityEndpoints } from '../src/endpoints/entities.js'
+import { createRouteGuards } from '../src/auth.js'
+import type { NgsiLdAuthenticator } from '../src/auth.js'
+
+const allowAll: NgsiLdAuthenticator = {
+    async authenticate() {
+        return { success: true, userRecord: { id: 1, keycloak_id: 'tester', roles: [], created_at: new Date(), updated_at: new Date() } }
+    },
+}
+const denyAll: NgsiLdAuthenticator = {
+    async authenticate() {
+        return { success: false, response: { status: 401, content: JSON.stringify({ error: 'Authentication required' }) } }
+    },
+}
 import type { NgsiLdEntity } from '../src/types/entity.js'
 import { property } from '../src/helpers/property.js'
 import { buildUrn } from '../src/helpers/urn.js'
@@ -82,7 +95,7 @@ test.group('Entity endpoints (integration)', group => {
         })
         cache = new EntityCache(redis)
         router = new MockRouter()
-        registerEntityEndpoints(router as any, cache, null as any, null as any)
+        registerEntityEndpoints(router as any, cache, null as any, null as any, createRouteGuards(allowAll, true))
     })
 
     group.each.teardown(async () => {
@@ -184,6 +197,19 @@ test.group('Entity endpoints (integration)', group => {
         assert.property(body[0], 'id')
         assert.property(body[0], 'type')
         assert.property(body[0], '@context')
+    })
+
+    test('writes require credentials while reads stay public', async ({ assert }) => {
+        const guarded = new MockRouter()
+        registerEntityEndpoints(guarded as any, cache, null as any, null as any, createRouteGuards(denyAll, true))
+
+        const write = makeRes()
+        await guarded.invoke('POST', '/ngsi-ld/v1/entities', makeReq({ body: makeEntity('AirQualityObserved', 'sensor-guard', { pm25: 1 }) }), write)
+        assert.equal(write.statusCode, 401)
+
+        const read = makeRes()
+        await guarded.invoke('GET', '/ngsi-ld/v1/entities', makeReq({ query: {} }), read)
+        assert.equal(read.statusCode, 200)
     })
 
     // POST /ngsi-ld/v1/entities

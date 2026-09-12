@@ -2,6 +2,24 @@ import type { Router, Request, Response } from 'ultimate-express'
 import type { SubscriptionStore } from '../subscriptions/subscription_store.js'
 import type { SubscriptionCache } from '../subscriptions/subscription_cache.js'
 import type { SubscriptionCreate } from '../types/subscription.js'
+import type { RouteGuards } from '../auth.js'
+import { assertSafeWebhookUrl, WebhookUrlError } from '../notifications/webhook_url.js'
+
+export interface SubscriptionEndpointOptions {
+    /** Accept webhooks on loopback and private networks (development only). */
+    allowPrivateWebhooks?: boolean
+}
+
+/** Resolves to an error title when the URI must be refused, undefined when it is acceptable. */
+async function webhookRejection(uri: string, options: SubscriptionEndpointOptions): Promise<string | undefined> {
+    try {
+        await assertSafeWebhookUrl(uri, { allowPrivate: options.allowPrivateWebhooks })
+        return undefined
+    } catch (err) {
+        if (err instanceof WebhookUrlError) return err.message
+        throw err
+    }
+}
 
 /**
  * Registers NGSI-LD subscription CRUD endpoints on the provided router.
@@ -9,13 +27,15 @@ import type { SubscriptionCreate } from '../types/subscription.js'
 export function registerSubscriptionEndpoints(
     router: Router,
     store: SubscriptionStore,
-    cache: SubscriptionCache
+    cache: SubscriptionCache,
+    guards: RouteGuards,
+    options: SubscriptionEndpointOptions = {}
 ): void {
     /**
      * POST /ngsi-ld/v1/subscriptions
      * Create a new subscription.
      */
-    router.post('/ngsi-ld/v1/subscriptions', async (req: Request, res: Response) => {
+    router.post('/ngsi-ld/v1/subscriptions', guards.write(async (req: Request, res: Response) => {
         const body = req.body as SubscriptionCreate
 
         if (!body?.notification?.endpoint?.uri) {
@@ -23,6 +43,12 @@ export function registerSubscriptionEndpoints(
                 type: 'https://uri.etsi.org/ngsi-ld/errors/BadRequestData',
                 title: 'Missing notification.endpoint.uri',
             })
+            return
+        }
+
+        const rejection = await webhookRejection(body.notification.endpoint.uri, options)
+        if (rejection) {
+            res.status(400).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/BadRequestData', title: rejection })
             return
         }
 
@@ -35,13 +61,13 @@ export function registerSubscriptionEndpoints(
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 
     /**
      * GET /ngsi-ld/v1/subscriptions
      * List all active subscriptions.
      */
-    router.get('/ngsi-ld/v1/subscriptions', async (_req: Request, res: Response) => {
+    router.get('/ngsi-ld/v1/subscriptions', guards.read(async (_req: Request, res: Response) => {
         try {
             const subs = await store.findAll()
             res.setHeader('Content-Type', 'application/ld+json')
@@ -49,12 +75,12 @@ export function registerSubscriptionEndpoints(
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 
     /**
      * GET /ngsi-ld/v1/subscriptions/:subscriptionId
      */
-    router.get('/ngsi-ld/v1/subscriptions/:subscriptionId', async (req: Request, res: Response) => {
+    router.get('/ngsi-ld/v1/subscriptions/:subscriptionId', guards.read(async (req: Request, res: Response) => {
         const id = req.params['subscriptionId'] as string
 
         try {
@@ -71,15 +97,24 @@ export function registerSubscriptionEndpoints(
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 
     /**
      * PATCH /ngsi-ld/v1/subscriptions/:subscriptionId
      * Partially update a subscription.
      */
-    router.patch('/ngsi-ld/v1/subscriptions/:subscriptionId', async (req: Request, res: Response) => {
+    router.patch('/ngsi-ld/v1/subscriptions/:subscriptionId', guards.write(async (req: Request, res: Response) => {
         const id = req.params['subscriptionId'] as string
         const patch = req.body as Partial<SubscriptionCreate>
+
+        const uri = patch?.notification?.endpoint?.uri
+        if (uri !== undefined) {
+            const rejection = await webhookRejection(uri, options)
+            if (rejection) {
+                res.status(400).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/BadRequestData', title: rejection })
+                return
+            }
+        }
 
         try {
             const updated = await store.update(id, patch)
@@ -95,12 +130,12 @@ export function registerSubscriptionEndpoints(
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 
     /**
      * DELETE /ngsi-ld/v1/subscriptions/:subscriptionId
      */
-    router.delete('/ngsi-ld/v1/subscriptions/:subscriptionId', async (req: Request, res: Response) => {
+    router.delete('/ngsi-ld/v1/subscriptions/:subscriptionId', guards.write(async (req: Request, res: Response) => {
         const id = req.params['subscriptionId'] as string
 
         try {
@@ -117,5 +152,5 @@ export function registerSubscriptionEndpoints(
         } catch (err) {
             res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
         }
-    })
+    }))
 }
