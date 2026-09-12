@@ -425,3 +425,38 @@ test.group('AssetsManager — delete', (group) => {
         assert.equal(db.getRecordCount(), 0)
     })
 })
+
+test.group('AssetsManager - is_public from multipart form fields', () => {
+    const upload = (is_public: unknown) => {
+        const { manager, db } = createManager()
+        const request = manager.handleUpload({
+            body: { description: 'Form upload', source: 'https://example.com', filename: 'upload.bin', is_public },
+            file: { buffer: Buffer.from('content') }
+        })
+        return { request, db }
+    }
+
+    test('the string "false" stores a private asset', async ({ assert }) => {
+        const { request, db } = upload('false')
+        assert.equal((await request).status, 200)
+        assert.isFalse(db.getAllRecords()[0].is_public)
+    })
+
+    test('the string "0" stores a private asset', async ({ assert }) => {
+        const { request, db } = upload('0')
+        assert.equal((await request).status, 200)
+        assert.isFalse(db.getAllRecords()[0].is_public)
+    })
+
+    test('the string "true" stores a public asset', async ({ assert }) => {
+        const { request, db } = upload('true')
+        assert.equal((await request).status, 200)
+        assert.isTrue(db.getAllRecords()[0].is_public)
+    })
+
+    test('an unparseable value is rejected, not defaulted', async ({ assert }) => {
+        const { request, db } = upload('maybe')
+        assert.equal((await request).status, 422)
+        assert.equal(db.getRecordCount(), 0)
+    })
+})
