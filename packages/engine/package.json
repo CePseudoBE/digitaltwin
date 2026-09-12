@@ -1,6 +1,6 @@
 {
   "name": "@cepseudo/engine",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Core engine for Digital Twin framework (Engine, Scheduler, Queues, Loader, OpenAPI)",
   "license": "MIT",
   "author": "Axel Hoffmann",

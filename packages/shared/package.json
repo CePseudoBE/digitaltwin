@@ -1,6 +1,6 @@
 {
   "name": "@cepseudo/shared",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Shared types, errors, utilities, validation, and environment helpers for Digital Twin packages",
   "license": "MIT",
   "author": "Axel Hoffmann",

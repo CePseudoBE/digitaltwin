@@ -9,14 +9,16 @@
  */
 import { test } from '@japa/runner'
 import { GenericContainer, Wait } from 'testcontainers'
+import type { StartedTestContainer } from 'testcontainers'
 import { OvhS3StorageService } from '../src/adapters/ovh_storage_service.js'
 
 const MINIO_USER = 'minioadmin'
 const MINIO_PASSWORD = 'minioadmin'
 const BUCKET = 'test-bucket'
 
-async function startMinio() {
-    const container = await new GenericContainer('minio/minio')
+// Image pinned on quay.io: the Docker Hub `minio/minio` repository is gone.
+async function startMinio(): Promise<{ container: StartedTestContainer; endpoint: string }> {
+    const container = await new GenericContainer('quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z.hotfix.7aa24e772')
         .withEnvironment({
             MINIO_ROOT_USER: MINIO_USER,
             MINIO_ROOT_PASSWORD: MINIO_PASSWORD,
@@ -58,7 +60,7 @@ function makeStorage(endpoint: string): OvhS3StorageService {
 }
 
 test.group('OvhS3StorageService (MinIO integration)', group => {
-    let container: Awaited<ReturnType<typeof startMinio>>['container']
+    let container: StartedTestContainer
     let endpoint: string
     let storage: OvhS3StorageService
 

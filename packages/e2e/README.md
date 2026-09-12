@@ -14,7 +14,7 @@ Tests run against real services, provisioned in one of two ways:
 | Service    | Image               | Purpose                                   |
 |------------|----------------------|-------------------------------------------|
 | PostgreSQL | `postgres:16-alpine` | Metadata storage, component tables, users |
-| MinIO      | `minio/minio`        | S3-compatible object storage              |
+| MinIO      | `quay.io/minio/minio` | S3-compatible object storage              |
 | Redis      | `redis:7-alpine`     | BullMQ queues (HTTP integration tests)    |
 
 ### CI environment variables
