@@ -47,13 +47,53 @@ export interface HealthStatus {
  */
 export type HealthCheckFn = () => Promise<HealthCheck>
 
+export interface HealthCheckOptions {
+    /** A critical check that is down makes the whole status 'unhealthy' (readiness 503), not just 'degraded' */
+    critical?: boolean
+}
+
+export interface HealthCheckerOptions {
+    /** A check that has not answered after this delay is reported down (default 3 s) */
+    checkTimeoutMs?: number
+}
+
+export const DEFAULT_CHECK_TIMEOUT_MS = 3000
+
 /**
- * Health checker with support for custom checks
+ * Rejects when `promise` has not settled after `ms`. The pending promise itself is not
+ * cancelled; callers use this to stay responsive when a backend stops answering.
+ */
+export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms} ms`)), ms)
+    })
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
+interface RegisteredCheck {
+    fn: HealthCheckFn
+    critical: boolean
+}
+
+/**
+ * Health checker with support for custom checks, a per-check timeout and critical checks
  */
 export class HealthChecker {
-    readonly #checks = new Map<string, HealthCheckFn>()
+    readonly #checks = new Map<string, RegisteredCheck>()
+    readonly #timeoutMs: number
     #componentCounts?: ComponentCounts
     #version?: string
+
+    constructor(options: HealthCheckerOptions = {}) {
+        this.#timeoutMs = options.checkTimeoutMs ?? DEFAULT_CHECK_TIMEOUT_MS
+    }
+
+    /** Changes whether an already registered check decides readiness. */
+    setCritical(name: string, critical: boolean): void {
+        const check = this.#checks.get(name)
+        if (check) check.critical = critical
+    }
 
     /**
      * Register a custom health check
@@ -72,8 +112,8 @@ export class HealthChecker {
      * })
      * ```
      */
-    registerCheck(name: string, checkFn: HealthCheckFn): void {
-        this.#checks.set(name, checkFn)
+    registerCheck(name: string, checkFn: HealthCheckFn, options: HealthCheckOptions = {}): void {
+        this.#checks.set(name, { fn: checkFn, critical: options.critical ?? false })
     }
 
     /**
@@ -114,10 +154,10 @@ export class HealthChecker {
         // Run all checks in parallel
         const entries = Array.from(this.#checks.entries())
         const results = await Promise.all(
-            entries.map(async ([name, checkFn]) => {
+            entries.map(async ([name, { fn }]) => {
                 const start = Date.now()
                 try {
-                    const result = await checkFn()
+                    const result = await withTimeout(fn(), this.#timeoutMs, `Health check "${name}"`)
                     return [name, { ...result, latency: result.latency ?? Date.now() - start }] as const
                 } catch (error) {
                     return [
@@ -139,10 +179,11 @@ export class HealthChecker {
         // Determine overall status
         const allChecks = Object.values(checks)
         const anyDown = allChecks.some(c => c.status === 'down')
-        const databaseDown = checks['database']?.status === 'down'
+        // The database and any check registered as critical decide readiness
+        const criticalDown = entries.some(([name, { critical }]) => (critical || name === 'database') && checks[name]?.status === 'down')
 
         let status: HealthStatus['status']
-        if (databaseDown) {
+        if (criticalDown) {
             status = 'unhealthy'
         } else if (anyDown) {
             status = 'degraded'
