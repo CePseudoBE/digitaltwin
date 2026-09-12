@@ -10,6 +10,7 @@ import {
     successResponse,
     errorResponse,
     badRequestResponse,
+    sanitizeFilename,
     notFoundResponse,
     validateData,
     validatePresignedUploadRequest
@@ -89,7 +90,7 @@ export class PresignedUploadService {
             }
 
             const config = this.deps.getConfiguration()
-            const sanitizedFilename = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+            const sanitizedFilename = sanitizeFilename(fileName)
             const key = `${config.name}/${Date.now()}/${sanitizedFilename}`
 
             // Generate presigned URL (5 min expiry)

@@ -222,3 +222,14 @@ test.group('OvhS3StorageService (MinIO integration)', group => {
         await assert.doesNotReject(() => storage.deleteBatch([]))
     })
 })
+
+test.group('OvhS3StorageService - deleteByPrefix() guard (no network)', () => {
+    test('refuses prefixes that would match the whole bucket before calling S3', async ({ assert }) => {
+        const storage = new OvhS3StorageService({
+            accessKey: 'x', secretKey: 'x', endpoint: 'http://127.0.0.1:1', region: 'us-east-1', bucket: 'b', pathStyle: true,
+        })
+        for (const prefix of ['', ' ', '/', '.', './']) {
+            await assert.rejects(() => storage.deleteByPrefix(prefix), /refuses/)
+        }
+    })
+})

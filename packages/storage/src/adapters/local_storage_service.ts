@@ -2,6 +2,11 @@ import { StorageService } from '../storage_service.js'
 import fs from 'fs/promises'
 import path from 'path'
 
+/** True when any path segment is `..`, in either slash style. */
+function hasParentSegment(value: string): boolean {
+    return value.split(/[\\/]/).includes('..')
+}
+
 /**
  * Local filesystem-based implementation of the StorageService.
  * Saves files in a configured folder using a timestamp as filename.
@@ -42,14 +47,21 @@ export class LocalStorageService extends StorageService {
         const timestamp = now.toISOString().replace(/[:.]/g, '-')
         const folder = collectorName || 'default'
         const filename = extension ? `${timestamp}.${extension}` : timestamp
-        const dirPath = path.join(this.baseDir, folder)
-        const filePath = path.join(dirPath, filename)
 
-        await fs.mkdir(dirPath, { recursive: true })
+        // Keys always use forward slashes, whatever the host OS. Inputs come from callers
+        // that may forward client data, so ".." segments are refused before path.join can
+        // normalise them into a different location, and the result is validated like every other method
+        if (hasParentSegment(folder) || hasParentSegment(filename) || /[\\/]/.test(filename)) {
+            throw new Error(`Invalid path: path traversal detected for "${folder}/${filename}"`)
+        }
+        const key = `${folder}/${filename}`
+        const filePath = this.#validatePath(key)
+
+        await fs.mkdir(path.dirname(filePath), { recursive: true })
         await fs.writeFile(filePath, buffer)
 
-        // return relative path (e.g., 'mycollector/2025-07-07T15-45-22-456Z.json')
-        return path.join(folder, filename)
+        // return relative key (e.g., 'mycollector/2025-07-07T15-45-22-456Z.json')
+        return key
     }
 
     /**
@@ -114,7 +126,10 @@ export class LocalStorageService extends StorageService {
      * @throws Error if path traversal is detected
      */
     async deleteByPrefix(prefix: string): Promise<number> {
-        const folderPath = this.#validatePath(prefix)
+        const folderPath = this.#validatePath(this.assertDeletablePrefix(prefix))
+        if (folderPath === this.#normalizedBase) {
+            throw new Error(`deleteByPrefix() refuses "${prefix}": it resolves to the storage root`)
+        }
 
         try {
             // Check if folder exists

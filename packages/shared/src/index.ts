@@ -89,6 +89,7 @@ export { validateData, safeValidate, validateQuery, validateParams, vine } from 
 export { Logger, LogLevel } from './utils/logger.js'
 export { safeAsync, tryAsync, safeCleanup, retryAsync } from './utils/safe_async.js'
 export { parseBoolean } from './utils/parse_boolean.js'
+export { sanitizeFilename } from './utils/sanitize_filename.js'
 export { servableEndpoint } from './utils/servable_endpoint.js'
 export type { ServableEndpointConfig } from './utils/servable_endpoint.js'
 export {

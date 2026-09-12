@@ -23,6 +23,7 @@ import {
     HttpStatus,
     safeAsync,
     parseBoolean,
+    sanitizeFilename,
     Logger,
     validateAssetUpdate,
     validateIdParam,
@@ -644,8 +645,8 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
         const config = this.getConfiguration()
         const now = new Date()
 
-        // Store file using framework pattern
-        const url = await this.storage.save(request.file, config.name, request.filename)
+        // Store file using framework pattern; the key never carries directory parts from the client
+        const url = await this.storage.save(request.file, config.name, sanitizeFilename(request.filename))
 
         // Create metadata with all asset-specific fields
         const metadata: AssetMetadataRow = {
@@ -930,7 +931,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
 
         // Store files and prepare metadata
         for (const request of requests) {
-            const url = await this.storage.save(request.file, config.name, request.filename)
+            const url = await this.storage.save(request.file, config.name, sanitizeFilename(request.filename))
 
             const metadata: AssetMetadataRow = {
                 name: config.name,

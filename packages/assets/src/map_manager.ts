@@ -1,5 +1,6 @@
 import { AssetsManager } from './assets_manager.js'
 import type { DataResponse, TypedRequest, DataRecord } from '@cepseudo/shared'
+import { sanitizeFilename } from '@cepseudo/shared'
 
 /**
  * Extended metadata for map layer assets
@@ -103,7 +104,7 @@ export abstract class MapManager extends AssetsManager {
             const layerBuffer = Buffer.from(layerJson, 'utf-8')
 
             // Generate filename from layer name or use timestamp
-            const filename = `${layerInfo.layer_name || 'layer'}_${Date.now()}.json`
+            const filename = `${sanitizeFilename(String(layerInfo.layer_name ?? ''), 'layer')}_${Date.now()}.json`
 
             // Store layer data using framework pattern
             const url = await this.storage.save(layerBuffer, config.name, filename)
