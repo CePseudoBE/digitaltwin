@@ -4,7 +4,7 @@ import type { Queue, Job } from 'bullmq'
 import type { QueueManager } from './queue_manager.js'
 import type { HarvesterConfiguration } from '@cepseudo/shared'
 import { Logger, LogLevel, engineEventBus } from '@cepseudo/shared'
-import debounce from 'lodash/debounce.js'
+import { debounce } from './debounce.js'
 
 /**
  * Job data interface for component jobs
@@ -69,7 +69,7 @@ class ComponentScheduler {
     private readonly multiQueue: boolean
     private readonly logger: Logger
     private readonly componentMap: Record<string, Collector | Harvester> = {}
-    private readonly debouncedTriggers: Record<string, () => void> = {}
+    private readonly debouncedTriggers: Record<string, ReturnType<typeof debounce<[]>>> = {}
 
     /**
      * Creates a new Component Scheduler instance
@@ -142,7 +142,10 @@ class ComponentScheduler {
 
             const triggerFunction = this.#createTriggerFunction(config)
             const debounceMs = config.debounceMs || 1000
-            this.debouncedTriggers[config.name] = debounce(triggerFunction, debounceMs)
+            this.debouncedTriggers[config.name] = debounce(triggerFunction, debounceMs, error => {
+                // Fires on the timer, after the caller is gone; typically the queue closed during shutdown
+                this.logger.warn(`Debounced trigger for harvester ${config.name} failed: ${error instanceof Error ? error.message : String(error)}`)
+            })
         }
     }
 
