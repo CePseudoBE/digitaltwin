@@ -321,8 +321,8 @@ importers:
         specifier: ^12.6.0
         version: 12.6.0
       kysely:
-        specifier: ^0.28.11
-        version: 0.28.11
+        specifier: ^0.29.5
+        version: 0.29.5
       pg:
         specifier: ^8.20.0
         version: 8.20.0
@@ -2994,9 +2994,9 @@ packages:
       tedious:
         optional: true
 
-  kysely@0.28.11:
-    resolution: {integrity: sha512-zpGIFg0HuoC893rIjYX1BETkVWdDnzTzF5e0kWXJFg5lE0k1/LfNWBejrcnOFu8Q2Rfq/hTDTU7XLUM8QOrpzg==}
-    engines: {node: '>=20.0.0'}
+  kysely@0.29.5:
+    resolution: {integrity: sha512-ooa+eSbBNPTo3MycPEuW5jdrxQdQwdtB3LC3h43FiXQbIry5tR0C5lDG7eealK0E4D7XjrnOP5DIUg/LyjRMYQ==}
+    engines: {node: '>=22.0.0'}
 
   lazystream@1.0.1:
     resolution: {integrity: sha512-b94GiNHQNy6JNTrt5w6zNyffMrNkXZb3KTkCZJb2V1xaEGCk093vkZ2jk3tpaeP33/OiXC+WvK9AxUebnf5nbw==}
@@ -7490,7 +7490,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  kysely@0.28.11: {}
+  kysely@0.29.5: {}
 
   lazystream@1.0.1:
     dependencies:
