@@ -344,10 +344,29 @@ export abstract class Harvester
             }
 
             // Parse source range
-            const { startDate, endDate, limit } = SourceRangeParser.parseSourceRange(latestDate, config.source_range)
+            const parsed = SourceRangeParser.parseSourceRange(latestDate, config.source_range)
+            let { startDate, endDate } = parsed
+            const { limit } = parsed
+
+            // A time window never reaches into the future: what lands after now belongs to the next run
+            const now = new Date()
+            if (endDate && endDate > now) endDate = now
+            if (endDate && endDate <= startDate) return false
 
             // Get source data based on range
-            const sourceData = await this.getSourceData(config.source, startDate, endDate, limit)
+            let sourceData = await this.getSourceData(config.source, startDate, endDate, limit)
+
+            if (endDate && sourceData.length === 0) {
+                // Gap in the source longer than the range: without this the window would stay
+                // empty forever. Jump to the next source record and open the window from there.
+                const [next] = await this.db.getAfterDate(config.source, startDate, 1)
+                if (!next) return false
+                startDate = new Date(next.date.getTime() - 1) // getByDateRange is inclusive on start
+                endDate = SourceRangeParser.parseSourceRange(startDate, config.source_range).endDate
+                if (endDate && endDate > now) endDate = now
+                if (!endDate || endDate <= startDate) return false
+                sourceData = await this.getSourceData(config.source, startDate, endDate, limit)
+            }
 
             if (!sourceData || sourceData.length === 0) {
                 return false
