@@ -23,6 +23,7 @@ test.group('Env.validate', () => {
     })
 
     test('stores validated config on Env.config', ({ assert }) => {
+        Env.config = {}
         const config = Env.validate({ KEY: Env.schema.string() }, { KEY: 'value' })
 
         assert.deepEqual(Env.config, config)
@@ -115,5 +116,25 @@ test.group('Env enum validation', () => {
                 { MODE: 'staging' }
             )
         }, 'Invalid value for MODE, expected one of dev, prod')
+    })
+})
+
+test.group('Env.config accumulates across validate() calls', () => {
+    test('a second validate() keeps the keys of the first', ({ assert }) => {
+        Env.config = {}
+        Env.validate({ STORAGE_CONFIG: Env.schema.string() }, { STORAGE_CONFIG: 'local' })
+        Env.validate({ DIGITALTWIN_DISABLE_AUTH: Env.schema.boolean({ optional: true }) }, { DIGITALTWIN_DISABLE_AUTH: 'true' })
+
+        assert.equal(Env.config.STORAGE_CONFIG, 'local')
+        assert.equal(Env.config.DIGITALTWIN_DISABLE_AUTH, true)
+        Env.config = {}
+    })
+
+    test('a key validated twice takes the latest value', ({ assert }) => {
+        Env.config = {}
+        Env.validate({ PORT: Env.schema.number() }, { PORT: '3000' })
+        Env.validate({ PORT: Env.schema.number() }, { PORT: '4000' })
+        assert.equal(Env.config.PORT, 4000)
+        Env.config = {}
     })
 })
