@@ -181,7 +181,9 @@ export class Env {
             }
         }
 
-        this.config = config
+        // Merge: several modules validate their own subset of the environment (auth, storage, ...),
+        // and each must still see the keys the others validated before it
+        this.config = { ...this.config, ...config }
         return config
     }
 }
