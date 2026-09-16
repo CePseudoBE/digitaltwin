@@ -5,6 +5,8 @@
  * that should be automatically registered with the digital twin engine's router.
  */
 
+import type { EndpointSchema } from '../types/http.js'
+
 /**
  * Configuration interface for the servable endpoint decorator.
  */
@@ -17,6 +19,9 @@ export interface ServableEndpointConfig {
 
     /** Response content type (defaults to 'application/json') */
     responseType?: string
+
+    /** JSON Schema validated by the engine before the handler runs */
+    schema?: EndpointSchema
 }
 
 /**
@@ -67,6 +72,7 @@ export interface ServableEndpointMeta {
     method: string
     path: string
     responseType?: string
+    schema?: EndpointSchema
     handlerName: string
 }
 
@@ -91,6 +97,7 @@ export function servableEndpoint(config: ServableEndpointConfig) {
             method: (config.method || 'get').toUpperCase(),
             path: config.path,
             responseType: config.responseType,
+            schema: config.schema,
             handlerName: propertyKey.toString()
         })
 

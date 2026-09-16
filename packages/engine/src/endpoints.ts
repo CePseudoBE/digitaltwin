@@ -7,10 +7,9 @@ import type { FastifyInstance, FastifyRequest, HTTPMethods } from 'fastify'
 import multipart from '@fastify/multipart'
 import type { Collector, Harvester, Handler, CustomTableManager } from '@cepseudo/components'
 import type { AssetsManager } from '@cepseudo/assets'
-import type { DataResponse, HttpMethod, TypedRequest, UploadedFile } from '@cepseudo/shared'
-import { DigitalTwinError, Logger, sanitizeFilename } from '@cepseudo/shared'
-
-const logger = new Logger('Endpoints')
+import type { AuthMiddleware } from '@cepseudo/auth'
+import type { DataResponse, EndpointSchema, HttpMethod, TypedRequest, UploadedFile } from '@cepseudo/shared'
+import { sanitizeFilename } from '@cepseudo/shared'
 
 // Re-exported from @cepseudo/shared for backward compatibility
 export type { HttpMethod } from '@cepseudo/shared'
@@ -20,6 +19,12 @@ interface Endpoint {
     path: string
     handler: (req: TypedRequest) => Promise<DataResponse> | DataResponse
     responseType?: string
+    schema?: EndpointSchema
+}
+
+export interface ExposeEndpointsOptions {
+    /** Resolves the caller's identity from the headers into `TypedRequest.user` */
+    authMiddleware?: Pick<AuthMiddleware, 'identify'>
 }
 
 const SUPPORTED_METHODS = new Set<string>(['get', 'post', 'put', 'patch', 'delete'])
@@ -49,60 +54,31 @@ async function readMultipart(request: FastifyRequest): Promise<{ body: Record<st
     return { body, file }
 }
 
-async function toTypedRequest(request: FastifyRequest): Promise<TypedRequest> {
+async function toTypedRequest(request: FastifyRequest, options: ExposeEndpointsOptions): Promise<TypedRequest> {
     const upload = request.isMultipart() ? await readMultipart(request) : undefined
     return {
         params: request.params as Record<string, string>,
         query: request.query as Record<string, string | string[] | undefined>,
         body: upload?.body ?? (request.body as Record<string, unknown> | undefined) ?? {},
         headers: request.headers,
+        user: options.authMiddleware?.identify(request.headers),
         file: upload?.file
     }
-}
-
-function errorResponse(error: unknown, request: FastifyRequest, endpointPath: string): DataResponse {
-    const requestId = (request.headers['x-request-id'] as string | undefined) || crypto.randomUUID()
-    const message = error instanceof Error ? error.message : String(error)
-
-    logger.error(`[${requestId}] ${request.method} ${endpointPath} - ${message}`, {
-        requestId,
-        method: request.method,
-        path: endpointPath,
-        userId: request.headers['x-user-id'],
-        stack: error instanceof Error ? error.stack : undefined
-    })
-
-    const json = (status: number, body: unknown): DataResponse => ({
-        status,
-        content: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json' }
-    })
-
-    if (error instanceof DigitalTwinError) {
-        return json(error.statusCode, { ...error.toJSON(), requestId })
-    }
-
-    const isProduction = process.env.NODE_ENV === 'production'
-    return json(500, {
-        error: {
-            code: 'INTERNAL_ERROR',
-            message: isProduction ? 'Internal server error' : message,
-            requestId,
-            timestamp: new Date().toISOString()
-        }
-    })
 }
 
 /**
  * Registers every component endpoint as a Fastify route.
  *
  * Handlers receive a framework-neutral `TypedRequest` and return a `DataResponse`
- * that is written back as-is (status, headers, content). Multipart bodies are
- * spooled to the temp upload directory and exposed as `req.file`.
+ * that is written back as-is (status, headers, content). An endpoint's `schema`
+ * is validated by Fastify before the handler runs. Multipart bodies are spooled
+ * to the temp upload directory and exposed as `req.file`. Errors propagate to the
+ * instance's error handler.
  */
 export async function exposeEndpoints(
     fastify: FastifyInstance,
-    servables: Array<Collector | Harvester | Handler | AssetsManager | CustomTableManager>
+    servables: Array<Collector | Harvester | Handler | AssetsManager | CustomTableManager>,
+    options: ExposeEndpointsOptions = {}
 ): Promise<void> {
     await fastify.register(multipart, { limits: { files: 1 } })
 
@@ -116,13 +92,9 @@ export async function exposeEndpoints(
             fastify.route({
                 method: method.toUpperCase() as HTTPMethods,
                 url: ep.path,
+                schema: ep.schema,
                 handler: async (request, reply) => {
-                    let result: DataResponse
-                    try {
-                        result = await ep.handler(await toTypedRequest(request))
-                    } catch (error) {
-                        result = errorResponse(error, request, ep.path)
-                    }
+                    const result = await ep.handler(await toTypedRequest(request, options))
                     reply.code(result.status).headers(result.headers ?? {})
                     return result.content
                 }

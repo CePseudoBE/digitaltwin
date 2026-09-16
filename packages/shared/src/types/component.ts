@@ -6,7 +6,7 @@
  */
 
 import type { HttpMethod } from './http_method.js'
-import type { DataResponse, TypedRequest } from './http.js'
+import type { DataResponse, EndpointSchema, TypedRequest } from './http.js'
 
 /**
  * Base configuration interface for all digital twin components.
@@ -204,5 +204,7 @@ export interface Servable {
         handler: (req: TypedRequest) => Promise<DataResponse>
         /** Optional response content type (defaults to 'application/json') */
         responseType?: string
+        /** Optional JSON Schema validated by the engine before the handler runs */
+        schema?: EndpointSchema
     }>
 }

@@ -85,6 +85,20 @@ export type EndpointHandler<
     TQuery = Record<string, string | string[] | undefined>
 > = (req: TypedRequest<TParams, TBody, TQuery>) => Promise<DataResponse> | DataResponse
 
+/**
+ * JSON Schema (for example TypeBox) declared on an endpoint.
+ *
+ * The engine validates `params`, `querystring` and `body` before calling the
+ * handler and answers 400 with a structured error on mismatch. `response`
+ * documents the payload per status code.
+ */
+export interface EndpointSchema {
+    params?: object
+    querystring?: object
+    body?: object
+    response?: Record<number, object>
+}
+
 // ========== Common request type aliases ==========
 
 /** Request with ID parameter */
