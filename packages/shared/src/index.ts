@@ -7,11 +7,9 @@ export type { UserRepository } from './types/user_repository.js'
 export type { AuthResult } from './types/auth_result.js'
 export type {
     DataResponse,
-    MulterFile,
+    UploadedFile,
     TypedRequest,
-    AuthenticatedTypedRequest,
     EndpointHandler,
-    GenericHandler,
     IdParamRequest,
     NoParamRequest,
     AssetUploadBody,
@@ -38,8 +36,7 @@ export type {
 export type {
     AuthenticatedUser,
     UserRecord,
-    AuthContext,
-    AuthenticatedRequest
+    AuthContext
 } from './types/auth.js'
 
 // Errors

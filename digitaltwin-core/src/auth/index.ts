@@ -10,4 +10,4 @@ export { AuthConfig } from '@cepseudo/auth'
 export { AuthMiddleware } from '@cepseudo/auth'
 
 // Types
-export type { AuthenticatedUser, UserRecord, AuthContext, AuthenticatedRequest, AuthResult, UserRepository } from '@cepseudo/auth'
+export type { AuthenticatedUser, UserRecord, AuthContext, AuthResult, UserRepository } from '@cepseudo/auth'

@@ -1,12 +1,11 @@
 /**
- * @fileoverview HTTP request type definitions for typed Express handlers
+ * @fileoverview Framework-neutral HTTP contract for component endpoints
  *
- * Provides strongly-typed request interfaces to replace `any` in handler functions.
- * These types extend Express Request with specific body, params, and query types.
+ * Components never see the underlying HTTP framework: handlers receive a
+ * TypedRequest built by the engine and return a DataResponse.
  */
 
-import type { Request, Response } from 'ultimate-express'
-import type { AuthContext } from './auth.js'
+import type { AuthenticatedUser } from './auth.js'
 
 /**
  * Standard HTTP response structure for component endpoints.
@@ -24,32 +23,25 @@ export interface DataResponse {
 }
 
 /**
- * Multer file object interface.
- * Represents an uploaded file from multipart/form-data requests.
+ * Metadata of a file received in a multipart/form-data request.
  */
-export interface MulterFile {
+export interface UploadedFile {
     /** Field name in the form */
     fieldname: string
     /** Original filename from the client */
     originalname: string
-    /** File encoding (e.g., '7bit') */
-    encoding: string
     /** MIME type of the file */
     mimetype: string
     /** File size in bytes */
     size: number
-    /** Path to uploaded file (disk storage) */
+    /** Path to the temporary file (disk storage) */
     path?: string
     /** File content (memory storage) */
     buffer?: Buffer
-    /** Destination directory (disk storage) */
-    destination?: string
-    /** Generated filename (disk storage) */
-    filename?: string
 }
 
 /**
- * Base typed request interface extending Express Request.
+ * Request passed to component endpoint handlers.
  *
  * @template TParams - Type for URL parameters (e.g., { id: string })
  * @template TBody - Type for request body
@@ -69,24 +61,15 @@ export interface TypedRequest<
     TParams = Record<string, string>,
     TBody = Record<string, unknown>,
     TQuery = Record<string, string | string[] | undefined>
-> extends Omit<Request, 'params' | 'body' | 'query' | 'file' | 'files'> {
+> {
     params: TParams
     body: TBody
     query: TQuery
-    file?: MulterFile
-    files?: MulterFile[] | Record<string, MulterFile[]>
-}
-
-/**
- * Request with authentication context.
- * Used for endpoints that require user authentication.
- */
-export interface AuthenticatedTypedRequest<
-    TParams = Record<string, string>,
-    TBody = unknown,
-    TQuery = Record<string, string | string[] | undefined>
-> extends TypedRequest<TParams, TBody, TQuery> {
-    auth?: AuthContext
+    headers: Record<string, string | string[] | undefined>
+    /** Authenticated user, set by the engine when the request carries valid credentials */
+    user?: AuthenticatedUser
+    /** Uploaded file for multipart requests */
+    file?: UploadedFile
 }
 
 /**
@@ -100,16 +83,7 @@ export type EndpointHandler<
     TParams = Record<string, string>,
     TBody = unknown,
     TQuery = Record<string, string | string[] | undefined>
-> = (req: TypedRequest<TParams, TBody, TQuery>, res?: Response) => Promise<DataResponse> | DataResponse
-
-/**
- * Generic handler function that accepts any typed request.
- * Used in interface definitions where specific types are unknown.
- */
-export type GenericHandler = (
-    req: TypedRequest<Record<string, string>, unknown, Record<string, string | string[] | undefined>>,
-    res?: Response
-) => Promise<DataResponse> | DataResponse
+> = (req: TypedRequest<TParams, TBody, TQuery>) => Promise<DataResponse> | DataResponse
 
 // ========== Common request type aliases ==========
 
@@ -136,7 +110,7 @@ export interface AssetUpdateBody {
 }
 
 /** Request for uploading an asset */
-export type AssetUploadRequest = TypedRequest<Record<string, never>, AssetUploadBody> & { file?: MulterFile }
+export type AssetUploadRequest = TypedRequest<Record<string, never>, AssetUploadBody>
 
 /** Request for getting an asset by ID */
 export type AssetGetRequest = TypedRequest<{ id: string }>
@@ -209,7 +183,7 @@ export type PresignedUploadConfirmRequest = TypedRequest<{ fileId: string }>
 // ========== Tileset request types ==========
 
 /** Tileset upload request */
-export type TilesetUploadRequest = TypedRequest<Record<string, never>, AssetUploadBody> & { file?: MulterFile }
+export type TilesetUploadRequest = TypedRequest<Record<string, never>, AssetUploadBody>
 
 /** Tileset list query */
 export interface TilesetListQuery {
