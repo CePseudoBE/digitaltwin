@@ -18,7 +18,7 @@
     "build": "tsc",
     "dev": "tsx src/cli.ts",
     "start": "node dist/index.js",
-    "test": "node --import ts-node-maintained/register/esm bin/test.ts",
+    "test": "node --import tsx bin/test.ts",
     "prepare": "npm run build"
   },
   "keywords": [
@@ -50,7 +50,6 @@
     "@types/prompts": "^2.4.9",
     "@japa/runner": "^4.3.0",
     "@japa/assert": "^4.1.0",
-    "ts-node-maintained": "^10.9.5",
     "@types/fs-extra": "^11.0.4"
   }
 }
