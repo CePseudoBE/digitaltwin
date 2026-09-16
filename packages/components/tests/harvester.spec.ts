@@ -82,9 +82,10 @@ test.group('Harvester - time-based windows', group => {
         assert.isTrue(await harvester.run())
         const firstDate = (await latestAgg())!.date
 
-        // New data arrives after the first run's end (which was "now" at that time)
+        // The first window ended at firstDate (exclusive): a record dated there belongs to the next run
+        await insertSource(firstDate)
+        // The second window must end strictly after firstDate
         await new Promise(r => setTimeout(r, 5))
-        await insertSource(new Date(Date.now()))
         assert.isTrue(await harvester.run())
         assert.isAbove((await latestAgg())!.date.getTime(), firstDate.getTime())
         assert.lengthOf(harvester.calls[1] as DataRecord[], 1)
