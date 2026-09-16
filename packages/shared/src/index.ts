@@ -10,6 +10,7 @@ export type {
     UploadedFile,
     TypedRequest,
     EndpointHandler,
+    EndpointSchema,
     IdParamRequest,
     NoParamRequest,
     AssetUploadBody,

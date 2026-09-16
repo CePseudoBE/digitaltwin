@@ -172,3 +172,35 @@ test.group('AuthMiddleware', (group) => {
         }
     })
 })
+
+test.group('AuthMiddleware.identify', (group) => {
+    group.teardown(() => {
+        enableAuth()
+    })
+
+    test('returns the anonymous user when auth is disabled', ({ assert }) => {
+        disableAuth()
+        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
+
+        const user = middleware.identify({})
+
+        assert.equal(user?.id, AuthConfig.getAnonymousUserId())
+    })
+
+    test('returns the caller parsed from the gateway headers', ({ assert }) => {
+        enableAuth()
+        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
+
+        const user = middleware.identify({ 'x-user-id': 'uuid-1', 'x-user-roles': 'admin,user' })
+
+        assert.deepEqual(user, { id: 'uuid-1', roles: ['admin', 'user'] })
+    })
+
+    test('returns undefined without valid credentials', ({ assert }) => {
+        enableAuth()
+        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
+
+        assert.isUndefined(middleware.identify({}))
+        assert.isUndefined(middleware.identify({ 'x-user-roles': 'admin' }))
+    })
+})

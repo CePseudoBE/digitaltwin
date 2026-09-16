@@ -2,6 +2,7 @@ import type { Collector, Harvester, Handler, CustomTableManager } from '@cepseud
 import type { AssetsManager } from '@cepseudo/assets'
 import type { StorageService } from '@cepseudo/storage'
 import type { DatabaseAdapter } from '@cepseudo/database'
+import { randomUUID } from 'node:crypto'
 import Fastify from 'fastify'
 import type { InjectOptions, LightMyRequestResponse } from 'fastify'
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
@@ -23,6 +24,7 @@ import {
 } from './component_types.js'
 import { UserService, AuthMiddleware } from '@cepseudo/auth'
 import { exposeEndpoints } from './endpoints.js'
+import { registerErrorHandler, registerRequestLogging } from './error_handler.js'
 import { createLegacyRouter, type LegacyRouter } from './legacy_router.js'
 import { scheduleComponents } from './scheduler.js'
 import { LogLevel, engineEventBus } from '@cepseudo/shared'
@@ -101,7 +103,16 @@ export type EnginePlugin = (engine: DigitalTwinEngine) => Promise<void> | void
 const DEFAULT_BODY_LIMIT = 50 * 1024 * 1024
 
 function createServer(bodyLimit: number) {
-    return Fastify({ logger: false, bodyLimit, ignoreTrailingSlash: true }).withTypeProvider<TypeBoxTypeProvider>()
+    const server = Fastify({
+        logger: false,
+        bodyLimit,
+        ignoreTrailingSlash: true,
+        requestIdHeader: 'x-request-id',
+        genReqId: () => randomUUID()
+    }).withTypeProvider<TypeBoxTypeProvider>()
+    registerErrorHandler(server)
+    registerRequestLogging(server)
+    return server
 }
 
 type EngineServer = ReturnType<typeof createServer>
@@ -552,7 +563,7 @@ export class DigitalTwinEngine {
         }
         await this.#server.register(cors, this.#corsOptions())
 
-        await exposeEndpoints(this.#server, this.#allComponents)
+        await exposeEndpoints(this.#server, this.#allComponents, { authMiddleware })
 
         // Setup component scheduling with queue manager (only if we have active components)
         if (this.#activeComponents.length > 0 && this.#queueManager) {

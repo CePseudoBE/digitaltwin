@@ -10,10 +10,12 @@ import type {
     Servable,
     ComponentConfiguration,
     DataResponse,
+    EndpointSchema,
     HttpMethod,
     OpenAPIDocumentable,
     OpenAPIComponentSpec,
-    OpenAPIPathItem
+    OpenAPIPathItem,
+    TypedRequest
 } from '@cepseudo/shared'
 
 /**
@@ -23,6 +25,9 @@ import type {
  * handler classes when using the @servableEndpoint decorator.
  */
 interface EndpointMeta {
+    /** JSON Schema validated by the engine before the handler runs */
+    schema?: EndpointSchema
+
     /** HTTP method for the endpoint */
     method: HttpMethod
 
@@ -43,6 +48,9 @@ interface EndpointMeta {
  * ready for registration with the Express router.
  */
 type EndpointDescriptor = {
+    /** JSON Schema validated by the engine before the handler runs */
+    schema?: EndpointSchema
+
     /** HTTP method for the endpoint */
     method: HttpMethod
 
@@ -53,7 +61,7 @@ type EndpointDescriptor = {
     responseType?: string
 
     /** Bound handler function */
-    handler: (...args: any[]) => Promise<DataResponse>
+    handler: (req: TypedRequest) => Promise<DataResponse>
 }
 
 /**
@@ -132,6 +140,7 @@ export abstract class Handler implements Component, Servable, OpenAPIDocumentabl
                 method: ep.method,
                 path: ep.path,
                 responseType: ep.responseType || config.contentType,
+                schema: ep.schema,
                 handler: handlerFn
             }
         })

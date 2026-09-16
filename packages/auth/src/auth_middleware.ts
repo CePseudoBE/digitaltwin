@@ -1,7 +1,7 @@
-import type { AuthResult } from '@cepseudo/shared'
+import type { AuthenticatedUser, AuthResult } from '@cepseudo/shared'
 import { unauthorizedResponse, errorResponse } from '@cepseudo/shared'
 import { AuthConfig } from './auth_config.js'
-import { ApisixAuthParser } from './apisix_parser.js'
+import { ApisixAuthParser, type HeadersLike } from './apisix_parser.js'
 import type { UserService } from './user_service.js'
 
 /**
@@ -34,6 +34,21 @@ export class AuthMiddleware {
      * - Gateway mode → parses APISIX headers
      * - JWT mode → validates Bearer token
      */
+    /**
+     * Reads the caller's identity from the request headers without touching the database.
+     * Returns undefined when the request carries no valid credentials; components that
+     * need the database record keep calling `authenticate()`.
+     */
+    identify(headers: HeadersLike): AuthenticatedUser | undefined {
+        if (AuthConfig.isAuthDisabled()) {
+            return AuthConfig.getAnonymousUser()
+        }
+        if (!ApisixAuthParser.hasValidAuth(headers)) {
+            return undefined
+        }
+        return ApisixAuthParser.parseAuthHeaders(headers) ?? undefined
+    }
+
     async authenticate(req: { headers?: Record<string, string | string[] | undefined> }): Promise<AuthResult> {
         // If auth is disabled, create an anonymous user
         if (AuthConfig.isAuthDisabled()) {
