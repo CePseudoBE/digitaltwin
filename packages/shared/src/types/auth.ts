@@ -1,6 +1,3 @@
-import type { Request } from 'ultimate-express'
-import type { MulterFile } from './http.js'
-
 /**
  * User information extracted from Keycloak JWT via Apache APISIX headers.
  *
@@ -71,35 +68,4 @@ export interface AuthContext {
     user: AuthenticatedUser
     /** Database user record with full role information */
     userRecord: UserRecord
-}
-
-/**
- * Request object extended with authentication context.
- *
- * Represents an HTTP request that has been augmented with
- * authentication information. Used by handlers that need
- * access to both request data and user context.
- *
- * @example
- * ```typescript
- * async function handleRequest(req: AuthenticatedRequest) {
- *   if (req.auth) {
- *     console.log(`Request from user: ${req.auth.user.id}`)
- *   }
- * }
- * ```
- */
-export interface AuthenticatedRequest {
-    /** Original Express request object */
-    originalRequest: Request
-    /** Authentication context (undefined if not authenticated) */
-    auth?: AuthContext
-    /** Request headers (including APISIX authentication headers) */
-    headers: Record<string, string>
-    /** URL parameters */
-    params?: Record<string, string>
-    /** Request body */
-    body?: Record<string, unknown>
-    /** File upload (for multipart requests with assets) */
-    file?: MulterFile
 }

@@ -71,6 +71,14 @@ export default tseslint.config(
         }
     },
 
+    // The shared contract must stay framework-neutral (ADR 0001)
+    {
+        files: ['packages/shared/src/**/*.ts'],
+        rules: {
+            'no-restricted-imports': ['error', { paths: ['ultimate-express', 'express', 'fastify'] }]
+        }
+    },
+
     // Test files - Even more permissive
     {
         files: ['**/*.spec.ts', '**/*.test.ts', '**/tests/**/*'],

@@ -1,11 +1,9 @@
 // Re-exported from @cepseudo/shared for backward compatibility
 export type {
     DataResponse,
-    MulterFile,
+    UploadedFile,
     TypedRequest,
-    AuthenticatedTypedRequest,
     EndpointHandler,
-    GenericHandler,
     IdParamRequest,
     NoParamRequest,
     AssetUploadBody,

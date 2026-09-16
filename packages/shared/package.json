@@ -32,18 +32,9 @@
   "dependencies": {
     "@vinejs/vine": "^4.2.0"
   },
-  "peerDependencies": {
-    "ultimate-express": ">=2.0.0"
-  },
-  "peerDependenciesMeta": {
-    "ultimate-express": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@japa/assert": "^4.1.0",
-    "@japa/runner": "^4.3.0",
-    "ultimate-express": "^2.0.9"
+    "@japa/runner": "^4.3.0"
   },
   "repository": {
     "type": "git",

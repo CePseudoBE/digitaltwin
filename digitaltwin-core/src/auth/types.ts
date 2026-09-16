@@ -3,6 +3,5 @@ export type {
     AuthenticatedUser,
     UserRecord,
     AuthContext,
-    AuthenticatedRequest,
     AuthResult
 } from '@cepseudo/shared'

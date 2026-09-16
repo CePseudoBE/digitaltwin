@@ -171,12 +171,6 @@ const createSensorSchema = vine.compile(
 const body = await validateData(createSensorSchema, req.body)
 ```
 
-## Peer Dependencies
-
-| Package | Required | Notes |
-|---|---|---|
-| `ultimate-express` | Optional | Only needed if you use HTTP-related types (`TypedRequest`, response helpers). Omit if you only use errors, validation, or utilities. |
-
 ## License
 
 MIT
