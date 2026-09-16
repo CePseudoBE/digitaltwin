@@ -1,118 +1,181 @@
 import { test } from '@japa/runner'
+import Fastify from 'fastify'
+import type { FastifyInstance } from 'fastify'
+import fs from 'node:fs/promises'
+import { NotFoundError } from '@cepseudo/shared'
+import type { TypedRequest } from '@cepseudo/shared'
 import { exposeEndpoints } from '../src/endpoints.js'
-import { TestCollector, TestHarvester, TestHandler } from './fixtures/mock_components.js'
+import { TestCollector, TestHandler } from './fixtures/mock_components.js'
 
-class MockRouter {
-    private routes = new Map<string, (req: any, res: any) => Promise<void>>()
-
-    private reg(method: string, path: string, handler: (req: any, res: any) => Promise<void>) {
-        this.routes.set(`${method.toUpperCase()} ${path}`, handler)
-    }
-
-    get(path: string, handler: (req: any, res: any) => any) { this.reg('GET', path, handler) }
-    post(path: string, handler: (req: any, res: any) => any) { this.reg('POST', path, handler) }
-    put(path: string, handler: (req: any, res: any) => any) { this.reg('PUT', path, handler) }
-    delete(path: string, handler: (req: any, res: any) => any) { this.reg('DELETE', path, handler) }
-    patch(path: string, handler: (req: any, res: any) => any) { this.reg('PATCH', path, handler) }
-
-    async invoke(method: string, path: string, req: any, res: any): Promise<void> {
-        const handler = this.routes.get(`${method.toUpperCase()} ${path}`)
-        if (!handler) throw new Error(`No handler registered: ${method.toUpperCase()} ${path}`)
-        await handler(req, res)
-    }
-}
-
-class MockResponse {
-    statusCode = 200
-    body: any = null
-    headers: Record<string, string> = {}
-
-    status(code: number) { this.statusCode = code; return this }
-    header(h: Record<string, string>) { this.headers = { ...this.headers, ...h }; return this }
-    send(content: any) { this.body = content; return this }
+async function serve(...servables: Array<TestCollector | TestHandler>): Promise<FastifyInstance> {
+    const fastify = Fastify({ logger: false })
+    await exposeEndpoints(fastify, servables)
+    return fastify
 }
 
 test.group('exposeEndpoints', () => {
     test('all component endpoints are reachable and return the configured response', async ({ assert }) => {
-        const router = new MockRouter()
         const collector = new TestCollector('c1', [
-            { method: 'get', path: '/data', handler: async () => ({ status: 200, content: { ok: true } }) }
+            { method: 'get', path: '/data', handler: async () => ({ status: 200, content: JSON.stringify({ ok: true }), headers: { 'Content-Type': 'application/json' } }) }
         ])
         const handler = new TestHandler('h1', [
             { method: 'post', path: '/action', handler: async () => ({ status: 201, content: 'created' }) },
+            { method: 'put', path: '/action/:id', handler: async () => ({ status: 200, content: 'replaced' }) },
+            { method: 'patch', path: '/action/:id', handler: async () => ({ status: 200, content: 'patched' }) },
             { method: 'delete', path: '/action/:id', handler: async () => ({ status: 204, content: '' }) }
         ])
+        const fastify = await serve(collector, handler)
 
-        await exposeEndpoints(router as any, [collector, handler])
+        assert.equal((await fastify.inject({ method: 'PUT', url: '/action/1' })).body, 'replaced')
+        assert.equal((await fastify.inject({ method: 'PATCH', url: '/action/1' })).body, 'patched')
 
-        const getRes = new MockResponse()
-        await router.invoke('GET', '/data', {}, getRes)
+        const getRes = await fastify.inject({ method: 'GET', url: '/data' })
         assert.equal(getRes.statusCode, 200)
-        assert.deepEqual(getRes.body, { ok: true })
+        assert.match(String(getRes.headers['content-type']), /^application\/json/)
+        assert.deepEqual(getRes.json(), { ok: true })
 
-        const postRes = new MockResponse()
-        await router.invoke('POST', '/action', {}, postRes)
+        const postRes = await fastify.inject({ method: 'POST', url: '/action' })
         assert.equal(postRes.statusCode, 201)
         assert.equal(postRes.body, 'created')
 
-        const deleteRes = new MockResponse()
-        await router.invoke('DELETE', '/action/:id', {}, deleteRes)
+        const deleteRes = await fastify.inject({ method: 'DELETE', url: '/action/42' })
         assert.equal(deleteRes.statusCode, 204)
     })
 
     test('component endpoint defined with uppercase method is reachable', async ({ assert }) => {
-        const router = new MockRouter()
-        const handler = new TestHandler('h', [
-            { method: 'GET' as any, path: '/upper', handler: async () => ({ status: 200, content: 'upper works' }) }
-        ])
+        const fastify = await serve(
+            new TestHandler('h', [{ method: 'GET' as any, path: '/upper', handler: async () => ({ status: 200, content: 'upper works' }) }])
+        )
 
-        await exposeEndpoints(router as any, [handler])
-
-        const res = new MockResponse()
-        await router.invoke('GET', '/upper', {}, res)
+        const res = await fastify.inject({ method: 'GET', url: '/upper' })
         assert.equal(res.statusCode, 200)
         assert.equal(res.body, 'upper works')
     })
 
-    test('passes request data to component handler', async ({ assert }) => {
-        const router = new MockRouter()
-        let receivedReq: any = null
+    test('passes params, query, body and headers to the component handler', async ({ assert }) => {
+        let received: TypedRequest | undefined
+        const fastify = await serve(
+            new TestHandler('h', [{
+                method: 'post',
+                path: '/items/:id',
+                handler: async (req: TypedRequest) => {
+                    received = req
+                    return { status: 201, headers: { 'X-Custom': 'val' }, content: JSON.stringify({ ok: true }) }
+                }
+            }])
+        )
 
-        const handler = new TestHandler('h', [{
-            method: 'post',
-            path: '/test',
-            handler: async (req: any) => {
-                receivedReq = req
-                return { status: 201, headers: { 'X-Custom': 'val' }, content: { ok: true } }
-            }
-        }])
+        const res = await fastify.inject({
+            method: 'POST',
+            url: '/items/5?verbose=true',
+            headers: { 'x-user-id': 'u1' },
+            payload: { name: 'x' }
+        })
 
-        await exposeEndpoints(router as any, [handler])
-
-        const req = { params: { id: '5' }, body: { name: 'x' } }
-        const res = new MockResponse()
-        await router.invoke('POST', '/test', req, res)
-
-        assert.deepEqual(receivedReq.params, { id: '5' })
         assert.equal(res.statusCode, 201)
-        assert.equal(res.headers['X-Custom'], 'val')
-        assert.deepEqual(res.body, { ok: true })
+        assert.equal(res.headers['x-custom'], 'val')
+        assert.deepEqual(received!.params, { id: '5' })
+        assert.deepEqual(received!.query, { verbose: 'true' })
+        assert.deepEqual(received!.body, { name: 'x' })
+        assert.equal(received!.headers['x-user-id'], 'u1')
+        assert.isUndefined(received!.file)
+    })
+
+    test('a request without a body gives the handler an empty object', async ({ assert }) => {
+        let received: TypedRequest | undefined
+        const fastify = await serve(
+            new TestHandler('h', [{ method: 'get', path: '/x', handler: async (req: TypedRequest) => { received = req; return { status: 200, content: '' } } }])
+        )
+
+        await fastify.inject({ method: 'GET', url: '/x' })
+        assert.deepEqual(received!.body, {})
+    })
+
+    test('multipart uploads are spooled to the temp directory and exposed as req.file', async ({ assert }) => {
+        const tempDir = '.test-uploads'
+        process.env.TEMP_UPLOAD_DIR = tempDir
+        let received: TypedRequest | undefined
+        const fastify = await serve(
+            new TestHandler('h', [{ method: 'post', path: '/upload', handler: async (req: TypedRequest) => { received = req; return { status: 200, content: '' } } }])
+        )
+
+        const boundary = 'testboundary'
+        const payload = [
+            `--${boundary}`,
+            'Content-Disposition: form-data; name="description"',
+            '',
+            'a model',
+            `--${boundary}`,
+            'Content-Disposition: form-data; name="file"; filename="model (v2).glb"',
+            'Content-Type: model/gltf-binary',
+            '',
+            'binarycontent',
+            `--${boundary}--`,
+            ''
+        ].join('\r\n')
+
+        try {
+            const res = await fastify.inject({
+                method: 'POST',
+                url: '/upload',
+                headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+                payload
+            })
+
+            assert.equal(res.statusCode, 200)
+            assert.deepEqual(received!.body, { description: 'a model' })
+            const file = received!.file!
+            assert.equal(file.fieldname, 'file')
+            assert.equal(file.originalname, 'model (v2).glb')
+            assert.equal(file.mimetype, 'model/gltf-binary')
+            assert.equal(file.size, 'binarycontent'.length)
+            assert.isTrue(file.path!.startsWith(tempDir))
+            assert.equal(await fs.readFile(file.path!, 'utf8'), 'binarycontent')
+        } finally {
+            delete process.env.TEMP_UPLOAD_DIR
+            await fs.rm(tempDir, { recursive: true, force: true })
+        }
+    })
+
+    test('a DigitalTwinError thrown by the handler maps to its status code', async ({ assert }) => {
+        const fastify = await serve(
+            new TestHandler('h', [{ method: 'get', path: '/missing', handler: async () => { throw new NotFoundError('nothing here') } }])
+        )
+
+        const res = await fastify.inject({ method: 'GET', url: '/missing', headers: { 'x-request-id': 'req-1' } })
+        assert.equal(res.statusCode, 404)
+        const body = res.json() as { requestId: string; error: { message: string } }
+        assert.equal(body.requestId, 'req-1')
+        assert.equal(body.error.message, 'nothing here')
+    })
+
+    test('an unexpected error gives a 500 whose message is hidden in production', async ({ assert }) => {
+        const fastify = await serve(
+            new TestHandler('h', [{ method: 'get', path: '/boom', handler: async () => { throw new Error('db exploded') } }])
+        )
+
+        const dev = await fastify.inject({ method: 'GET', url: '/boom' })
+        assert.equal(dev.statusCode, 500)
+        assert.equal((dev.json() as { error: { message: string } }).error.message, 'db exploded')
+
+        process.env.NODE_ENV = 'production'
+        try {
+            const prod = await fastify.inject({ method: 'GET', url: '/boom' })
+            assert.equal(prod.statusCode, 500)
+            assert.equal((prod.json() as { error: { message: string } }).error.message, 'Internal server error')
+        } finally {
+            process.env.NODE_ENV = 'test'
+        }
     })
 
     test('throws for unsupported HTTP methods', async ({ assert }) => {
-        const router = new MockRouter()
-        const handler = new TestHandler('h', [
-            { method: 'TRACE' as any, path: '/x', handler: async () => ({ status: 200, content: '' }) }
-        ])
-
         await assert.rejects(
-            () => exposeEndpoints(router as any, [handler]),
+            () => serve(new TestHandler('h', [{ method: 'TRACE' as any, path: '/x', handler: async () => ({ status: 200, content: '' }) }])),
             /Unsupported HTTP method/
         )
     })
 
     test('handles components with no endpoints', async ({ assert }) => {
-        const router = new MockRouter()
-        await assert.doesNotReject(() => exposeEndpoints(router as any, [new TestCollector('empty', [])]))
+        await assert.doesNotReject(() => serve(new TestCollector('empty', [])))
     })
 })

@@ -2,13 +2,12 @@ import type { Collector, Harvester, Handler, CustomTableManager } from '@cepseud
 import type { AssetsManager } from '@cepseudo/assets'
 import type { StorageService } from '@cepseudo/storage'
 import type { DatabaseAdapter } from '@cepseudo/database'
-import type { Router as ExpressRouter, RequestHandler } from 'ultimate-express'
-import express from 'ultimate-express'
-import multer from 'multer'
+import Fastify from 'fastify'
+import type { InjectOptions, LightMyRequestResponse } from 'fastify'
+import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
+import cors from '@fastify/cors'
+import compress from '@fastify/compress'
 import type { ConnectionOptions, Worker } from 'bullmq'
-import fs from 'fs/promises'
-import cors from 'cors'
-import compression from 'compression'
 
 import { initializeComponents, initializeAssetsManagers } from './initializer.js'
 import {
@@ -24,6 +23,7 @@ import {
 } from './component_types.js'
 import { UserService, AuthMiddleware } from '@cepseudo/auth'
 import { exposeEndpoints } from './endpoints.js'
+import { createLegacyRouter, type LegacyRouter } from './legacy_router.js'
 import { scheduleComponents } from './scheduler.js'
 import { LogLevel, engineEventBus } from '@cepseudo/shared'
 import type { QueueConfig } from './queue_manager.js'
@@ -95,6 +95,17 @@ export interface ValidationResult {
  * }
  * ```
  */
+/** Runs after components and auth are initialised and before the server listens. */
+export type EnginePlugin = (engine: DigitalTwinEngine) => Promise<void> | void
+
+const DEFAULT_BODY_LIMIT = 50 * 1024 * 1024
+
+function createServer(bodyLimit: number) {
+    return Fastify({ logger: false, bodyLimit, ignoreTrailingSlash: true }).withTypeProvider<TypeBoxTypeProvider>()
+}
+
+type EngineServer = ReturnType<typeof createServer>
+
 export interface EngineOptions {
     /** Array of data collectors to register with the engine */
     collectors?: Collector[]
@@ -132,7 +143,11 @@ export interface EngineOptions {
         port: number
         /** Server host (default: '0.0.0.0') */
         host?: string
+        /** Maximum request body size in bytes (default: 50 MiB) */
+        bodyLimit?: number
     }
+    /** Run after components and auth are initialised, before the server listens */
+    plugins?: EnginePlugin[]
     /** Logging configuration */
     logging?: {
         /** Log level (default: LogLevel.INFO) */
@@ -202,16 +217,15 @@ export class DigitalTwinEngine {
     #customTableManagers: CustomTableManager[]
     readonly #storage: StorageService
     readonly #database: DatabaseAdapter
-    readonly #app: ReturnType<typeof express>
-    readonly #router: ExpressRouter
+    readonly #server: EngineServer
+    readonly #router: LegacyRouter
     readonly #options: EngineOptions
     /** Built in start(); shared with optional plugins such as NGSI-LD */
     #authMiddleware?: AuthMiddleware
     #queueManager: QueueManager | null
     #uploadProcessor: UploadProcessor | null
     readonly #uploadReconciler: UploadReconciler
-    /** uWebSockets.js TemplatedApp - has close() method to shut down all connections */
-    #server?: { close(): unknown }
+    #listening = false
     #workers: Worker[] = []
     #isShuttingDown = false
     #isStarted = false
@@ -297,8 +311,8 @@ export class DigitalTwinEngine {
         this.#storage = this.#options.storage
         this.#database = this.#options.database
         this.#healthChecker = new HealthChecker({ checkTimeoutMs: this.#options.health?.checkTimeoutMs })
-        this.#app = express()
-        this.#router = express.Router()
+        this.#server = createServer(this.#options.server?.bodyLimit ?? DEFAULT_BODY_LIMIT)
+        this.#router = createLegacyRouter(this.#server)
         this.#queueManager = this.#createQueueManager()
         this.#uploadProcessor = this.#createUploadProcessor()
         this.#uploadReconciler = new UploadReconciler(this.#database, this.#storage)
@@ -376,19 +390,6 @@ export class DigitalTwinEngine {
     }
 
     /**
-     * Ensure temporary upload directory exists
-     * @private
-     */
-    async #ensureTempUploadDir(): Promise<void> {
-        const tempDir = process.env.TEMP_UPLOAD_DIR || '/tmp/digitaltwin-uploads'
-        try {
-            await fs.mkdir(tempDir, { recursive: true })
-        } catch (error) {
-            throw new Error(`Failed to create temp upload directory ${tempDir}: ${error}`)
-        }
-    }
-
-    /**
      * Setup monitoring endpoints for queue statistics and health checks
      * @private
      */
@@ -415,33 +416,26 @@ export class DigitalTwinEngine {
         })
 
         // Liveness probe - shallow check, always returns ok if process is running
-        this.#router.get('/api/health/live', (req, res) => {
-            res.status(200).json(livenessCheck())
-        })
+        this.#server.get('/api/health/live', async () => livenessCheck())
 
         // Readiness probe - deep check with database and redis verification
-        this.#router.get('/api/health/ready', async (req, res) => {
+        this.#server.get('/api/health/ready', async (_request, reply) => {
             const health = await this.#healthChecker.performCheck()
-            const statusCode = health.status === 'unhealthy' ? 503 : 200
-            res.status(statusCode).json(health)
+            reply.code(health.status === 'unhealthy' ? 503 : 200)
+            return health
         })
 
         // Full health check endpoint (detailed)
-        this.#router.get('/api/health', async (req, res) => {
-            const health = await this.#healthChecker.performCheck()
-            res.json(health)
-        })
+        this.#server.get('/api/health', async () => this.#healthChecker.performCheck())
 
         // Queue statistics endpoint
-        this.#router.get('/api/queues/stats', async (req, res) => {
+        this.#server.get('/api/queues/stats', async () => {
             if (this.#queueManager) {
-                const stats = await this.#queueManager.getQueueStats()
-                res.json(stats)
-            } else {
-                res.json({
-                    collectors: { status: 'No collectors configured' },
-                    harvesters: { status: 'No harvesters configured' }
-                })
+                return this.#queueManager.getQueueStats()
+            }
+            return {
+                collectors: { status: 'No collectors configured' },
+                harvesters: { status: 'No harvesters configured' }
             }
         })
     }
@@ -551,7 +545,14 @@ export class DigitalTwinEngine {
             this.#uploadReconciler.start()
         }
 
-        await exposeEndpoints(this.#router, this.#allComponents)
+        // Fastify attaches hooks only to routes registered after the plugin, so these come first
+        // Compression is off by default: API gateways (APISIX, Kong, ...) usually handle it
+        if (process.env.DIGITALTWIN_ENABLE_COMPRESSION === 'true') {
+            await this.#server.register(compress, { threshold: 1024 })
+        }
+        await this.#server.register(cors, this.#corsOptions())
+
+        await exposeEndpoints(this.#server, this.#allComponents)
 
         // Setup component scheduling with queue manager (only if we have active components)
         if (this.#activeComponents.length > 0 && this.#queueManager) {
@@ -564,93 +565,37 @@ export class DigitalTwinEngine {
 
         this.#setupMonitoringEndpoints()
 
-        // Ensure temporary upload directory exists
-        await this.#ensureTempUploadDir()
-
-        // HTTP compression - disabled by default as API gateways (APISIX, Kong, etc.) typically handle this
-        // Enable with DIGITALTWIN_ENABLE_COMPRESSION=true for standalone deployments without a gateway
-        const enableCompression = process.env.DIGITALTWIN_ENABLE_COMPRESSION === 'true'
-        if (enableCompression) {
-            const compressionMiddleware = compression({
-                filter: (req, res) => {
-                    // Don't compress binary streams
-                    if (req.headers['accept']?.includes('application/octet-stream')) {
-                        return false
-                    }
-                    // Use default filter for other content types
-                    return compression.filter(req, res)
-                },
-                level: 6, // Balance between speed and compression ratio
-                threshold: 1024 // Only compress responses larger than 1KB
-            })
-            this.#app.use(compressionMiddleware as unknown as RequestHandler)
-        }
-
-        // Enable CORS for cross-origin requests from frontend applications
-        this.#app.use(
-            cors({
-                origin: process.env.CORS_ORIGIN || true, // Allow all origins by default, configure in production
-                methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-                allowedHeaders: ['Content-Type', 'Authorization'],
-                credentials: true // Allow cookies/credentials
-            })
-        )
-
-        // Configure Express middlewares for body parsing - no limits for large files
-        this.#app.use(express.json({ limit: '10gb' }))
-        this.#app.use(express.urlencoded({ extended: true, limit: '10gb' }))
-
-        // Add multipart/form-data support for file uploads with disk storage for large files
-        const upload = multer({
-            storage: multer.diskStorage({
-                destination: (req, file, cb) => {
-                    // Use temporary directory, will be cleaned up after processing
-                    const tempDir = process.env.TEMP_UPLOAD_DIR || '/tmp/digitaltwin-uploads'
-                    cb(null, tempDir)
-                },
-                filename: (req, file, cb) => {
-                    // Generate unique filename to avoid conflicts
-                    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
-                    cb(null, file.fieldname + '-' + uniqueSuffix + '-' + file.originalname)
-                }
-            }),
-            limits: {
-                // Remove file size limit to allow large files (10GB+)
-                files: 1, // Only one file per request for safety
-                parts: 10, // Limit form parts
-                headerPairs: 2000 // Limit header pairs
-            }
-        })
-        this.#app.use(upload.single('file') as any)
-
-        this.#app.use(this.#router)
-
-        const { port, host = '0.0.0.0' } = this.#options.server ?? {
-            port: 3000,
-            host: '0.0.0.0'
-        }
-
-        // Wait for server to be ready
-        // Note: ultimate-express types say (host, port, callback) but implementation accepts (port, host, callback)
-        // The implementation internally reorders to (host, port) for uWebSockets.js
-        // Using type assertion to work around this types bug in ultimate-express
-        await new Promise<void>(resolve => {
-            const app = this.#app as unknown as {
-                listen(port: number, host: string, callback: () => void): { close(): unknown }
-            }
-            this.#server = app.listen(port, host, () => {
-                resolve()
-            })
-        })
-
-        // Note: uWebSockets.js (used by ultimate-express) handles timeouts differently than Node.js http.Server:
-        // - HTTP idle timeout is 10 seconds (only when connection is inactive)
-        // - During active data transfer (file uploads), the connection stays open
-        // - Properties like timeout, keepAliveTimeout, headersTimeout don't exist on TemplatedApp
-        // For large file uploads, this should work fine as the connection remains active during transfer.
-
-        // Attempt to load optional packages (e.g. @cepseudo/ngsi-ld)
+        // Routes cannot be added once the server listens, so plugins run before it
         await this.#loadOptionalPackages()
+        for (const plugin of this.#options.plugins ?? []) {
+            await plugin(this)
+        }
+
+        const { port, host = '0.0.0.0' } = this.#options.server ?? { port: 3000, host: '0.0.0.0' }
+        await this.#server.listen({ port, host })
+        this.#listening = true
+    }
+
+    /**
+     * Without an allowlist any origin is served, but never with credentials (#50).
+     * `CORS_ORIGIN` is a comma-separated allowlist; credentials are enabled only with it.
+     */
+    #corsOptions(): { origin: string[] | boolean; credentials: boolean; methods: string[]; allowedHeaders: string[] } {
+        const allowlist = (process.env.CORS_ORIGIN ?? '')
+            .split(',')
+            .map(origin => origin.trim())
+            .filter(Boolean)
+
+        if (allowlist.length === 0 && process.env.NODE_ENV === 'production') {
+            console.warn('[DigitalTwin] CORS_ORIGIN is not set: every origin is allowed, credentials are disabled')
+        }
+
+        return {
+            origin: allowlist.length > 0 ? allowlist : true,
+            credentials: allowlist.length > 0,
+            methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization']
+        }
     }
 
     /**
@@ -692,18 +637,21 @@ export class DigitalTwinEngine {
      * ```
      */
     getPort(): number | undefined {
-        if (!this.#server) return undefined
-        // ultimate-express stores port on the app instance
-        // Use type assertion to access the port property
-        const app = this.#app as unknown as { port?: number }
-        return app.port ?? this.#options.server?.port
+        if (!this.#listening) return undefined
+        const address = this.#server.server.address()
+        return typeof address === 'object' && address ? address.port : undefined
+    }
+
+    /** Dispatches a request in-process, without a network socket. Intended for tests. */
+    inject(options: InjectOptions | string): Promise<LightMyRequestResponse> {
+        return this.#server.inject(options)
     }
 
     /**
-     * Returns the internal Express Router.
-     * Used by optional plugin packages to register additional routes.
+     * Express-style router for plugins that still register `(req, res)` handlers.
+     * Transitional until the NGSI-LD package becomes a Fastify plugin (#102).
      */
-    getRouter(): ExpressRouter {
+    getRouter(): LegacyRouter {
         return this.#router
     }
 
@@ -1014,14 +962,14 @@ export class DigitalTwinEngine {
         // 1. Remove all event listeners to prevent new work
         this.#cleanupEventListeners()
 
-        // 2. Close HTTP server (uWebSockets.js TemplatedApp.close() is synchronous)
-        if (this.#server) {
+        // 2. Close HTTP server: stops accepting connections and waits for in-flight requests
+        if (this.#listening) {
             try {
-                this.#server.close()
+                await withTimeout(this.#server.close(), Math.min(this.#shutdownTimeout / 3, 10000), 'Server close')
             } catch (error) {
                 errors.push(this.#wrapError('Server close', error))
             }
-            this.#server = undefined
+            this.#listening = false
         }
 
         // 3. Drain queues - wait for active jobs with timeout

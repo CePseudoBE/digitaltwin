@@ -101,7 +101,6 @@ export { loadComponents, type LoadComponentsOptions, type LoadComponentsResult }
 
 // Engine Components
 export { QueueManager } from './engine/queue_manager.js'
-export { errorHandler, asyncHandler, notFoundHandler } from './engine/error_handler.js'
 export {
     HealthChecker,
     createDatabaseCheck,
