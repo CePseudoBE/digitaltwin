@@ -22,7 +22,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "clean": "rimraf dist tsconfig.tsbuildinfo",
-    "test": "node -r ./bin/set-test-env.cjs --import ts-node-maintained/register/esm --enable-source-maps bin/test.ts",
+    "test": "node -r ./bin/set-test-env.cjs --import tsx --enable-source-maps bin/test.ts",
     "lint": "eslint src tests --no-error-on-unmatched-pattern",
     "lint:fix": "eslint src tests --fix --no-error-on-unmatched-pattern"
   },
@@ -36,8 +36,7 @@
   "devDependencies": {
     "@japa/assert": "^4.1.0",
     "@japa/runner": "^4.3.0",
-    "@types/jsonwebtoken": "^9.0.10",
-    "ts-node-maintained": "^10.9.5"
+    "@types/jsonwebtoken": "^9.0.10"
   },
   "repository": {
     "type": "git",

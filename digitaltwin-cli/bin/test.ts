@@ -4,8 +4,6 @@ import * as reporters from '@japa/runner/reporters'
 
 // Set test environment
 process.env.NODE_ENV = 'test'
-process.env.TS_NODE_PROJECT = 'tsconfig.json'
-process.env.TS_NODE_TRANSPILE_ONLY = 'true'
 
 // Get file filter from CLI args
 const args = process.argv.slice(2).filter((arg) => arg !== '--')

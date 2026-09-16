@@ -22,7 +22,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "clean": "rimraf dist tsconfig.tsbuildinfo",
-    "test": "node -r ./bin/set-test-env.cjs --import ts-node-maintained/register/esm --enable-source-maps bin/test.ts",
+    "test": "node -r ./bin/set-test-env.cjs --import tsx --enable-source-maps bin/test.ts",
     "lint": "eslint src tests --no-error-on-unmatched-pattern",
     "lint:fix": "eslint src tests --fix --no-error-on-unmatched-pattern"
   },
@@ -50,8 +50,7 @@
     "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.19",
     "@types/multer": "^2.0.0",
-    "testcontainers": "^11.3.1",
-    "ts-node-maintained": "^10.9.5"
+    "testcontainers": "^11.3.1"
   },
   "repository": {
     "type": "git",

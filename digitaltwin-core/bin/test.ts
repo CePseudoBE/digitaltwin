@@ -4,8 +4,6 @@ import * as reporters from '@japa/runner/reporters'
 
 // Set test environment
 process.env.NODE_ENV = 'test'
-process.env.TS_NODE_PROJECT = 'tsconfig.test.json'
-process.env.TS_NODE_TRANSPILE_ONLY = 'true'
 // Disable authentication for tests (unless explicitly testing auth)
 process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
 

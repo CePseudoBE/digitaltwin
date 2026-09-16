@@ -1,3 +1,2 @@
 process.env.NODE_ENV = 'test'
-process.env.TS_NODE_PROJECT = 'tsconfig.test.json'
-process.env.TS_NODE_TRANSPILE_ONLY = 'true'
+process.env.TSX_TSCONFIG_PATH = 'tsconfig.test.json'

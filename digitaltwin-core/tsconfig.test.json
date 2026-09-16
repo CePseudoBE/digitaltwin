@@ -5,11 +5,6 @@
     "rootDir": ".",
     "noEmit": true
   },
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node",
-    "transpileOnly": true
-  },
   "include": [
     "src/**/*",
     "tests/**/*",
