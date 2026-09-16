@@ -99,24 +99,25 @@ test.group('NGSI-LD E2E — engine + real HTTP', group => {
             server: { port: ENGINE_PORT },
             logging: { level: LogLevel.SILENT },
             queues: { multiQueue: true },
+            // Explicitly register the NGSI-LD plugin: pnpm strict isolation prevents the engine's
+            // auto-discovery (dynamic import) from resolving @cepseudo/ngsi-ld from its own context.
+            // Plugins run before the server listens, since Fastify refuses routes added afterwards.
+            plugins: [
+                engine =>
+                    registerNgsiLd({
+                        router: engine.getRouter(),
+                        db: engine.getDatabase(),
+                        redis: engine.getRedisConfig(),
+                        components: engine.getAllComponents(),
+                        logger: new Logger('ngsi-ld'),
+                        authMiddleware: engine.getAuthMiddleware(),
+                        allowPrivateWebhooks: true, // the webhook receiver below listens on 127.0.0.1
+                    }),
+            ],
         })
 
         // DIGITALTWIN_DISABLE_AUTH is already set to 'true' by setupInfrastructure()
         await engine.start()
-
-        // Explicitly register the NGSI-LD plugin — pnpm strict isolation prevents
-        // the engine's auto-discovery (dynamic import) from resolving @cepseudo/ngsi-ld
-        // from the engine package's context. The e2e process owns the dependency.
-        const redisConfig = engine.getRedisConfig()
-        await registerNgsiLd({
-            router: engine.getRouter(),
-            db: engine.getDatabase(),
-            redis: redisConfig,
-            components: engine.getAllComponents(),
-            logger: new Logger('ngsi-ld'),
-            authMiddleware: engine.getAuthMiddleware(),
-            allowPrivateWebhooks: true, // the webhook receiver below listens on 127.0.0.1
-        })
 
         baseUrl = `http://localhost:${ENGINE_PORT}`
     })

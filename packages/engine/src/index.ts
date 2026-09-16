@@ -1,6 +1,6 @@
 // Engine
 export { DigitalTwinEngine } from './digital_twin_engine.js'
-export type { EngineOptions, ComponentValidationResult } from './digital_twin_engine.js'
+export type { EngineOptions, EnginePlugin, ComponentValidationResult } from './digital_twin_engine.js'
 
 // Scheduler
 export { scheduleComponents } from './scheduler.js'
@@ -46,8 +46,6 @@ export {
 export type { HealthCheckFn, HealthCheck, HealthStatus, ComponentCounts } from './health.js'
 
 // Error Handler
-export { errorHandler, asyncHandler, notFoundHandler } from './error_handler.js'
-
 // Graceful Shutdown
 export { setupGracefulShutdown } from './graceful_shutdown.js'
 export type { ShutdownOptions } from './graceful_shutdown.js'

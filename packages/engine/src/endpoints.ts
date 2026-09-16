@@ -1,135 +1,132 @@
-/**
- * @fileoverview HTTP endpoint exposure utilities for digital twin components
- *
- * This module handles the automatic registration of HTTP endpoints from servable
- * components to the Express router, enabling RESTful API access to digital twin data.
- */
-
-import type { Router, Request, Response } from 'ultimate-express'
+import crypto from 'node:crypto'
+import fs from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import path from 'node:path'
+import { pipeline } from 'node:stream/promises'
+import type { FastifyInstance, FastifyRequest, HTTPMethods } from 'fastify'
+import multipart from '@fastify/multipart'
 import type { Collector, Harvester, Handler, CustomTableManager } from '@cepseudo/components'
 import type { AssetsManager } from '@cepseudo/assets'
-import type { HttpMethod } from '@cepseudo/shared'
-import { DigitalTwinError, Logger } from '@cepseudo/shared'
+import type { DataResponse, HttpMethod, TypedRequest, UploadedFile } from '@cepseudo/shared'
+import { DigitalTwinError, Logger, sanitizeFilename } from '@cepseudo/shared'
 
 const logger = new Logger('Endpoints')
 
-/**
- * Supported HTTP methods for component endpoints.
- *
- * These methods correspond to standard REST operations:
- * - get: Retrieve data
- * - post: Create new resources
- * - put: Update existing resources (full update)
- * - patch: Update existing resources (partial update)
- * - delete: Remove resources
- */
 // Re-exported from @cepseudo/shared for backward compatibility
 export type { HttpMethod } from '@cepseudo/shared'
 
-/**
- * Interface defining an HTTP endpoint exposed by a component.
- *
- * Each endpoint specifies the HTTP method, URL path, handler function,
- * and optional response content type for serving component data via HTTP.
- */
 interface Endpoint {
-    /** HTTP method for this endpoint */
     method: HttpMethod
-
-    /** URL path pattern (e.g., '/api/data/:id') */
     path: string
-
-    /** Function to handle HTTP requests to this endpoint */
-    handler: (...args: any[]) => any
-
-    /** Optional response content type (defaults to 'application/json') */
+    handler: (req: TypedRequest) => Promise<DataResponse> | DataResponse
     responseType?: string
 }
 
+const SUPPORTED_METHODS = new Set<string>(['get', 'post', 'put', 'patch', 'delete'])
+
+function tempUploadDir(): string {
+    return process.env.TEMP_UPLOAD_DIR || '/tmp/digitaltwin-uploads'
+}
+
+async function readMultipart(request: FastifyRequest): Promise<{ body: Record<string, unknown>; file?: UploadedFile }> {
+    const body: Record<string, unknown> = {}
+    let file: UploadedFile | undefined
+
+    for await (const part of request.parts()) {
+        if (part.type !== 'file') {
+            body[part.fieldname] = part.value
+            continue
+        }
+        const dir = tempUploadDir()
+        await fs.mkdir(dir, { recursive: true })
+        const filePath = path.join(dir, `${part.fieldname}-${Date.now()}-${crypto.randomInt(1e9)}-${sanitizeFilename(part.filename)}`)
+        let size = 0
+        part.file.on('data', (chunk: Buffer) => (size += chunk.length))
+        await pipeline(part.file, createWriteStream(filePath))
+        file = { fieldname: part.fieldname, originalname: part.filename, mimetype: part.mimetype, size, path: filePath }
+    }
+
+    return { body, file }
+}
+
+async function toTypedRequest(request: FastifyRequest): Promise<TypedRequest> {
+    const upload = request.isMultipart() ? await readMultipart(request) : undefined
+    return {
+        params: request.params as Record<string, string>,
+        query: request.query as Record<string, string | string[] | undefined>,
+        body: upload?.body ?? (request.body as Record<string, unknown> | undefined) ?? {},
+        headers: request.headers,
+        file: upload?.file
+    }
+}
+
+function errorResponse(error: unknown, request: FastifyRequest, endpointPath: string): DataResponse {
+    const requestId = (request.headers['x-request-id'] as string | undefined) || crypto.randomUUID()
+    const message = error instanceof Error ? error.message : String(error)
+
+    logger.error(`[${requestId}] ${request.method} ${endpointPath} - ${message}`, {
+        requestId,
+        method: request.method,
+        path: endpointPath,
+        userId: request.headers['x-user-id'],
+        stack: error instanceof Error ? error.stack : undefined
+    })
+
+    const json = (status: number, body: unknown): DataResponse => ({
+        status,
+        content: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' }
+    })
+
+    if (error instanceof DigitalTwinError) {
+        return json(error.statusCode, { ...error.toJSON(), requestId })
+    }
+
+    const isProduction = process.env.NODE_ENV === 'production'
+    return json(500, {
+        error: {
+            code: 'INTERNAL_ERROR',
+            message: isProduction ? 'Internal server error' : message,
+            requestId,
+            timestamp: new Date().toISOString()
+        }
+    })
+}
+
 /**
- * Automatically registers HTTP endpoints from servable components to an Express router.
+ * Registers every component endpoint as a Fastify route.
  *
- * This function iterates through all provided components, extracts their endpoints,
- * and registers them with the Express router. Each endpoint is wrapped with error
- * handling to ensure robust API behavior.
- *
- * @param router - Express router instance to register endpoints with
- * @param servables - Array of components that expose HTTP endpoints
- *
- * @throws {Error} When an unsupported HTTP method is encountered
- *
- * @example
- * ```typescript
- * const router = express.Router();
- * const components = [collector1, harvester1, assetsManager1];
- *
- * await exposeEndpoints(router, components);
- *
- * // Now the router has all endpoints from the components registered
- * app.use('/api', router);
- * ```
+ * Handlers receive a framework-neutral `TypedRequest` and return a `DataResponse`
+ * that is written back as-is (status, headers, content). Multipart bodies are
+ * spooled to the temp upload directory and exposed as `req.file`.
  */
 export async function exposeEndpoints(
-    router: Router,
+    fastify: FastifyInstance,
     servables: Array<Collector | Harvester | Handler | AssetsManager | CustomTableManager>
 ): Promise<void> {
+    await fastify.register(multipart, { limits: { files: 1 } })
+
     for (const servable of servables) {
-        const endpoints: Endpoint[] = servable.getEndpoints()
-
-        for (const ep of endpoints) {
-            const method = ep.method.toLowerCase() as HttpMethod
-
-            if (typeof router[method] === 'function') {
-                // Register endpoint with error handling wrapper
-                router[method](ep.path, async (req: Request, res: Response) => {
-                    try {
-                        const result = await ep.handler(req)
-                        res.status(result.status)
-                            .header(result.headers || {})
-                            .send(result.content)
-                    } catch (error) {
-                        const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID()
-
-                        // Log the error with context
-                        logger.error(
-                            `[${requestId}] ${req.method} ${ep.path} - ${error instanceof Error ? error.message : String(error)}`,
-                            {
-                                requestId,
-                                method: req.method,
-                                path: ep.path,
-                                userId: req.headers['x-user-id'],
-                                stack: error instanceof Error ? error.stack : undefined
-                            }
-                        )
-
-                        // Handle DigitalTwinError with proper status code
-                        if (error instanceof DigitalTwinError) {
-                            res.status(error.statusCode).send({
-                                ...error.toJSON(),
-                                requestId
-                            })
-                            return
-                        }
-
-                        // Generic error response
-                        const isProduction = process.env.NODE_ENV === 'production'
-                        res.status(500).send({
-                            error: {
-                                code: 'INTERNAL_ERROR',
-                                message: isProduction
-                                    ? 'Internal server error'
-                                    : error instanceof Error
-                                      ? error.message
-                                      : String(error),
-                                requestId,
-                                timestamp: new Date().toISOString()
-                            }
-                        })
-                    }
-                })
-            } else {
+        for (const ep of servable.getEndpoints() as Endpoint[]) {
+            const method = ep.method.toLowerCase()
+            if (!SUPPORTED_METHODS.has(method)) {
                 throw new Error(`Unsupported HTTP method: ${ep.method}`)
             }
+
+            fastify.route({
+                method: method.toUpperCase() as HTTPMethods,
+                url: ep.path,
+                handler: async (request, reply) => {
+                    let result: DataResponse
+                    try {
+                        result = await ep.handler(await toTypedRequest(request))
+                    } catch (error) {
+                        result = errorResponse(error, request, ep.path)
+                    }
+                    reply.code(result.status).headers(result.headers ?? {})
+                    return result.content
+                }
+            })
         }
     }
 }

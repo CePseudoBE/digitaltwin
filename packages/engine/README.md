@@ -43,7 +43,7 @@ await engine.start()
 - **Component lifecycle management** -- registers, validates, and initializes collectors, harvesters, handlers, assets managers, and custom table managers
 - **Dependency injection** -- automatically injects database, storage, and auth middleware into components
 - **BullMQ scheduling** -- cron-based and event-driven scheduling across 4 queues (collectors, harvesters, priority, uploads)
-- **HTTP server** -- Express-compatible server (via ultimate-express) with automatic endpoint registration from components
+- **HTTP server** -- Fastify 5 server with automatic endpoint registration from components
 - **Health checks** -- aggregated health status for Kubernetes readiness/liveness probes (database, Redis, storage)
 - **OpenAPI generation** -- auto-generates OpenAPI 3.0.3 specs from registered components
 - **Graceful shutdown** -- handles SIGTERM/SIGINT with configurable timeout and ordered resource cleanup
