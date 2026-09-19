@@ -177,6 +177,8 @@ export class QueueManager {
         await Promise.all(
             queues.map(async queue => {
                 try {
+                    // BullMQ leaves an unhandled rejection behind when a queue is closed mid-handshake
+                    await withTimeout(queue.waitUntilReady(), 1000, 'Queue ready').catch(() => {})
                     await withTimeout(queue.close(), 3000, 'Queue close')
                 } catch {
                     // QUIT never answers once Redis is gone; dropping the socket stops ioredis reconnecting
