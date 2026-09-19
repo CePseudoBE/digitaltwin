@@ -77,9 +77,9 @@ export class UploadProcessor {
         this.worker.on('failed', (job, err) => console.error(`[UploadProcessor] Job ${job?.id} failed:`, err.message))
     }
 
-    async stop(): Promise<void> {
+    async stop(force = false): Promise<void> {
         if (this.worker) {
-            await this.worker.close()
+            await this.worker.close(force)
             this.worker = null
         }
     }

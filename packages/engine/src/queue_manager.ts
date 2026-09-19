@@ -1,6 +1,7 @@
 // src/engine/queue_manager.ts
 import type { QueueOptions, ConnectionOptions } from 'bullmq'
 import { Queue } from 'bullmq'
+import { withTimeout } from './health.js'
 
 /**
  * Configuration options for the Queue Manager
@@ -171,31 +172,18 @@ export class QueueManager {
      * @returns Promise that resolves when all queues are closed
      */
     async close(): Promise<void> {
-        const closePromises: Promise<void>[] = []
-
-        // Close all queues with timeout protection
         const queues = [this.collectorQueue, this.harvesterQueue, this.priorityQueue, this.uploadQueue]
 
-        for (const queue of queues) {
-            closePromises.push(
-                Promise.race([
-                    queue.close(),
-                    new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Queue close timeout')), 3000))
-                ]).catch(async () => {
-                    // Force close if timeout - try to access Redis connection directly
-                    try {
-                        const redisConnection = (queue as any).redisConnection
-                        if (redisConnection && typeof redisConnection.disconnect === 'function') {
-                            await redisConnection.disconnect()
-                        }
-                    } catch {
-                        // Ignore forced cleanup errors
-                    }
-                })
-            )
-        }
-
-        await Promise.all(closePromises)
+        await Promise.all(
+            queues.map(async queue => {
+                try {
+                    await withTimeout(queue.close(), 3000, 'Queue close')
+                } catch {
+                    // QUIT never answers once Redis is gone; dropping the socket stops ioredis reconnecting
+                    await withTimeout(queue.disconnect(), 1000, 'Queue disconnect').catch(() => {})
+                }
+            })
+        )
 
         // Wait for connections to fully close
         await new Promise(resolve => setTimeout(resolve, 300))
