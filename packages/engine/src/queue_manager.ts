@@ -23,6 +23,15 @@ export interface QueueConfig {
 }
 
 /**
+ * BullMQ probes the Redis version with INFO while a connection initialises; closing that
+ * connection before the reply arrives flushes the probe and BullMQ leaves the rejection unhandled.
+ * Skipping the probe (a documented option) removes the only command that can be caught in flight.
+ */
+export function withoutVersionCheck(connection: ConnectionOptions): ConnectionOptions {
+    return 'host' in connection ? { ...connection, skipVersionCheck: true } : connection
+}
+
+/**
  * Queue configuration constants
  */
 const QUEUE_DEFAULTS = {
@@ -91,7 +100,7 @@ export class QueueManager {
      * @param config - Queue configuration options
      */
     constructor(config: QueueConfig = {}) {
-        const baseConnection = config.redis || QUEUE_DEFAULTS.REDIS
+        const baseConnection = withoutVersionCheck(config.redis || QUEUE_DEFAULTS.REDIS)
 
         this.collectorQueue = this.#createCollectorQueue(baseConnection, config.queueOptions?.collectors)
         this.harvesterQueue = this.#createHarvesterQueue(baseConnection, config.queueOptions?.harvesters)
@@ -177,8 +186,6 @@ export class QueueManager {
         await Promise.all(
             queues.map(async queue => {
                 try {
-                    // BullMQ leaves an unhandled rejection behind when a queue is closed mid-handshake
-                    await withTimeout(queue.waitUntilReady(), 1000, 'Queue ready').catch(() => {})
                     await withTimeout(queue.close(), 3000, 'Queue close')
                 } catch {
                     // QUIT never answers once Redis is gone; dropping the socket stops ioredis reconnecting

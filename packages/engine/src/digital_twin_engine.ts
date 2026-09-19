@@ -29,7 +29,7 @@ import { createLegacyRouter, type LegacyRouter } from './legacy_router.js'
 import { scheduleComponents } from './scheduler.js'
 import { LogLevel, engineEventBus } from '@cepseudo/shared'
 import type { QueueConfig } from './queue_manager.js'
-import { QueueManager } from './queue_manager.js'
+import { QueueManager, withoutVersionCheck } from './queue_manager.js'
 import { UploadProcessor, UploadReconciler } from '@cepseudo/assets'
 import { isAsyncUploadable } from '@cepseudo/assets'
 import {
@@ -541,11 +541,11 @@ export class DigitalTwinEngine {
         // Start upload processor worker (for async file processing)
         // Uses same Redis config as QueueManager (defaults to localhost:6379 if not specified)
         if (this.#uploadProcessor) {
-            const redisConfig = this.#options.redis || {
+            const redisConfig = withoutVersionCheck(this.#options.redis || {
                 host: 'localhost',
                 port: 6379,
                 maxRetriesPerRequest: null
-            }
+            })
             this.#uploadProcessor.start(redisConfig)
         }
 
