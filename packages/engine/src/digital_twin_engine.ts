@@ -29,7 +29,7 @@ import { createLegacyRouter, type LegacyRouter } from './legacy_router.js'
 import { scheduleComponents } from './scheduler.js'
 import { LogLevel, engineEventBus } from '@cepseudo/shared'
 import type { QueueConfig } from './queue_manager.js'
-import { QueueManager } from './queue_manager.js'
+import { QueueManager, withoutVersionCheck } from './queue_manager.js'
 import { UploadProcessor, UploadReconciler } from '@cepseudo/assets'
 import { isAsyncUploadable } from '@cepseudo/assets'
 import {
@@ -541,11 +541,11 @@ export class DigitalTwinEngine {
         // Start upload processor worker (for async file processing)
         // Uses same Redis config as QueueManager (defaults to localhost:6379 if not specified)
         if (this.#uploadProcessor) {
-            const redisConfig = this.#options.redis || {
+            const redisConfig = withoutVersionCheck(this.#options.redis || {
                 host: 'localhost',
                 port: 6379,
                 maxRetriesPerRequest: null
-            }
+            })
             this.#uploadProcessor.start(redisConfig)
         }
 
@@ -984,16 +984,20 @@ export class DigitalTwinEngine {
         }
 
         // 3. Drain queues - wait for active jobs with timeout
+        let redisReachable = true
         if (this.#queueManager) {
             try {
-                await this.#drainQueues()
+                redisReachable = await this.#drainQueues()
             } catch (error) {
                 errors.push(this.#wrapError('Queue drain', error))
             }
         }
 
+        // Graceful closes wait for Redis to answer; without it they would hang and leak reconnecting sockets
+        const force = !redisReachable
+
         // 4. Close all workers with extended timeout and force close
-        await this.#closeWorkers(errors)
+        await this.#closeWorkers(errors, force)
 
         // 5. Stop upload reconciler and processor
         try {
@@ -1004,7 +1008,7 @@ export class DigitalTwinEngine {
 
         if (this.#uploadProcessor) {
             try {
-                await withTimeout(this.#uploadProcessor.stop(), Math.min(this.#shutdownTimeout / 3, 10000), "Upload processor stop")
+                await withTimeout(this.#uploadProcessor.stop(force), Math.min(this.#shutdownTimeout / 3, 10000), "Upload processor stop")
             } catch (error) {
                 errors.push(this.#wrapError('Upload processor', error))
             }
@@ -1044,8 +1048,9 @@ export class DigitalTwinEngine {
         engineEventBus.removeAllListeners()
     }
 
-    async #drainQueues(): Promise<void> {
-        if (!this.#queueManager) return
+    /** Waits for active jobs to finish; false when Redis stopped answering. */
+    async #drainQueues(): Promise<boolean> {
+        if (!this.#queueManager) return true
 
         const timeout = Math.min(this.#shutdownTimeout / 2, 15000)
         const startTime = Date.now()
@@ -1058,7 +1063,7 @@ export class DigitalTwinEngine {
                 const stats = await withTimeout(this.#queueManager.getQueueStats(), Math.min(3000, remaining), 'Queue stats')
                 const totalActive = Object.values(stats).reduce((sum, q) => sum + (q.active || 0), 0)
 
-                if (totalActive === 0) break
+                if (totalActive === 0) return true
 
                 if (process.env.NODE_ENV !== 'test') {
                     console.log(`[DigitalTwin] Waiting for ${totalActive} active jobs...`)
@@ -1066,19 +1071,20 @@ export class DigitalTwinEngine {
                 await new Promise(resolve => setTimeout(resolve, 1000))
             } catch {
                 await new Promise(resolve => setTimeout(resolve, 1000))
-                break
+                return false
             }
         }
+        return true
     }
 
-    async #closeWorkers(errors: Error[]): Promise<void> {
+    async #closeWorkers(errors: Error[], force: boolean): Promise<void> {
         const workerTimeout = Math.min(this.#shutdownTimeout / 3, 10000)
 
         await Promise.all(
             this.#workers.map(async worker => {
                 try {
                     await Promise.race([
-                        worker.close(),
+                        worker.close(force),
                         new Promise((_, reject) =>
                             setTimeout(() => reject(new Error('Worker close timeout')), workerTimeout)
                         )

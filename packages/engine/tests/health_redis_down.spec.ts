@@ -1,4 +1,5 @@
 import { test } from '@japa/runner'
+import { inspect } from 'node:util'
 import { RedisContainer } from '@testcontainers/redis'
 import type { StartedRedisContainer } from '@testcontainers/redis'
 import { LogLevel } from '@cepseudo/shared'
@@ -8,14 +9,30 @@ import { MockDatabaseAdapter } from './fixtures/mock_database.js'
 import { MockStorageService } from './fixtures/mock_storage.js'
 import { freePort } from './fixtures/free_port.js'
 
+// BullMQ prints connection errors with console.error when nothing listens to them
+async function countReconnectErrors(port: number, windowMs: number): Promise<number> {
+    const original = console.error
+    let count = 0
+    console.error = (error: unknown) => {
+        if (inspect(error).includes(`:${port}`)) count++
+    }
+    try {
+        await new Promise(resolve => setTimeout(resolve, windowMs))
+    } finally {
+        console.error = original
+    }
+    return count
+}
+
 test.group('Engine health when Redis disappears', () => {
     test('readiness turns 503 within the check timeout and shutdown still completes in bounded time', async ({ assert }) => {
         const redis: StartedRedisContainer = await new RedisContainer('redis:7-alpine').start()
         const port = await freePort()
+        const redisPort = redis.getMappedPort(6379)
         const engine = new DigitalTwinEngine({
             storage: new MockStorageService(),
             database: new MockDatabaseAdapter(),
-            redis: { host: redis.getHost(), port: redis.getMappedPort(6379) },
+            redis: { host: redis.getHost(), port: redisPort },
             server: { port },
             logging: { level: LogLevel.SILENT },
             health: { checkTimeoutMs: 1500 },
@@ -43,6 +60,9 @@ test.group('Engine health when Redis disappears', () => {
             await engine.stop()
             stopped = true
             assert.isBelow(Date.now() - stopStarted, 20000, 'shutdown must stay bounded without Redis')
+
+            // ioredis retries at most every 2 s, so a leaked connection shows up inside this window
+            assert.equal(await countReconnectErrors(redisPort, 2500), 0, 'no connection may keep reconnecting after stop()')
         } finally {
             if (!stopped) await engine.stop().catch(() => {})
         }

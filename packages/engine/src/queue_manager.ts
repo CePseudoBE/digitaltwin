@@ -1,6 +1,7 @@
 // src/engine/queue_manager.ts
 import type { QueueOptions, ConnectionOptions } from 'bullmq'
 import { Queue } from 'bullmq'
+import { withTimeout } from './health.js'
 
 /**
  * Configuration options for the Queue Manager
@@ -19,6 +20,15 @@ export interface QueueConfig {
         priority?: Partial<QueueOptions>
         uploads?: Partial<QueueOptions>
     }
+}
+
+/**
+ * BullMQ probes the Redis version with INFO while a connection initialises; closing that
+ * connection before the reply arrives flushes the probe and BullMQ leaves the rejection unhandled.
+ * Skipping the probe (a documented option) removes the only command that can be caught in flight.
+ */
+export function withoutVersionCheck(connection: ConnectionOptions): ConnectionOptions {
+    return 'host' in connection ? { ...connection, skipVersionCheck: true } : connection
 }
 
 /**
@@ -90,7 +100,7 @@ export class QueueManager {
      * @param config - Queue configuration options
      */
     constructor(config: QueueConfig = {}) {
-        const baseConnection = config.redis || QUEUE_DEFAULTS.REDIS
+        const baseConnection = withoutVersionCheck(config.redis || QUEUE_DEFAULTS.REDIS)
 
         this.collectorQueue = this.#createCollectorQueue(baseConnection, config.queueOptions?.collectors)
         this.harvesterQueue = this.#createHarvesterQueue(baseConnection, config.queueOptions?.harvesters)
@@ -171,31 +181,18 @@ export class QueueManager {
      * @returns Promise that resolves when all queues are closed
      */
     async close(): Promise<void> {
-        const closePromises: Promise<void>[] = []
-
-        // Close all queues with timeout protection
         const queues = [this.collectorQueue, this.harvesterQueue, this.priorityQueue, this.uploadQueue]
 
-        for (const queue of queues) {
-            closePromises.push(
-                Promise.race([
-                    queue.close(),
-                    new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Queue close timeout')), 3000))
-                ]).catch(async () => {
-                    // Force close if timeout - try to access Redis connection directly
-                    try {
-                        const redisConnection = (queue as any).redisConnection
-                        if (redisConnection && typeof redisConnection.disconnect === 'function') {
-                            await redisConnection.disconnect()
-                        }
-                    } catch {
-                        // Ignore forced cleanup errors
-                    }
-                })
-            )
-        }
-
-        await Promise.all(closePromises)
+        await Promise.all(
+            queues.map(async queue => {
+                try {
+                    await withTimeout(queue.close(), 3000, 'Queue close')
+                } catch {
+                    // QUIT never answers once Redis is gone; dropping the socket stops ioredis reconnecting
+                    await withTimeout(queue.disconnect(), 1000, 'Queue disconnect').catch(() => {})
+                }
+            })
+        )
 
         // Wait for connections to fully close
         await new Promise(resolve => setTimeout(resolve, 300))
