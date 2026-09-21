@@ -17,6 +17,7 @@ export {
     validateCustomRecordUpdate,
     validateDateRangeQuery,
     presignedUploadRequestSchema,
+    mapLayerUploadSchema,
     validatePresignedUploadRequest
 } from './schemas.js'
 

@@ -8,9 +8,19 @@ import type { TypedRequest } from '@cepseudo/shared'
 import { exposeEndpoints } from '../src/endpoints.js'
 import type { ExposeEndpointsOptions } from '../src/endpoints.js'
 import { registerErrorHandler } from '../src/error_handler.js'
-import { TestCollector, TestHandler } from './fixtures/mock_components.js'
+import { MapManager } from '@cepseudo/assets'
+import type { AssetsManagerConfiguration } from '@cepseudo/shared'
+import { TestAssetsManager, TestCollector, TestHandler } from './fixtures/mock_components.js'
+import { MockDatabaseAdapter } from './fixtures/mock_database.js'
+import { MockStorageService } from './fixtures/mock_storage.js'
 
-async function serve(servables: Array<TestCollector | TestHandler>, options?: ExposeEndpointsOptions): Promise<FastifyInstance> {
+class TestMapManager extends MapManager {
+    getConfiguration(): AssetsManagerConfiguration {
+        return { name: 'maps', description: 'Test map manager', contentType: 'application/json', endpoint: 'maps' }
+    }
+}
+
+async function serve(servables: Parameters<typeof exposeEndpoints>[1], options?: ExposeEndpointsOptions): Promise<FastifyInstance> {
     const fastify = Fastify({ logger: false, requestIdHeader: 'x-request-id' })
     registerErrorHandler(fastify)
     await exposeEndpoints(fastify, servables, options)
@@ -232,6 +242,45 @@ test.group('exposeEndpoints', () => {
 
             assert.equal((await fastify.inject({ method: 'POST', url: '/upload', ...multipartPayload('small') })).statusCode, 200)
         })
+    })
+
+    test('assets routes validate the id param and JSON bodies before the handler runs', async ({ assert }) => {
+        const manager = new TestAssetsManager('models')
+        manager.setDependencies(new MockDatabaseAdapter(), new MockStorageService())
+        const fastify = await serve([manager])
+        const code = (res: { json: () => unknown }) => (res.json() as { error: { code: string } }).error.code
+
+        for (const url of ['/assets/abc', '/assets/0', '/assets/1.5', '/assets/abc/download']) {
+            const res = await fastify.inject(url)
+            assert.equal(res.statusCode, 400, url)
+            assert.equal(code(res), 'VALIDATION_ERROR', url)
+        }
+        assert.equal((await fastify.inject({ method: 'DELETE', url: '/assets/abc' })).statusCode, 400)
+
+        const badSource = await fastify.inject({ method: 'PUT', url: '/assets/1', payload: { source: 'not a url' } })
+        assert.equal(badSource.statusCode, 400)
+        assert.equal(code(badSource), 'VALIDATION_ERROR')
+
+        const badSize = await fastify.inject({ method: 'POST', url: '/assets/upload-request', payload: { fileName: 'a.glb', fileSize: -1, contentType: 'model/gltf-binary' } })
+        assert.equal(badSize.statusCode, 400)
+        const missingName = await fastify.inject({ method: 'POST', url: '/assets/upload-request', payload: { fileSize: 10, contentType: 'model/gltf-binary' } })
+        assert.equal(missingName.statusCode, 400)
+
+        // A well-formed id is coerced to a number and still reaches the handler
+        const missing = await fastify.inject('/assets/1')
+        assert.equal(missing.statusCode, 404)
+        assert.equal(missing.body, 'Asset not found')
+    })
+
+    test('map layer uploads require a JSON layer object', async ({ assert }) => {
+        const fastify = await serve([new TestMapManager()])
+
+        const empty = await fastify.inject({ method: 'POST', url: '/maps', payload: {} })
+        assert.equal(empty.statusCode, 400)
+        assert.include((empty.json() as { error: { message: string } }).error.message, 'layer')
+
+        const notAnObject = await fastify.inject({ method: 'POST', url: '/maps', payload: { layer: 'x' } })
+        assert.equal(notAnObject.statusCode, 400)
     })
 
     test('a DigitalTwinError thrown by the handler maps to its status code', async ({ assert }) => {

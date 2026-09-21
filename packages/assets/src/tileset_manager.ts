@@ -1,4 +1,4 @@
-import { AssetsManager } from './assets_manager.js'
+import { AssetsManager, type AssetsEndpoint } from './assets_manager.js'
 import type { DataResponse, OpenAPIComponentSpec, HttpMethod, TypedRequest, DataRecord, MetadataRow, AssetsManagerConfiguration } from '@cepseudo/shared'
 import {
     successResponse,
@@ -9,7 +9,10 @@ import {
     forbiddenResponse,
     safeAsync,
     Logger,
-    parseBoolean
+    parseBoolean,
+    assetUpdateSchema,
+    idParamSchema,
+    presignedUploadRequestSchema
 } from '@cepseudo/shared'
 import { ApisixAuthParser } from '@cepseudo/auth'
 import { extractAndStoreArchive } from './utils/zip_utils.js'
@@ -578,12 +581,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
     /**
      * Get HTTP endpoints for this manager.
      */
-    override getEndpoints(): Array<{
-        method: HttpMethod
-        path: string
-        handler: (req: TypedRequest) => Promise<DataResponse>
-        responseType?: string
-    }> {
+    override getEndpoints(): AssetsEndpoint[] {
         const config = this.getConfiguration()
 
         return [
@@ -592,7 +590,8 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 method: 'get',
                 path: `/${config.endpoint}/:id/status`,
                 handler: this.handleGetStatus.bind(this),
-                responseType: 'application/json'
+                responseType: 'application/json',
+                schema: { params: idParamSchema }
             },
             // List tilesets
             {
@@ -613,7 +612,8 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 method: 'post',
                 path: `/${config.endpoint}/upload-request`,
                 handler: this.handlePresignedUploadRequest.bind(this),
-                responseType: 'application/json'
+                responseType: 'application/json',
+                schema: { body: presignedUploadRequestSchema }
             },
             // Presigned upload confirm (triggers extraction)
             {
@@ -627,14 +627,16 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 method: 'put',
                 path: `/${config.endpoint}/:id`,
                 handler: this.handleUpdate.bind(this),
-                responseType: 'application/json'
+                responseType: 'application/json',
+                schema: { params: idParamSchema, body: assetUpdateSchema }
             },
             // Delete tileset
             {
                 method: 'delete',
                 path: `/${config.endpoint}/:id`,
                 handler: this.handleDelete.bind(this),
-                responseType: 'application/json'
+                responseType: 'application/json',
+                schema: { params: idParamSchema }
             }
         ]
     }

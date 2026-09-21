@@ -8,7 +8,8 @@ import type {
     OpenAPIComponentSpec,
     DataRecord,
     AuthResult,
-    TypedRequest
+    TypedRequest,
+    EndpointSchema
 } from '@cepseudo/shared'
 import {
     successResponse,
@@ -31,7 +32,10 @@ import {
     validatePagination,
     validateData,
     validateQuery,
-    validateParams
+    validateParams,
+    assetUpdateSchema,
+    idParamSchema,
+    presignedUploadRequestSchema
 } from '@cepseudo/shared'
 import type { StorageService } from '@cepseudo/storage'
 import type { DatabaseAdapter, MetadataRow } from '@cepseudo/database'
@@ -228,6 +232,16 @@ export interface UpdateAssetRequest {
  *
  * Each concrete AssetsManager creates its own table based on the configuration name.
  */
+/** One HTTP route served by an assets manager */
+export interface AssetsEndpoint {
+    method: HttpMethod
+    path: string
+    handler: (req: TypedRequest) => Promise<DataResponse>
+    responseType?: string
+    /** JSON Schema validated by the engine before the handler runs; never set on multipart routes */
+    schema?: EndpointSchema
+}
+
 export abstract class AssetsManager implements Component, Servable, OpenAPIDocumentable {
     protected db!: DatabaseAdapter
     protected storage!: StorageService
@@ -1011,12 +1025,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      * DELETE /gltf/123     - Delete asset
      * ```
      */
-    getEndpoints(): Array<{
-        method: HttpMethod
-        path: string
-        handler: (req: TypedRequest) => Promise<DataResponse>
-        responseType?: string
-    }> {
+    getEndpoints(): AssetsEndpoint[] {
         const config = this.getConfiguration()
         return [
             {
@@ -1035,7 +1044,8 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
                 method: 'post',
                 path: `/${config.endpoint}/upload-request`,
                 handler: this.handlePresignedUploadRequest.bind(this),
-                responseType: 'application/json'
+                responseType: 'application/json',
+                schema: { body: presignedUploadRequestSchema }
             },
             {
                 method: 'post',
@@ -1047,25 +1057,29 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
                 method: 'get',
                 path: `/${config.endpoint}/:id`,
                 handler: this.handleGetAsset.bind(this),
-                responseType: config.contentType
+                responseType: config.contentType,
+                schema: { params: idParamSchema }
             },
             {
                 method: 'put',
                 path: `/${config.endpoint}/:id`,
                 handler: this.handleUpdate.bind(this),
-                responseType: 'application/json'
+                responseType: 'application/json',
+                schema: { params: idParamSchema, body: assetUpdateSchema }
             },
             {
                 method: 'get',
                 path: `/${config.endpoint}/:id/download`,
                 handler: this.handleDownload.bind(this),
-                responseType: config.contentType
+                responseType: config.contentType,
+                schema: { params: idParamSchema }
             },
             {
                 method: 'delete',
                 path: `/${config.endpoint}/:id`,
                 handler: this.handleDelete.bind(this),
-                responseType: 'application/json'
+                responseType: 'application/json',
+                schema: { params: idParamSchema }
             },
             {
                 method: 'post',
