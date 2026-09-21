@@ -5,10 +5,10 @@ import { LocalStorageService } from '../src/storage/adapters/local_storage_servi
 import { LogLevel } from '../src/utils/logger.js'
 
 /**
- * Tests for DigitalTwinEngine server methods with ultimate-express
+ * Tests for DigitalTwinEngine server methods
  * These tests verify that getPort(), stop(), and the server lifecycle work correctly
  */
-test.group('Engine Server Methods (ultimate-express)', () => {
+test.group('Engine Server Methods', () => {
 
     test('getPort() returns correct port after start', async ({ assert }) => {
         const storage = new LocalStorageService('.test_tmp_server')

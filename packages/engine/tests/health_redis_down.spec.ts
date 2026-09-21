@@ -7,7 +7,6 @@ import { DigitalTwinEngine } from '../src/digital_twin_engine.js'
 import { TestCollector } from './fixtures/mock_components.js'
 import { MockDatabaseAdapter } from './fixtures/mock_database.js'
 import { MockStorageService } from './fixtures/mock_storage.js'
-import { freePort } from './fixtures/free_port.js'
 
 // BullMQ prints connection errors with console.error when nothing listens to them
 async function countReconnectErrors(port: number, windowMs: number): Promise<number> {
@@ -27,13 +26,12 @@ async function countReconnectErrors(port: number, windowMs: number): Promise<num
 test.group('Engine health when Redis disappears', () => {
     test('readiness turns 503 within the check timeout and shutdown still completes in bounded time', async ({ assert }) => {
         const redis: StartedRedisContainer = await new RedisContainer('redis:7-alpine').start()
-        const port = await freePort()
         const redisPort = redis.getMappedPort(6379)
         const engine = new DigitalTwinEngine({
             storage: new MockStorageService(),
             database: new MockDatabaseAdapter(),
             redis: { host: redis.getHost(), port: redisPort },
-            server: { port },
+            server: { port: 0 },
             logging: { level: LogLevel.SILENT },
             health: { checkTimeoutMs: 1500 },
         })
@@ -43,6 +41,7 @@ test.group('Engine health when Redis disappears', () => {
         let stopped = false
         try {
             await engine.start()
+            const port = engine.getPort()
             const ready = await fetch(`http://127.0.0.1:${port}/api/health/ready`)
             assert.equal(ready.status, 200)
 

@@ -100,7 +100,7 @@ test('HTTP Integration - Real endpoints via GET requests', async ({ assert }) =>
         port: redisPort
       },
       logging: { level: LogLevel.SILENT },
-      server: { port: 3001 }, // Port fixe pour le test
+      server: { port: 0 },
       queues: {
         multiQueue: true
       }
@@ -112,8 +112,7 @@ test('HTTP Integration - Real endpoints via GET requests', async ({ assert }) =>
     await new Promise(resolve => setTimeout(resolve, 1000))
     
     try {
-      // Utiliser le port fixe configuré
-      const serverPort = 3001
+      const serverPort = engine.getPort()
       
       // Attendre que le collector collecte des données (au moins une fois)
       await new Promise(resolve => setTimeout(resolve, 6000))

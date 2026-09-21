@@ -7,7 +7,6 @@ import { DigitalTwinEngine } from '../src/digital_twin_engine.js'
 import { TestCollector, TestAssetsManager, TestCustomTableManager } from './fixtures/mock_components.js'
 import { MockDatabaseAdapter } from './fixtures/mock_database.js'
 import { MockStorageService } from './fixtures/mock_storage.js'
-import { freePort } from './fixtures/free_port.js'
 
 /** Records which tables the engine asked for, whichever adapter method it used. */
 class RecordingDatabase extends MockDatabaseAdapter {
@@ -43,7 +42,7 @@ test.group('Engine.start() with components added after construction', group => {
             storage: new MockStorageService(),
             database,
             redis: connection,
-            server: { port: await freePort() },
+            server: { port: 0 },
             logging: { level: LogLevel.SILENT },
         })
 
@@ -77,7 +76,7 @@ test.group('Engine.start() with components added after construction', group => {
         const engine = new DigitalTwinEngine({
             storage: new MockStorageService(),
             database: new MockDatabaseAdapter(),
-            server: { port: await freePort() },
+            server: { port: 0 },
             logging: { level: LogLevel.SILENT },
         })
 

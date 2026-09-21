@@ -1,7 +1,7 @@
 /**
  * HTTP Integration Tests
  *
- * Starts the real DigitalTwinEngine with Express, sends HTTP requests
+ * Starts the real DigitalTwinEngine on its Fastify server, sends HTTP requests
  * with x-user-id / x-user-roles headers (simulating APISIX gateway),
  * and verifies full-stack responses.
  */
@@ -17,8 +17,6 @@ import {
     CalculatorHandler,
     E2ECustomTableManager,
 } from './helpers/test_components.js'
-
-const ENGINE_PORT = 19876
 
 test.group('HTTP Integration — Engine + APISIX headers', (group) => {
     let infra: E2EInfrastructure
@@ -58,13 +56,13 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
                 host: redis.getHost(),
                 port: redis.getMappedPort(6379),
             },
-            server: { port: ENGINE_PORT },
+            server: { port: 0 },
             logging: { level: LogLevel.SILENT },
             queues: { multiQueue: true },
         })
 
         await engine.start()
-        baseUrl = `http://localhost:${ENGINE_PORT}`
+        baseUrl = `http://127.0.0.1:${engine.getPort()}`
 
         // Manually run the collector so its retrieve endpoint has data
         // (the cron schedule is every 15 min, too slow for tests)
