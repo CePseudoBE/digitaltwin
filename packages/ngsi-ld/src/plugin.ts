@@ -1,9 +1,10 @@
 import { Queue } from 'bullmq'
 import type { ConnectionOptions } from 'bullmq'
 import { Redis } from 'ioredis'
-import type { Router } from 'ultimate-express'
+import type { FastifyInstance } from 'fastify'
 import type { DatabaseAdapter } from '@cepseudo/database'
 import { Logger, engineEventBus, parseBoolean } from '@cepseudo/shared'
+import type { ComponentEvent } from '@cepseudo/shared'
 import { createRouteGuards } from './auth.js'
 import type { NgsiLdAuthenticator } from './auth.js'
 import type { NotificationJobData } from './types/notification.js'
@@ -14,6 +15,7 @@ import { SubscriptionMatcher } from './subscriptions/subscription_matcher.js'
 import { isNgsiLdCollector, isNgsiLdHarvester } from './components/type_guards.js'
 import { enqueueNotification } from './notifications/notification_sender.js'
 import { startNotificationWorker } from './notifications/notification_worker.js'
+import { ngsiLdErrorHandler } from './endpoints/errors.js'
 import { registerEntityEndpoints } from './endpoints/entities.js'
 import { registerAttrsEndpoints } from './endpoints/attrs.js'
 import { registerSubscriptionEndpoints } from './endpoints/subscriptions.js'
@@ -23,8 +25,8 @@ import { registerTypesEndpoints } from './endpoints/types.js'
  * Configuration options for the NGSI-LD plugin.
  */
 export interface NgsiLdPluginOptions {
-    /** Express Router from the engine */
-    router: Router
+    /** The engine's Fastify server, before it listens */
+    fastify: FastifyInstance
     /** Database adapter for subscription persistence */
     db: DatabaseAdapter
     /** Redis connection config for entity cache and subscription cache */
@@ -41,6 +43,12 @@ export interface NgsiLdPluginOptions {
     allowPrivateWebhooks?: boolean
 }
 
+/** What the engine keeps to shut the plugin down. */
+export interface NgsiLdHandle {
+    /** Stops the notification worker and closes the queue and Redis connection. */
+    close(): Promise<void>
+}
+
 /**
  * Registers the NGSI-LD plugin with the Digital Twin engine.
  *
@@ -48,12 +56,12 @@ export interface NgsiLdPluginOptions {
  * 1. Connects to Redis
  * 2. Runs the subscription table migration
  * 3. Warms up the subscription cache
- * 4. Registers NGSI-LD HTTP endpoints
+ * 4. Registers the NGSI-LD routes as an encapsulated Fastify plugin
  * 5. Starts the notification worker
  * 6. Listens to engineEventBus for component completion events
  */
-export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<void> {
-    const { router, db, redis: redisConfig, components, logger, authMiddleware } = options
+export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<NgsiLdHandle> {
+    const { fastify, db, redis: redisConfig, components, logger, authMiddleware } = options
     const publicRead = options.publicRead ?? true
     const allowPrivateWebhooks =
         options.allowPrivateWebhooks ?? parseBoolean(process.env.NGSI_LD_ALLOW_PRIVATE_WEBHOOKS, 'NGSI_LD_ALLOW_PRIVATE_WEBHOOKS') ?? false
@@ -62,57 +70,46 @@ export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<void
     if (!authMiddleware) logger.warn('NGSI-LD plugin started without an auth middleware: write endpoints will answer 401')
     if (allowPrivateWebhooks) logger.warn('NGSI-LD notifications may target private networks (allowPrivateWebhooks); not for production')
 
-    // Connect to Redis
     const redisConnection = new Redis({
         host: redisConfig.host,
         port: redisConfig.port,
         password: redisConfig.password,
         maxRetriesPerRequest: null,
-        enableReadyCheck: true,
+        enableReadyCheck: true
     })
 
-    // Create Redis connection for BullMQ (separate connection, same config)
+    // BullMQ opens its own connections from the plain config
     const bullmqConnection: ConnectionOptions = {
         host: redisConfig.host,
         port: redisConfig.port,
-        password: redisConfig.password,
+        password: redisConfig.password
     }
 
-    // Initialize subsystems
     const entityCache = new EntityCache(redisConnection)
     const subscriptionStore = new SubscriptionStore(db)
     const subscriptionCache = new SubscriptionCache(redisConnection)
     const matcher = new SubscriptionMatcher(subscriptionCache)
 
-    // Run migration to create subscriptions table
     await subscriptionStore.runMigration()
-
-    // Warm up subscription cache from database
     const allSubs = await subscriptionStore.findAll()
     await subscriptionCache.warmup(allSubs)
-
     logger.info(`NGSI-LD plugin initialized: ${allSubs.length} subscriptions loaded`)
 
-    // BullMQ notification queue
-    const notificationQueue = new Queue<NotificationJobData>('ngsi-ld-notifications', {
-        connection: bullmqConnection,
+    const notificationQueue = new Queue<NotificationJobData>('ngsi-ld-notifications', { connection: bullmqConnection })
+
+    // Encapsulated so the NGSI-LD error format applies to these routes only
+    await fastify.register(async instance => {
+        instance.setErrorHandler(ngsiLdErrorHandler)
+        registerEntityEndpoints(instance, entityCache, guards)
+        registerAttrsEndpoints(instance, entityCache, guards)
+        registerSubscriptionEndpoints(instance, subscriptionStore, subscriptionCache, guards, { allowPrivateWebhooks })
+        registerTypesEndpoints(instance, entityCache, guards)
     })
 
-    // Register HTTP endpoints
-    registerEntityEndpoints(router, entityCache, subscriptionStore, subscriptionCache, guards)
-    registerAttrsEndpoints(router, entityCache, guards)
-    registerSubscriptionEndpoints(router, subscriptionStore, subscriptionCache, guards, { allowPrivateWebhooks })
-    registerTypesEndpoints(router, entityCache, guards)
+    const worker = startNotificationWorker(bullmqConnection, subscriptionStore, subscriptionCache, logger, { allowPrivateWebhooks })
 
-    // Start notification delivery worker
-    startNotificationWorker(bullmqConnection, subscriptionStore, subscriptionCache, logger, { allowPrivateWebhooks })
-
-    // Listen to engine events for NGSI-LD-aware components
-    engineEventBus.on('component:event', async event => {
-        if (
-            event.type !== 'collector:completed' &&
-            event.type !== 'harvester:completed'
-        ) {
+    const onComponentEvent = async (event: ComponentEvent): Promise<void> => {
+        if (event.type !== 'collector:completed' && event.type !== 'harvester:completed') {
             return
         }
 
@@ -126,11 +123,9 @@ export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<void
         if (!isNgsiLdCollector(component) && !isNgsiLdHarvester(component)) return
 
         try {
-            // Get the latest record from database
             const record = await db.getLatestByName(event.componentName)
             if (!record) return
 
-            // Parse the data
             const blob = await record.data()
             let data: unknown
             try {
@@ -139,16 +134,11 @@ export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<void
                 data = blob.toString()
             }
 
-            // Convert to NGSI-LD entity
             const entity = component.toNgsiLdEntity(data, record)
             const oldEntity = await entityCache.get(entity.id)
-
-            // Update cache
             await entityCache.set(entity)
 
-            // Evaluate subscriptions
             const matchingSubIds = await matcher.match(entity, oldEntity ?? undefined)
-
             for (const subId of matchingSubIds) {
                 const sub = await subscriptionCache.getById(subId)
                 if (sub) {
@@ -158,5 +148,15 @@ export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<void
         } catch (err) {
             logger.warn(`NGSI-LD event processing failed for ${event.componentName}: ${err instanceof Error ? err.message : String(err)}`)
         }
-    })
+    }
+    engineEventBus.on('component:event', onComponentEvent)
+
+    return {
+        async close() {
+            engineEventBus.off('component:event', onComponentEvent)
+            await worker.close()
+            await notificationQueue.close()
+            await redisConnection.quit()
+        }
+    }
 }

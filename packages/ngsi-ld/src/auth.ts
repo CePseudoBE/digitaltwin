@@ -1,22 +1,19 @@
 import type { AuthResult } from '@cepseudo/shared'
-import type { Request, Response } from 'ultimate-express'
+import type { FastifyReply, FastifyRequest } from 'fastify'
+import { NGSI_LD_ERROR_TYPES } from './endpoints/errors.js'
 
 /** The subset of the engine's AuthMiddleware the plugin relies on. */
 export interface NgsiLdAuthenticator {
     authenticate(req: { headers?: Record<string, string | string[] | undefined> }): Promise<AuthResult>
 }
 
-export type RouteHandler = (req: Request, res: Response) => Promise<void> | void
+/** A Fastify `preHandler` that answers the request itself when the caller is not allowed in. */
+export type RouteGuard = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>
 
-/** Wraps route handlers so writes always authenticate and reads do when `publicRead` is off. */
+/** Writes always authenticate; reads only when `publicRead` is off. */
 export interface RouteGuards {
-    read: (handler: RouteHandler) => RouteHandler
-    write: (handler: RouteHandler) => RouteHandler
-}
-
-const ERROR_TYPES: Record<number, string> = {
-    401: 'https://uri.etsi.org/ngsi-ld/errors/Unauthorized',
-    403: 'https://uri.etsi.org/ngsi-ld/errors/Forbidden',
+    read?: RouteGuard
+    write: RouteGuard
 }
 
 function titleOf(content: Buffer | string): string {
@@ -30,28 +27,20 @@ function titleOf(content: Buffer | string): string {
 }
 
 /**
- * Builds the guards used by every NGSI-LD endpoint.
+ * Builds the guards used by every NGSI-LD route.
  * Without an authenticator, writes are refused outright: an unconfigured plugin must fail closed.
  */
 export function createRouteGuards(auth: NgsiLdAuthenticator | undefined, publicRead: boolean): RouteGuards {
-    const protect = (handler: RouteHandler): RouteHandler => async (req, res) => {
+    const protect: RouteGuard = async (request, reply) => {
         if (!auth) {
-            res.status(401).json({ type: ERROR_TYPES[401], title: 'Authentication is not configured for the NGSI-LD API' })
-            return
+            return reply.code(401).send({ type: NGSI_LD_ERROR_TYPES[401], title: 'Authentication is not configured for the NGSI-LD API' })
         }
-
-        const result = await auth.authenticate({ headers: req.headers })
+        const result = await auth.authenticate({ headers: request.headers })
         if (!result.success) {
             const status = result.response.status
-            res.status(status).json({
-                type: ERROR_TYPES[status] ?? 'https://uri.etsi.org/ngsi-ld/errors/InternalError',
-                title: titleOf(result.response.content),
-            })
-            return
+            return reply.code(status).send({ type: NGSI_LD_ERROR_TYPES[status] ?? NGSI_LD_ERROR_TYPES[500], title: titleOf(result.response.content) })
         }
-
-        await handler(req, res)
     }
 
-    return { write: protect, read: publicRead ? handler => handler : protect }
+    return { write: protect, read: publicRead ? undefined : protect }
 }

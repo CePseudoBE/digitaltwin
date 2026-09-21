@@ -1,43 +1,24 @@
-import type { Router, Request, Response } from 'ultimate-express'
+import type { FastifyInstance } from 'fastify'
 import type { RouteGuards } from '../auth.js'
 import type { EntityCache } from '../cache/entity_cache.js'
 import type { NgsiLdEntity } from '../types/entity.js'
+import { problem } from './errors.js'
+import { attributeFragmentSchema, entityIdParamsSchema } from './schemas.js'
 
 /**
- * Registers the NGSI-LD attrs endpoint on the provided router.
+ * Registers the NGSI-LD attrs route: append or update attributes on an existing entity.
  */
-export function registerAttrsEndpoints(router: Router, entityCache: EntityCache, guards: RouteGuards): void {
-    /**
-     * PATCH /ngsi-ld/v1/entities/:entityId/attrs
-     * Append or update attributes on an existing entity (partial update).
-     */
-    router.patch('/ngsi-ld/v1/entities/:entityId/attrs', guards.write(async (req: Request, res: Response) => {
-        const entityId = decodeURIComponent(req.params['entityId'] as string)
-
-        try {
-            const existing = await entityCache.get(entityId)
+export function registerAttrsEndpoints(fastify: FastifyInstance, entityCache: EntityCache, guards: RouteGuards): void {
+    fastify.patch<{ Params: { entityId: string }; Body: Partial<NgsiLdEntity> }>(
+        '/ngsi-ld/v1/entities/:entityId/attrs',
+        { schema: { params: entityIdParamsSchema, body: attributeFragmentSchema }, preHandler: guards.write },
+        async (request, reply) => {
+            const existing = await entityCache.get(request.params.entityId)
             if (!existing) {
-                res.status(404).json({
-                    type: 'https://uri.etsi.org/ngsi-ld/errors/ResourceNotFound',
-                    title: 'Entity not found',
-                })
-                return
+                return reply.code(404).send(problem(404, 'Entity not found'))
             }
-
-            const attrsFragment = req.body as Partial<NgsiLdEntity>
-            // Merge attributes into the existing entity (NGSI-LD PATCH semantics)
-            const merged: NgsiLdEntity = {
-                ...existing,
-                ...attrsFragment,
-                // Preserve immutable fields
-                id: existing.id,
-                type: existing.type,
-            }
-
-            await entityCache.set(merged)
-            res.status(204).end()
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
+            await entityCache.set({ ...existing, ...request.body, id: existing.id, type: existing.type })
+            return reply.code(204).send()
         }
-    }))
+    )
 }

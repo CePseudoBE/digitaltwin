@@ -1,170 +1,106 @@
-import type { Router, Request, Response } from 'ultimate-express'
+import type { FastifyInstance } from 'fastify'
 import type { RouteGuards } from '../auth.js'
 import type { EntityCache } from '../cache/entity_cache.js'
 import type { NgsiLdEntity } from '../types/entity.js'
-import type { SubscriptionStore } from '../subscriptions/subscription_store.js'
-import type { SubscriptionCache } from '../subscriptions/subscription_cache.js'
 import { NGSI_LD_CORE_CONTEXT } from '../types/context.js'
 import { parseQ, evaluateQ } from '../subscriptions/q_parser.js'
+import { problem } from './errors.js'
+import { attributeFragmentSchema, entityAttrsQuerySchema, entityIdParamsSchema, entityListQuerySchema, entitySchema } from './schemas.js'
 
-const LD_JSON = 'application/ld+json'
+export const LD_JSON = 'application/ld+json'
+
+interface EntityListQuery {
+    type?: string
+    q?: string
+    attrs?: string
+    limit?: number
+    offset?: number
+}
 
 function withContext(entity: NgsiLdEntity): NgsiLdEntity {
-    return {
-        ...entity,
-        '@context': entity['@context'] ?? NGSI_LD_CORE_CONTEXT,
+    return { ...entity, '@context': entity['@context'] ?? NGSI_LD_CORE_CONTEXT }
+}
+
+function project(entity: NgsiLdEntity, attrs: string | undefined): NgsiLdEntity {
+    if (!attrs) return withContext(entity)
+    const projected: NgsiLdEntity = { id: entity.id, type: entity.type }
+    for (const attr of attrs.split(',').map(a => a.trim())) {
+        if (entity[attr] !== undefined) projected[attr] = entity[attr]
     }
+    return withContext(projected)
 }
 
 /**
- * Registers NGSI-LD entity endpoints on the provided router.
+ * Registers the NGSI-LD entity routes on the given Fastify instance.
  */
-export function registerEntityEndpoints(
-    router: Router,
-    entityCache: EntityCache,
-    _subscriptionStore: SubscriptionStore,
-    _subscriptionCache: SubscriptionCache,
-    guards: RouteGuards
-): void {
-    /**
-     * GET /ngsi-ld/v1/entities
-     * Query entities by type, q-filter, attributes, pagination.
-     */
-    router.get('/ngsi-ld/v1/entities', guards.read(async (req: Request, res: Response) => {
-        const type = req.query['type'] as string | undefined
-        const q = req.query['q'] as string | undefined
-        const attrs = req.query['attrs'] as string | undefined
-        const limit = parseInt(String(req.query['limit'] ?? '20'), 10)
-        const offset = parseInt(String(req.query['offset'] ?? '0'), 10)
+export function registerEntityEndpoints(fastify: FastifyInstance, entityCache: EntityCache, guards: RouteGuards): void {
+    fastify.get<{ Querystring: EntityListQuery }>(
+        '/ngsi-ld/v1/entities',
+        { schema: { querystring: entityListQuerySchema }, preHandler: guards.read },
+        async (request, reply) => {
+            const { type, q, attrs, limit = 20, offset = 0 } = request.query
+            let entities = await entityCache.list({ type })
 
-        try {
-            let entities = await entityCache.list({ type, limit, offset })
-
-            // Apply q-filter
+            // The filter runs before pagination so a page never hides matching entities (#80)
             if (q) {
+                let expr
                 try {
-                    const expr = parseQ(q)
-                    entities = entities.filter(e => evaluateQ(expr, e))
+                    expr = parseQ(q)
                 } catch {
-                    res.status(400).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/BadRequestData', title: 'Invalid q filter' })
-                    return
+                    return reply.code(400).send(problem(400, 'Invalid q filter'))
                 }
+                entities = entities.filter(e => evaluateQ(expr, e))
             }
 
-            // Project attributes
-            if (attrs) {
-                const attrsArray = attrs.split(',').map(a => a.trim())
-                entities = entities.map(e => {
-                    const projected: NgsiLdEntity = { id: e.id, type: e.type }
-                    for (const attr of attrsArray) {
-                        if (e[attr] !== undefined) projected[attr] = e[attr]
-                    }
-                    return withContext(projected)
-                })
-            } else {
-                entities = entities.map(withContext)
-            }
-
-            res.setHeader('Content-Type', LD_JSON)
-            res.status(200).json(entities)
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
+            const page = entities.slice(offset, offset + limit).map(e => project(e, attrs))
+            return reply.type(LD_JSON).send(page)
         }
-    }))
+    )
 
-    /**
-     * POST /ngsi-ld/v1/entities
-     * Create or replace an entity in the cache.
-     */
-    router.post('/ngsi-ld/v1/entities', guards.write(async (req: Request, res: Response) => {
-        const body = req.body as NgsiLdEntity
-
-        if (!body || !body.id || !body.type) {
-            res.status(400).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/BadRequestData', title: 'Missing id or type' })
-            return
+    fastify.post<{ Body: NgsiLdEntity }>(
+        '/ngsi-ld/v1/entities',
+        { schema: { body: entitySchema }, preHandler: guards.write },
+        async (request, reply) => {
+            await entityCache.set(request.body)
+            return reply.code(201).header('Location', `/ngsi-ld/v1/entities/${encodeURIComponent(request.body.id)}`).send()
         }
+    )
 
-        try {
-            await entityCache.set(body)
-            res.setHeader('Location', `/ngsi-ld/v1/entities/${encodeURIComponent(body.id)}`)
-            res.status(201).end()
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
-        }
-    }))
-
-    /**
-     * GET /ngsi-ld/v1/entities/:entityId
-     */
-    router.get('/ngsi-ld/v1/entities/:entityId', guards.read(async (req: Request, res: Response) => {
-        const entityId = decodeURIComponent(req.params['entityId'] as string)
-        const attrs = req.query['attrs'] as string | undefined
-
-        try {
-            let entity = await entityCache.get(entityId)
+    fastify.get<{ Params: { entityId: string }; Querystring: { attrs?: string } }>(
+        '/ngsi-ld/v1/entities/:entityId',
+        { schema: { params: entityIdParamsSchema, querystring: entityAttrsQuerySchema }, preHandler: guards.read },
+        async (request, reply) => {
+            const entity = await entityCache.get(request.params.entityId)
             if (!entity) {
-                res.status(404).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/ResourceNotFound', title: 'Entity not found' })
-                return
+                return reply.code(404).send(problem(404, 'Entity not found'))
             }
-
-            if (attrs) {
-                const attrsArray = attrs.split(',').map(a => a.trim())
-                const projected: NgsiLdEntity = { id: entity.id, type: entity.type }
-                for (const attr of attrsArray) {
-                    if (entity[attr] !== undefined) projected[attr] = entity[attr]
-                }
-                entity = withContext(projected)
-            } else {
-                entity = withContext(entity)
-            }
-
-            res.setHeader('Content-Type', LD_JSON)
-            res.status(200).json(entity)
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
+            return reply.type(LD_JSON).send(project(entity, request.query.attrs))
         }
-    }))
+    )
 
-    /**
-     * PATCH /ngsi-ld/v1/entities/:entityId
-     * Merge-patch an entity.
-     */
-    router.patch('/ngsi-ld/v1/entities/:entityId', guards.write(async (req: Request, res: Response) => {
-        const entityId = decodeURIComponent(req.params['entityId'] as string)
-
-        try {
-            const existing = await entityCache.get(entityId)
+    fastify.patch<{ Params: { entityId: string }; Body: Partial<NgsiLdEntity> }>(
+        '/ngsi-ld/v1/entities/:entityId',
+        { schema: { params: entityIdParamsSchema, body: attributeFragmentSchema }, preHandler: guards.write },
+        async (request, reply) => {
+            const existing = await entityCache.get(request.params.entityId)
             if (!existing) {
-                res.status(404).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/ResourceNotFound', title: 'Entity not found' })
-                return
+                return reply.code(404).send(problem(404, 'Entity not found'))
             }
-
-            const patch = req.body as Partial<NgsiLdEntity>
-            const merged: NgsiLdEntity = { ...existing, ...patch, id: existing.id, type: existing.type }
-            await entityCache.set(merged)
-            res.status(204).end()
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
+            await entityCache.set({ ...existing, ...request.body, id: existing.id, type: existing.type })
+            return reply.code(204).send()
         }
-    }))
+    )
 
-    /**
-     * DELETE /ngsi-ld/v1/entities/:entityId
-     */
-    router.delete('/ngsi-ld/v1/entities/:entityId', guards.write(async (req: Request, res: Response) => {
-        const entityId = decodeURIComponent(req.params['entityId'] as string)
-
-        try {
-            const existing = await entityCache.get(entityId)
+    fastify.delete<{ Params: { entityId: string } }>(
+        '/ngsi-ld/v1/entities/:entityId',
+        { schema: { params: entityIdParamsSchema }, preHandler: guards.write },
+        async (request, reply) => {
+            const existing = await entityCache.get(request.params.entityId)
             if (!existing) {
-                res.status(404).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/ResourceNotFound', title: 'Entity not found' })
-                return
+                return reply.code(404).send(problem(404, 'Entity not found'))
             }
-
-            await entityCache.delete(entityId)
-            res.status(204).end()
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
+            await entityCache.delete(request.params.entityId)
+            return reply.code(204).send()
         }
-    }))
+    )
 }

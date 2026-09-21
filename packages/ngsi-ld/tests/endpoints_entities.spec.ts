@@ -1,74 +1,38 @@
 import { test } from '@japa/runner'
+import Fastify from 'fastify'
+import type { FastifyInstance } from 'fastify'
 import { Redis } from 'ioredis'
 import { RedisContainer } from '@testcontainers/redis'
+import type { StartedRedisContainer } from '@testcontainers/redis'
 import { EntityCache } from '../src/cache/entity_cache.js'
 import { registerEntityEndpoints } from '../src/endpoints/entities.js'
+import { ngsiLdErrorHandler } from '../src/endpoints/errors.js'
 import { createRouteGuards } from '../src/auth.js'
 import type { NgsiLdAuthenticator } from '../src/auth.js'
-
-const allowAll: NgsiLdAuthenticator = {
-    async authenticate() {
-        return { success: true, userRecord: { id: 1, keycloak_id: 'tester', roles: [], created_at: new Date(), updated_at: new Date() } }
-    },
-}
-const denyAll: NgsiLdAuthenticator = {
-    async authenticate() {
-        return { success: false, response: { status: 401, content: JSON.stringify({ error: 'Authentication required' }) } }
-    },
-}
 import type { NgsiLdEntity } from '../src/types/entity.js'
 import { property } from '../src/helpers/property.js'
 import { buildUrn } from '../src/helpers/urn.js'
 import { NGSI_LD_CORE_CONTEXT } from '../src/types/context.js'
 
-// --- MockRouter ---
-
-type RouteHandler = (req: any, res: any) => Promise<void> | void
-
-class MockRouter {
-    private routes = new Map<string, RouteHandler>()
-
-    private reg(method: string, path: string, h: RouteHandler) {
-        this.routes.set(`${method} ${path}`, h)
+const allowAll: NgsiLdAuthenticator = {
+    async authenticate() {
+        return { success: true, userRecord: { id: 1, keycloak_id: 'tester', roles: [], created_at: new Date(), updated_at: new Date() } }
     }
-
-    get(path: string, h: RouteHandler) { this.reg('GET', path, h) }
-    post(path: string, h: RouteHandler) { this.reg('POST', path, h) }
-    patch(path: string, h: RouteHandler) { this.reg('PATCH', path, h) }
-    delete(path: string, h: RouteHandler) { this.reg('DELETE', path, h) }
-
-    async invoke(method: string, templatePath: string, req: any, res: any) {
-        const h = this.routes.get(`${method} ${templatePath}`)
-        if (!h) throw new Error(`No handler registered: ${method} ${templatePath}`)
-        await h(req, res)
+}
+const denyAll: NgsiLdAuthenticator = {
+    async authenticate() {
+        return { success: false, response: { status: 401, content: JSON.stringify({ error: 'Authentication required' }) } }
     }
 }
 
-// --- Mock req / res factories ---
-
-function makeReq(opts: {
-    body?: unknown
-    params?: Record<string, string>
-    query?: Record<string, string>
-} = {}) {
-    return { body: opts.body ?? {}, params: opts.params ?? {}, query: opts.query ?? {} }
+async function buildApp(cache: EntityCache, auth: NgsiLdAuthenticator): Promise<FastifyInstance> {
+    const app = Fastify({ logger: false })
+    await app.register(async instance => {
+        instance.setErrorHandler(ngsiLdErrorHandler)
+        registerEntityEndpoints(instance, cache, createRouteGuards(auth, true))
+    })
+    return app
 }
-
-function makeRes() {
-    const res = {
-        statusCode: 200,
-        body: undefined as unknown,
-        resHeaders: {} as Record<string, string>,
-        ended: false,
-        status(code: number) { res.statusCode = code; return res },
-        json(data: unknown) { res.body = data; return res },
-        end() { res.ended = true; return res },
-        setHeader(name: string, value: string) { res.resHeaders[name] = value; return res },
-    }
-    return res
-}
-
-// --- Entity helpers ---
 
 function makeEntity(type: string, localId: string, attrs: Record<string, number | string> = {}): NgsiLdEntity {
     const entity: NgsiLdEntity = { id: buildUrn(type, localId), type }
@@ -78,119 +42,112 @@ function makeEntity(type: string, localId: string, attrs: Record<string, number 
     return entity
 }
 
-// --- Tests ---
+const entityUrl = (id: string) => `/ngsi-ld/v1/entities/${encodeURIComponent(id)}`
 
 test.group('Entity endpoints (integration)', group => {
-    let redisContainer: Awaited<ReturnType<ReturnType<typeof RedisContainer.prototype.start>['constructor']>>
+    let redisContainer: StartedRedisContainer
     let redis: Redis
     let cache: EntityCache
-    let router: MockRouter
+    let app: FastifyInstance
 
     group.each.setup(async () => {
         redisContainer = await new RedisContainer('redis:7-alpine').start()
-        redis = new Redis({
-            host: (redisContainer as any).getHost(),
-            port: (redisContainer as any).getPort(),
-            maxRetriesPerRequest: null,
-        })
+        redis = new Redis({ host: redisContainer.getHost(), port: redisContainer.getPort(), maxRetriesPerRequest: null })
         cache = new EntityCache(redis)
-        router = new MockRouter()
-        registerEntityEndpoints(router as any, cache, null as any, null as any, createRouteGuards(allowAll, true))
+        app = await buildApp(cache, allowAll)
     })
 
     group.each.teardown(async () => {
+        await app.close()
         await redis.quit()
-        await (redisContainer as any).stop()
+        await redisContainer.stop()
     })
 
     // GET /ngsi-ld/v1/entities
 
     test('GET /ngsi-ld/v1/entities returns 200 with empty array when cache is empty', async ({ assert }) => {
-        const req = makeReq({ query: {} })
-        const res = makeRes()
-
-        await router.invoke('GET', '/ngsi-ld/v1/entities', req, res)
+        const res = await app.inject('/ngsi-ld/v1/entities')
 
         assert.equal(res.statusCode, 200)
-        assert.deepEqual(res.body, [])
+        assert.include(String(res.headers['content-type']), 'application/ld+json')
+        assert.deepEqual(res.json(), [])
     })
 
     test('GET /ngsi-ld/v1/entities returns all entities with @context added', async ({ assert }) => {
-        const e1 = makeEntity('AirQualityObserved', 'sensor-1', { pm25: 42 })
-        const e2 = makeEntity('WeatherObserved', 'station-1', { temperature: 15 })
-        await cache.set(e1)
-        await cache.set(e2)
+        await cache.set(makeEntity('AirQualityObserved', 'sensor-1', { pm25: 42 }))
+        await cache.set(makeEntity('WeatherObserved', 'station-1', { temperature: 15 }))
 
-        const req = makeReq({ query: {} })
-        const res = makeRes()
-
-        await router.invoke('GET', '/ngsi-ld/v1/entities', req, res)
+        const res = await app.inject('/ngsi-ld/v1/entities')
 
         assert.equal(res.statusCode, 200)
-        const body = res.body as NgsiLdEntity[]
+        const body = res.json() as NgsiLdEntity[]
         assert.lengthOf(body, 2)
         for (const entity of body) {
-            assert.property(entity, '@context')
             assert.equal(entity['@context'], NGSI_LD_CORE_CONTEXT)
         }
     })
 
     test('GET /ngsi-ld/v1/entities?type=X returns only entities of that type', async ({ assert }) => {
-        const e1 = makeEntity('AirQualityObserved', 'sensor-2', { pm25: 30 })
-        const e2 = makeEntity('WeatherObserved', 'station-2', { temperature: 18 })
-        await cache.set(e1)
-        await cache.set(e2)
+        await cache.set(makeEntity('AirQualityObserved', 'sensor-2', { pm25: 30 }))
+        await cache.set(makeEntity('WeatherObserved', 'station-2', { temperature: 18 }))
 
-        const req = makeReq({ query: { type: 'AirQualityObserved' } })
-        const res = makeRes()
-
-        await router.invoke('GET', '/ngsi-ld/v1/entities', req, res)
+        const res = await app.inject('/ngsi-ld/v1/entities?type=AirQualityObserved')
 
         assert.equal(res.statusCode, 200)
-        const body = res.body as NgsiLdEntity[]
+        const body = res.json() as NgsiLdEntity[]
         assert.lengthOf(body, 1)
         assert.equal(body[0].type, 'AirQualityObserved')
     })
 
     test('GET /ngsi-ld/v1/entities?q=pm25>30 returns only matching entities', async ({ assert }) => {
         const e1 = makeEntity('AirQualityObserved', 'sensor-3', { pm25: 50 })
-        const e2 = makeEntity('AirQualityObserved', 'sensor-4', { pm25: 10 })
         await cache.set(e1)
-        await cache.set(e2)
+        await cache.set(makeEntity('AirQualityObserved', 'sensor-4', { pm25: 10 }))
 
-        const req = makeReq({ query: { q: 'pm25>30' } })
-        const res = makeRes()
-
-        await router.invoke('GET', '/ngsi-ld/v1/entities', req, res)
+        const res = await app.inject({ url: '/ngsi-ld/v1/entities', query: { q: 'pm25>30' } })
 
         assert.equal(res.statusCode, 200)
-        const body = res.body as NgsiLdEntity[]
+        const body = res.json() as NgsiLdEntity[]
         assert.lengthOf(body, 1)
         assert.equal(body[0].id, e1.id)
     })
 
-    test('GET /ngsi-ld/v1/entities with invalid q-filter returns 400', async ({ assert }) => {
-        const req = makeReq({ query: { q: 'invalid!!!' } })
-        const res = makeRes()
+    test('the q filter runs before pagination, so a page never hides matches', async ({ assert }) => {
+        for (let i = 0; i < 30; i++) {
+            await cache.set(makeEntity('AirQualityObserved', `sensor-${String(i).padStart(2, '0')}`, { pm25: i >= 25 ? 90 : 5 }))
+        }
 
-        await router.invoke('GET', '/ngsi-ld/v1/entities', req, res)
+        const res = await app.inject({ url: '/ngsi-ld/v1/entities', query: { q: 'pm25>50', limit: '20' } })
+
+        assert.equal(res.statusCode, 200)
+        assert.lengthOf(res.json() as NgsiLdEntity[], 5)
+
+        const secondPage = await app.inject({ url: '/ngsi-ld/v1/entities', query: { q: 'pm25>50', limit: '2', offset: '4' } })
+        assert.lengthOf(secondPage.json() as NgsiLdEntity[], 1)
+    })
+
+    test('GET /ngsi-ld/v1/entities with a non-numeric or out-of-range limit returns 400', async ({ assert }) => {
+        for (const limit of ['abc', '0', '5000']) {
+            const res = await app.inject({ url: '/ngsi-ld/v1/entities', query: { limit } })
+            assert.equal(res.statusCode, 400, limit)
+            assert.include((res.json() as { type: string }).type, 'BadRequestData')
+        }
+    })
+
+    test('GET /ngsi-ld/v1/entities with invalid q-filter returns 400', async ({ assert }) => {
+        const res = await app.inject({ url: '/ngsi-ld/v1/entities', query: { q: 'invalid!!!' } })
 
         assert.equal(res.statusCode, 400)
-        const body = res.body as { type: string }
-        assert.include(body.type, 'BadRequestData')
+        assert.include((res.json() as { type: string }).type, 'BadRequestData')
     })
 
     test('GET /ngsi-ld/v1/entities?attrs=pm25 projects entities to only that attribute', async ({ assert }) => {
-        const e1 = makeEntity('AirQualityObserved', 'sensor-5', { pm25: 60, temperature: 22 })
-        await cache.set(e1)
+        await cache.set(makeEntity('AirQualityObserved', 'sensor-5', { pm25: 60, temperature: 22 }))
 
-        const req = makeReq({ query: { attrs: 'pm25' } })
-        const res = makeRes()
-
-        await router.invoke('GET', '/ngsi-ld/v1/entities', req, res)
+        const res = await app.inject('/ngsi-ld/v1/entities?attrs=pm25')
 
         assert.equal(res.statusCode, 200)
-        const body = res.body as NgsiLdEntity[]
+        const body = res.json() as NgsiLdEntity[]
         assert.lengthOf(body, 1)
         assert.property(body[0], 'pm25')
         assert.notProperty(body[0], 'temperature')
@@ -200,52 +157,38 @@ test.group('Entity endpoints (integration)', group => {
     })
 
     test('writes require credentials while reads stay public', async ({ assert }) => {
-        const guarded = new MockRouter()
-        registerEntityEndpoints(guarded as any, cache, null as any, null as any, createRouteGuards(denyAll, true))
+        const guarded = await buildApp(cache, denyAll)
+        try {
+            const write = await guarded.inject({ method: 'POST', url: '/ngsi-ld/v1/entities', payload: makeEntity('AirQualityObserved', 'sensor-guard', { pm25: 1 }) })
+            assert.equal(write.statusCode, 401)
+            assert.include((write.json() as { type: string }).type, 'Unauthorized')
 
-        const write = makeRes()
-        await guarded.invoke('POST', '/ngsi-ld/v1/entities', makeReq({ body: makeEntity('AirQualityObserved', 'sensor-guard', { pm25: 1 }) }), write)
-        assert.equal(write.statusCode, 401)
-
-        const read = makeRes()
-        await guarded.invoke('GET', '/ngsi-ld/v1/entities', makeReq({ query: {} }), read)
-        assert.equal(read.statusCode, 200)
+            const read = await guarded.inject('/ngsi-ld/v1/entities')
+            assert.equal(read.statusCode, 200)
+        } finally {
+            await guarded.close()
+        }
     })
 
     // POST /ngsi-ld/v1/entities
 
     test('POST /ngsi-ld/v1/entities with valid body returns 201 and Location header', async ({ assert }) => {
         const entity = makeEntity('AirQualityObserved', 'sensor-6', { pm25: 33 })
-        const req = makeReq({ body: entity })
-        const res = makeRes()
 
-        await router.invoke('POST', '/ngsi-ld/v1/entities', req, res)
+        const res = await app.inject({ method: 'POST', url: '/ngsi-ld/v1/entities', payload: entity })
 
         assert.equal(res.statusCode, 201)
-        assert.isTrue(res.ended)
-        assert.equal(res.resHeaders['Location'], `/ngsi-ld/v1/entities/${encodeURIComponent(entity.id)}`)
+        assert.equal(res.body, '')
+        assert.equal(res.headers['location'], entityUrl(entity.id))
+        assert.deepEqual(await cache.get(entity.id), entity)
     })
 
-    test('POST /ngsi-ld/v1/entities missing id returns 400', async ({ assert }) => {
-        const req = makeReq({ body: { type: 'AirQualityObserved' } })
-        const res = makeRes()
-
-        await router.invoke('POST', '/ngsi-ld/v1/entities', req, res)
-
-        assert.equal(res.statusCode, 400)
-        const body = res.body as { type: string }
-        assert.include(body.type, 'BadRequestData')
-    })
-
-    test('POST /ngsi-ld/v1/entities missing type returns 400', async ({ assert }) => {
-        const req = makeReq({ body: { id: buildUrn('AirQualityObserved', 'sensor-99') } })
-        const res = makeRes()
-
-        await router.invoke('POST', '/ngsi-ld/v1/entities', req, res)
-
-        assert.equal(res.statusCode, 400)
-        const body = res.body as { type: string }
-        assert.include(body.type, 'BadRequestData')
+    test('POST /ngsi-ld/v1/entities missing id or type returns 400', async ({ assert }) => {
+        for (const payload of [{ type: 'AirQualityObserved' }, { id: buildUrn('AirQualityObserved', 'sensor-99') }, 'not json']) {
+            const res = await app.inject({ method: 'POST', url: '/ngsi-ld/v1/entities', payload, headers: { 'content-type': 'application/json' } })
+            assert.equal(res.statusCode, 400)
+            assert.include((res.json() as { type: string }).type, 'BadRequestData')
+        }
     })
 
     // GET /ngsi-ld/v1/entities/:entityId
@@ -254,26 +197,22 @@ test.group('Entity endpoints (integration)', group => {
         const entity = makeEntity('AirQualityObserved', 'sensor-7', { pm25: 77 })
         await cache.set(entity)
 
-        const req = makeReq({ params: { entityId: entity.id } })
-        const res = makeRes()
-
-        await router.invoke('GET', '/ngsi-ld/v1/entities/:entityId', req, res)
+        const res = await app.inject(entityUrl(entity.id))
 
         assert.equal(res.statusCode, 200)
-        const body = res.body as NgsiLdEntity
+        const body = res.json() as NgsiLdEntity
         assert.equal(body.id, entity.id)
         assert.property(body, '@context')
+
+        const projected = await app.inject(`${entityUrl(entity.id)}?attrs=nothing`)
+        assert.deepEqual(Object.keys(projected.json() as object).sort(), ['@context', 'id', 'type'])
     })
 
     test('GET /ngsi-ld/v1/entities/:entityId with unknown id returns 404', async ({ assert }) => {
-        const req = makeReq({ params: { entityId: buildUrn('AirQualityObserved', 'nobody') } })
-        const res = makeRes()
-
-        await router.invoke('GET', '/ngsi-ld/v1/entities/:entityId', req, res)
+        const res = await app.inject(entityUrl(buildUrn('AirQualityObserved', 'nobody')))
 
         assert.equal(res.statusCode, 404)
-        const body = res.body as { type: string }
-        assert.include(body.type, 'ResourceNotFound')
+        assert.include((res.json() as { type: string }).type, 'ResourceNotFound')
     })
 
     // PATCH /ngsi-ld/v1/entities/:entityId
@@ -282,34 +221,19 @@ test.group('Entity endpoints (integration)', group => {
         const entity = makeEntity('AirQualityObserved', 'sensor-8', { pm25: 10 })
         await cache.set(entity)
 
-        const req = makeReq({
-            params: { entityId: entity.id },
-            body: { pm25: property(99) },
-        })
-        const res = makeRes()
-
-        await router.invoke('PATCH', '/ngsi-ld/v1/entities/:entityId', req, res)
+        const res = await app.inject({ method: 'PATCH', url: entityUrl(entity.id), payload: { pm25: property(99), id: 'urn:ngsi-ld:Tampered:1' } })
 
         assert.equal(res.statusCode, 204)
-        assert.isTrue(res.ended)
-
         const updated = await cache.get(entity.id)
-        assert.isNotNull(updated)
         assert.deepEqual(updated!.pm25, property(99))
+        assert.equal(updated!.id, entity.id)
     })
 
     test('PATCH /ngsi-ld/v1/entities/:entityId with unknown id returns 404', async ({ assert }) => {
-        const req = makeReq({
-            params: { entityId: buildUrn('AirQualityObserved', 'ghost') },
-            body: { pm25: property(1) },
-        })
-        const res = makeRes()
-
-        await router.invoke('PATCH', '/ngsi-ld/v1/entities/:entityId', req, res)
+        const res = await app.inject({ method: 'PATCH', url: entityUrl(buildUrn('AirQualityObserved', 'ghost')), payload: { pm25: property(1) } })
 
         assert.equal(res.statusCode, 404)
-        const body = res.body as { type: string }
-        assert.include(body.type, 'ResourceNotFound')
+        assert.include((res.json() as { type: string }).type, 'ResourceNotFound')
     })
 
     // DELETE /ngsi-ld/v1/entities/:entityId
@@ -318,26 +242,16 @@ test.group('Entity endpoints (integration)', group => {
         const entity = makeEntity('AirQualityObserved', 'sensor-9', { pm25: 5 })
         await cache.set(entity)
 
-        const req = makeReq({ params: { entityId: entity.id } })
-        const res = makeRes()
-
-        await router.invoke('DELETE', '/ngsi-ld/v1/entities/:entityId', req, res)
+        const res = await app.inject({ method: 'DELETE', url: entityUrl(entity.id) })
 
         assert.equal(res.statusCode, 204)
-        assert.isTrue(res.ended)
-
-        const gone = await cache.get(entity.id)
-        assert.isNull(gone)
+        assert.isNull(await cache.get(entity.id))
     })
 
     test('DELETE /ngsi-ld/v1/entities/:entityId with unknown id returns 404', async ({ assert }) => {
-        const req = makeReq({ params: { entityId: buildUrn('AirQualityObserved', 'phantom') } })
-        const res = makeRes()
-
-        await router.invoke('DELETE', '/ngsi-ld/v1/entities/:entityId', req, res)
+        const res = await app.inject({ method: 'DELETE', url: entityUrl(buildUrn('AirQualityObserved', 'phantom')) })
 
         assert.equal(res.statusCode, 404)
-        const body = res.body as { type: string }
-        assert.include(body.type, 'ResourceNotFound')
+        assert.include((res.json() as { type: string }).type, 'ResourceNotFound')
     })
 })

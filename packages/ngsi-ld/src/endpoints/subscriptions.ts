@@ -1,14 +1,19 @@
-import type { Router, Request, Response } from 'ultimate-express'
+import type { FastifyInstance } from 'fastify'
 import type { SubscriptionStore } from '../subscriptions/subscription_store.js'
 import type { SubscriptionCache } from '../subscriptions/subscription_cache.js'
 import type { SubscriptionCreate } from '../types/subscription.js'
 import type { RouteGuards } from '../auth.js'
 import { assertSafeWebhookUrl, WebhookUrlError } from '../notifications/webhook_url.js'
+import { LD_JSON } from './entities.js'
+import { problem } from './errors.js'
+import { subscriptionIdParamsSchema, subscriptionPatchSchema, subscriptionSchema } from './schemas.js'
 
 export interface SubscriptionEndpointOptions {
     /** Accept webhooks on loopback and private networks (development only). */
     allowPrivateWebhooks?: boolean
 }
+
+type SubscriptionParams = { subscriptionId: string }
 
 /** Resolves to an error title when the URI must be refused, undefined when it is acceptable. */
 async function webhookRejection(uri: string, options: SubscriptionEndpointOptions): Promise<string | undefined> {
@@ -22,135 +27,75 @@ async function webhookRejection(uri: string, options: SubscriptionEndpointOption
 }
 
 /**
- * Registers NGSI-LD subscription CRUD endpoints on the provided router.
+ * Registers the NGSI-LD subscription CRUD routes on the given Fastify instance.
  */
 export function registerSubscriptionEndpoints(
-    router: Router,
+    fastify: FastifyInstance,
     store: SubscriptionStore,
     cache: SubscriptionCache,
     guards: RouteGuards,
     options: SubscriptionEndpointOptions = {}
 ): void {
-    /**
-     * POST /ngsi-ld/v1/subscriptions
-     * Create a new subscription.
-     */
-    router.post('/ngsi-ld/v1/subscriptions', guards.write(async (req: Request, res: Response) => {
-        const body = req.body as SubscriptionCreate
-
-        if (!body?.notification?.endpoint?.uri) {
-            res.status(400).json({
-                type: 'https://uri.etsi.org/ngsi-ld/errors/BadRequestData',
-                title: 'Missing notification.endpoint.uri',
-            })
-            return
-        }
-
-        const rejection = await webhookRejection(body.notification.endpoint.uri, options)
-        if (rejection) {
-            res.status(400).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/BadRequestData', title: rejection })
-            return
-        }
-
-        try {
-            const sub = await store.create(body)
-            await cache.add(sub)
-            res.setHeader('Location', `/ngsi-ld/v1/subscriptions/${sub.id}`)
-            res.setHeader('Content-Type', 'application/ld+json')
-            res.status(201).json(sub)
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
-        }
-    }))
-
-    /**
-     * GET /ngsi-ld/v1/subscriptions
-     * List all active subscriptions.
-     */
-    router.get('/ngsi-ld/v1/subscriptions', guards.read(async (_req: Request, res: Response) => {
-        try {
-            const subs = await store.findAll()
-            res.setHeader('Content-Type', 'application/ld+json')
-            res.status(200).json(subs)
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
-        }
-    }))
-
-    /**
-     * GET /ngsi-ld/v1/subscriptions/:subscriptionId
-     */
-    router.get('/ngsi-ld/v1/subscriptions/:subscriptionId', guards.read(async (req: Request, res: Response) => {
-        const id = req.params['subscriptionId'] as string
-
-        try {
-            const sub = await store.findById(id)
-            if (!sub) {
-                res.status(404).json({
-                    type: 'https://uri.etsi.org/ngsi-ld/errors/ResourceNotFound',
-                    title: 'Subscription not found',
-                })
-                return
-            }
-            res.setHeader('Content-Type', 'application/ld+json')
-            res.status(200).json(sub)
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
-        }
-    }))
-
-    /**
-     * PATCH /ngsi-ld/v1/subscriptions/:subscriptionId
-     * Partially update a subscription.
-     */
-    router.patch('/ngsi-ld/v1/subscriptions/:subscriptionId', guards.write(async (req: Request, res: Response) => {
-        const id = req.params['subscriptionId'] as string
-        const patch = req.body as Partial<SubscriptionCreate>
-
-        const uri = patch?.notification?.endpoint?.uri
-        if (uri !== undefined) {
-            const rejection = await webhookRejection(uri, options)
+    fastify.post<{ Body: SubscriptionCreate }>(
+        '/ngsi-ld/v1/subscriptions',
+        { schema: { body: subscriptionSchema }, preHandler: guards.write },
+        async (request, reply) => {
+            const rejection = await webhookRejection(request.body.notification.endpoint.uri, options)
             if (rejection) {
-                res.status(400).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/BadRequestData', title: rejection })
-                return
+                return reply.code(400).send(problem(400, rejection))
             }
+            const sub = await store.create(request.body)
+            await cache.add(sub)
+            return reply.code(201).header('Location', `/ngsi-ld/v1/subscriptions/${sub.id}`).type(LD_JSON).send(sub)
         }
+    )
 
-        try {
-            const updated = await store.update(id, patch)
+    fastify.get('/ngsi-ld/v1/subscriptions', { preHandler: guards.read }, async (_request, reply) => {
+        return reply.type(LD_JSON).send(await store.findAll())
+    })
+
+    fastify.get<{ Params: SubscriptionParams }>(
+        '/ngsi-ld/v1/subscriptions/:subscriptionId',
+        { schema: { params: subscriptionIdParamsSchema }, preHandler: guards.read },
+        async (request, reply) => {
+            const sub = await store.findById(request.params.subscriptionId)
+            if (!sub) {
+                return reply.code(404).send(problem(404, 'Subscription not found'))
+            }
+            return reply.type(LD_JSON).send(sub)
+        }
+    )
+
+    fastify.patch<{ Params: SubscriptionParams; Body: Partial<SubscriptionCreate> }>(
+        '/ngsi-ld/v1/subscriptions/:subscriptionId',
+        { schema: { params: subscriptionIdParamsSchema, body: subscriptionPatchSchema }, preHandler: guards.write },
+        async (request, reply) => {
+            const uri = request.body.notification?.endpoint?.uri
+            if (uri !== undefined) {
+                const rejection = await webhookRejection(uri, options)
+                if (rejection) {
+                    return reply.code(400).send(problem(400, rejection))
+                }
+            }
+            const updated = await store.update(request.params.subscriptionId, request.body)
             if (!updated) {
-                res.status(404).json({
-                    type: 'https://uri.etsi.org/ngsi-ld/errors/ResourceNotFound',
-                    title: 'Subscription not found',
-                })
-                return
+                return reply.code(404).send(problem(404, 'Subscription not found'))
             }
             await cache.update(updated)
-            res.status(204).end()
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
+            return reply.code(204).send()
         }
-    }))
+    )
 
-    /**
-     * DELETE /ngsi-ld/v1/subscriptions/:subscriptionId
-     */
-    router.delete('/ngsi-ld/v1/subscriptions/:subscriptionId', guards.write(async (req: Request, res: Response) => {
-        const id = req.params['subscriptionId'] as string
-
-        try {
-            const deleted = await store.delete(id)
+    fastify.delete<{ Params: SubscriptionParams }>(
+        '/ngsi-ld/v1/subscriptions/:subscriptionId',
+        { schema: { params: subscriptionIdParamsSchema }, preHandler: guards.write },
+        async (request, reply) => {
+            const deleted = await store.delete(request.params.subscriptionId)
             if (!deleted) {
-                res.status(404).json({
-                    type: 'https://uri.etsi.org/ngsi-ld/errors/ResourceNotFound',
-                    title: 'Subscription not found',
-                })
-                return
+                return reply.code(404).send(problem(404, 'Subscription not found'))
             }
-            await cache.remove(id)
-            res.status(204).end()
-        } catch (err) {
-            res.status(500).json({ type: 'https://uri.etsi.org/ngsi-ld/errors/InternalError', title: String(err) })
+            await cache.remove(request.params.subscriptionId)
+            return reply.code(204).send()
         }
-    }))
+    )
 }
