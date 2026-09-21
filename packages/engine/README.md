@@ -204,12 +204,26 @@ On `engine.start()`, the following sequence executes:
 
 1. **Database initialization** -- runs migrations, creates component tables
 2. **Component initialization** -- injects dependencies (database, storage, auth middleware) into active components
-3. **Endpoint registration** -- maps component HTTP endpoints to Express routes
+3. **Endpoint registration** -- maps component HTTP endpoints to Fastify routes
 4. **Queue setup** -- creates BullMQ queues and workers backed by Redis
 5. **Scheduling** -- registers cron schedules and event triggers for collectors/harvesters
 6. **Server start** -- binds the HTTP server and begins accepting requests
 
 On `engine.stop()`, resources are cleaned up in reverse order with a configurable timeout to allow in-flight requests and queue jobs to complete.
+
+### Request contract
+
+Components never see the HTTP framework. Each endpoint handler receives a `TypedRequest`
+(`params`, `query`, `body`, `headers`, `user`, `file`) and returns a `DataResponse`
+(`status`, `content`, `headers`), both from `@cepseudo/shared`. The engine adapts them to Fastify
+in `endpoints.ts`: it validates the endpoint's TypeBox `schema` (400 on mismatch), converts
+`params` and `querystring` to the declared types, spools multipart uploads to a temp file exposed
+as `req.file`, and identifies the caller into `req.user`.
+
+The raw Fastify request and reply are not exposed to components. Code that needs them registers a
+Fastify plugin through `engine.getServer()` in an `EngineOptions.plugins` entry, before the server
+listens. The choice of Fastify and the shape of this contract are recorded in
+[ADR 0001](../../docs/adr/0001-http-framework.md).
 
 ## License
 

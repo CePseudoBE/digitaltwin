@@ -84,6 +84,8 @@ export {
 } from './validation/schemas.js'
 export { validateData, safeValidate, validateQuery, validateParams } from './validation/validate.js'
 export type { FieldError } from './validation/validate.js'
+export { Type } from 'typebox'
+export type { Static } from 'typebox'
 
 // Utils
 export { Logger, LogLevel } from './utils/logger.js'

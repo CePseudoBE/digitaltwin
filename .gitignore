@@ -85,3 +85,6 @@ temp/
 .Trashes
 ehthumbs.db
 Desktop.ini
+
+# Handlers rendered by the CLI template tests
+digitaltwin-cli/tests/generated/

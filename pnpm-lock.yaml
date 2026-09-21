@@ -81,6 +81,9 @@ importers:
         specifier: ^0.4.1
         version: 0.4.1
     devDependencies:
+      '@cepseudo/engine':
+        specifier: workspace:*
+        version: link:../packages/engine
       '@japa/assert':
         specifier: ^4.1.0
         version: 4.2.0(@japa/runner@4.5.0)
@@ -90,6 +93,12 @@ importers:
       '@types/fs-extra':
         specifier: ^11.0.4
         version: 11.0.4
+      digitaltwin-core:
+        specifier: workspace:*
+        version: link:../digitaltwin-core
+      fastify:
+        specifier: ^5.12.5
+        version: 5.12.5
 
   digitaltwin-core:
     dependencies:
