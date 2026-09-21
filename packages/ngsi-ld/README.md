@@ -34,7 +34,8 @@ The engine never imports `@cepseudo/ngsi-ld` statically. Instead, it uses a dyna
 async function loadOptionalPackages() {
     try {
         const { registerNgsiLd } = await import('@cepseudo/ngsi-ld')
-        await registerNgsiLd({ router, db, redis, components, logger })
+        // Registers the routes as an encapsulated Fastify plugin; the handle is closed in engine.stop()
+        ngsiLd = await registerNgsiLd({ fastify, db, redis, components, logger, authMiddleware })
         logger.info('NGSI-LD plugin loaded')
     } catch {
         // Package not installed — skip silently, framework works without it

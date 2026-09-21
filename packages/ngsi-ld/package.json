@@ -32,17 +32,13 @@
   "dependencies": {
     "@cepseudo/components": "workspace:*",
     "@cepseudo/database": "workspace:*",
-    "@cepseudo/shared": "workspace:*"
+    "@cepseudo/shared": "workspace:*",
+    "typebox": "^1.3.32"
   },
   "peerDependencies": {
     "bullmq": ">=5.0.0",
     "ioredis": ">=5.0.0",
-    "ultimate-express": ">=2.0.0"
-  },
-  "peerDependenciesMeta": {
-    "ultimate-express": {
-      "optional": true
-    }
+    "fastify": ">=5.0.0"
   },
   "devDependencies": {
     "@japa/assert": "^4.1.0",
@@ -51,11 +47,11 @@
     "@testcontainers/redis": "^11.3.1",
     "better-sqlite3": "^12.6.0",
     "bullmq": "^5.0.0",
+    "fastify": "^5.12.5",
     "ioredis": "^5.0.0",
     "pg": "^8.20.0",
     "rimraf": "^6.0.1",
-    "testcontainers": "^11.3.1",
-    "ultimate-express": "^2.0.9"
+    "testcontainers": "^11.3.1"
   },
   "repository": {
     "type": "git",

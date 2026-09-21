@@ -1,8 +1,9 @@
 // Plugin entry point
 export { registerNgsiLd } from './plugin.js'
-export type { NgsiLdPluginOptions } from './plugin.js'
+export type { NgsiLdPluginOptions, NgsiLdHandle } from './plugin.js'
 export { createRouteGuards } from './auth.js'
-export type { NgsiLdAuthenticator, RouteGuards } from './auth.js'
+export type { NgsiLdAuthenticator, RouteGuard, RouteGuards } from './auth.js'
+export { ngsiLdErrorHandler, problem, NGSI_LD_ERROR_TYPES } from './endpoints/errors.js'
 export { assertSafeWebhookUrl, isPrivateAddress, WebhookUrlError } from './notifications/webhook_url.js'
 export type { WebhookUrlOptions } from './notifications/webhook_url.js'
 export type { NotificationWorkerOptions } from './notifications/notification_worker.js'

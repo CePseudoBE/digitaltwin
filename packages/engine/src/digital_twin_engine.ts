@@ -4,7 +4,7 @@ import type { StorageService } from '@cepseudo/storage'
 import type { DatabaseAdapter } from '@cepseudo/database'
 import { randomUUID } from 'node:crypto'
 import Fastify from 'fastify'
-import type { InjectOptions, LightMyRequestResponse } from 'fastify'
+import type { FastifyInstance, InjectOptions, LightMyRequestResponse } from 'fastify'
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import cors from '@fastify/cors'
 import compress from '@fastify/compress'
@@ -25,7 +25,6 @@ import {
 import { UserService, AuthMiddleware } from '@cepseudo/auth'
 import { exposeEndpoints } from './endpoints.js'
 import { registerErrorHandler, registerRequestLogging } from './error_handler.js'
-import { createLegacyRouter, type LegacyRouter } from './legacy_router.js'
 import { registerOpenApi, type OpenApiOptions } from './openapi.js'
 import { scheduleComponents } from './scheduler.js'
 import { LogLevel, engineEventBus } from '@cepseudo/shared'
@@ -237,10 +236,11 @@ export class DigitalTwinEngine {
     readonly #storage: StorageService
     readonly #database: DatabaseAdapter
     readonly #server: EngineServer
-    readonly #router: LegacyRouter
     readonly #options: EngineOptions
     /** Built in start(); shared with optional plugins such as NGSI-LD */
     #authMiddleware?: AuthMiddleware
+    /** Handle returned by the NGSI-LD plugin when it is installed, closed in stop() */
+    #ngsiLd?: { close(): Promise<void> }
     #queueManager: QueueManager | null
     #uploadProcessor: UploadProcessor | null
     readonly #uploadReconciler: UploadReconciler
@@ -331,7 +331,6 @@ export class DigitalTwinEngine {
         this.#database = this.#options.database
         this.#healthChecker = new HealthChecker({ checkTimeoutMs: this.#options.health?.checkTimeoutMs })
         this.#server = createServer(this.#options.server?.bodyLimit ?? DEFAULT_BODY_LIMIT)
-        this.#router = createLegacyRouter(this.#server)
         this.#queueManager = this.#createQueueManager()
         this.#uploadProcessor = this.#createUploadProcessor()
         this.#uploadReconciler = new UploadReconciler(this.#database, this.#storage)
@@ -631,8 +630,8 @@ export class DigitalTwinEngine {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ngsiLd = await import(ngsiLdPkg) as any
             const { Logger } = await import('@cepseudo/shared')
-            await ngsiLd.registerNgsiLd({
-                router: this.#router,
+            this.#ngsiLd = await ngsiLd.registerNgsiLd({
+                fastify: this.#server,
                 db: this.#database,
                 redis: this.getRedisConfig(),
                 components: this.getAllComponents(),
@@ -668,11 +667,11 @@ export class DigitalTwinEngine {
     }
 
     /**
-     * Express-style router for plugins that still register `(req, res)` handlers.
-     * Transitional until the NGSI-LD package becomes a Fastify plugin (#102).
+     * The Fastify server, for plugins registered by hand before start() listens.
+     * Routes cannot be added once the server listens.
      */
-    getRouter(): LegacyRouter {
-        return this.#router
+    getServer(): FastifyInstance {
+        return this.#server
     }
 
     /**
@@ -990,6 +989,15 @@ export class DigitalTwinEngine {
                 errors.push(this.#wrapError('Server close', error))
             }
             this.#listening = false
+        }
+
+        if (this.#ngsiLd) {
+            try {
+                await withTimeout(this.#ngsiLd.close(), Math.min(this.#shutdownTimeout / 3, 10000), 'NGSI-LD plugin close')
+            } catch (error) {
+                errors.push(this.#wrapError('NGSI-LD plugin', error))
+            }
+            this.#ngsiLd = undefined
         }
 
         // 3. Drain queues - wait for active jobs with timeout
