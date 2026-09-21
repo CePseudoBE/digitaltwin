@@ -380,7 +380,7 @@ bullmq + ioredis          Queue management + Redis
 knex                      Database query builder (PostgreSQL, SQLite)
 @aws-sdk/client-s3        OVH Object Storage (S3-compatible)
 @aws-sdk/s3-request-presigner  Presigned URL generation
-multer                    File upload handling (legacy, replaced by presigned URLs for large files)
+@fastify/multipart        Multipart uploads (small files; presigned URLs are the large-file path)
 jsonwebtoken              JWT validation
 typebox                   Input validation (JSON Schema, shared with Fastify routes and OpenAPI)
 jszip                     ZIP handling for tilesets
