@@ -28,6 +28,40 @@ function capture(): { handler: (req: TypedRequest) => Promise<{ status: number; 
     }
 }
 
+function multipartPayload(fileContent: string): { headers: Record<string, string>; payload: string } {
+    const boundary = 'testboundary'
+    const payload = [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="description"',
+        '',
+        'a model',
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="model (v2).glb"',
+        'Content-Type: model/gltf-binary',
+        '',
+        fileContent,
+        `--${boundary}--`,
+        ''
+    ].join('\r\n')
+    return { headers: { 'content-type': `multipart/form-data; boundary=${boundary}` }, payload }
+}
+
+async function withTempDir(run: (dir: string) => Promise<void>): Promise<void> {
+    const tempDir = '.test-uploads'
+    process.env.TEMP_UPLOAD_DIR = tempDir
+    await fs.rm(tempDir, { recursive: true, force: true })
+    try {
+        await run(tempDir)
+    } finally {
+        delete process.env.TEMP_UPLOAD_DIR
+        await fs.rm(tempDir, { recursive: true, force: true })
+    }
+}
+
+async function filesIn(dir: string): Promise<string[]> {
+    return fs.readdir(dir).catch(() => [])
+}
+
 test.group('exposeEndpoints', () => {
     test('all component endpoints are reachable and return the configured response', async ({ assert }) => {
         const collector = new TestCollector('c1', [
@@ -145,33 +179,11 @@ test.group('exposeEndpoints', () => {
     })
 
     test('multipart uploads are spooled to the temp directory and exposed as req.file', async ({ assert }) => {
-        const tempDir = '.test-uploads'
-        process.env.TEMP_UPLOAD_DIR = tempDir
-        const probe = capture()
-        const fastify = await serve([new TestHandler('h', [{ method: 'post', path: '/upload', handler: probe.handler }])])
+        await withTempDir(async tempDir => {
+            const probe = capture()
+            const fastify = await serve([new TestHandler('h', [{ method: 'post', path: '/upload', handler: probe.handler }])])
 
-        const boundary = 'testboundary'
-        const payload = [
-            `--${boundary}`,
-            'Content-Disposition: form-data; name="description"',
-            '',
-            'a model',
-            `--${boundary}`,
-            'Content-Disposition: form-data; name="file"; filename="model (v2).glb"',
-            'Content-Type: model/gltf-binary',
-            '',
-            'binarycontent',
-            `--${boundary}--`,
-            ''
-        ].join('\r\n')
-
-        try {
-            const res = await fastify.inject({
-                method: 'POST',
-                url: '/upload',
-                headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
-                payload
-            })
+            const res = await fastify.inject({ method: 'POST', url: '/upload', ...multipartPayload('binarycontent') })
 
             assert.equal(res.statusCode, 200)
             const received = probe.received()
@@ -183,10 +195,43 @@ test.group('exposeEndpoints', () => {
             assert.equal(file.size, 'binarycontent'.length)
             assert.isTrue(file.path!.startsWith(tempDir))
             assert.equal(await fs.readFile(file.path!, 'utf8'), 'binarycontent')
-        } finally {
-            delete process.env.TEMP_UPLOAD_DIR
-            await fs.rm(tempDir, { recursive: true, force: true })
-        }
+        })
+    })
+
+    test('an anonymous multipart request is refused with 401 before anything is written to disk', async ({ assert }) => {
+        await withTempDir(async tempDir => {
+            const probe = capture()
+            const fastify = await serve([new TestHandler('h', [{ method: 'post', path: '/upload', handler: probe.handler }])], {
+                authMiddleware: { identify: headers => (headers['x-user-id'] ? { id: String(headers['x-user-id']), roles: [] } : undefined) }
+            })
+
+            const anonymous = await fastify.inject({ method: 'POST', url: '/upload', ...multipartPayload('binarycontent') })
+            assert.equal(anonymous.statusCode, 401)
+            assert.equal((anonymous.json() as { error: { code: string } }).error.code, 'AUTHENTICATION_ERROR')
+            assert.deepEqual(await filesIn(tempDir), [])
+
+            const { headers, payload } = multipartPayload('binarycontent')
+            const identified = await fastify.inject({ method: 'POST', url: '/upload', headers: { ...headers, 'x-user-id': 'u1' }, payload })
+            assert.equal(identified.statusCode, 200)
+            assert.equal(probe.received().user?.id, 'u1')
+        })
+    })
+
+    test('a file over maxFileSize answers 413 with a structured error and leaves no temp file', async ({ assert }) => {
+        await withTempDir(async tempDir => {
+            const probe = capture()
+            const fastify = await serve([new TestHandler('h', [{ method: 'post', path: '/upload', handler: probe.handler }])], { maxFileSize: 8 })
+
+            const res = await fastify.inject({ method: 'POST', url: '/upload', ...multipartPayload('x'.repeat(64)) })
+
+            assert.equal(res.statusCode, 413)
+            const body = res.json() as { error: { code: string; message: string; requestId: string } }
+            assert.equal(body.error.code, 'FST_REQ_FILE_TOO_LARGE')
+            assert.isString(body.error.requestId)
+            assert.deepEqual(await filesIn(tempDir), [])
+
+            assert.equal((await fastify.inject({ method: 'POST', url: '/upload', ...multipartPayload('small') })).statusCode, 200)
+        })
     })
 
     test('a DigitalTwinError thrown by the handler maps to its status code', async ({ assert }) => {

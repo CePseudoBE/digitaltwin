@@ -1156,29 +1156,22 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
                 return badRequestResponse('No file data available')
             }
 
-            // Upload asset and cleanup
-            try {
-                await this.uploadAsset({
-                    description: validData.description,
-                    source: validData.source,
-                    owner_id: userId,
-                    filename: validData.filename,
-                    file: fileBuffer,
-                    is_public: validData.is_public
-                })
-                if (validData.filePath) {
-                    await this.cleanupTempFile(validData.filePath)
-                }
-            } catch (error) {
-                if (validData.filePath) {
-                    await this.cleanupTempFile(validData.filePath)
-                }
-                throw error
-            }
+            await this.uploadAsset({
+                description: validData.description,
+                source: validData.source,
+                owner_id: userId,
+                filename: validData.filename,
+                file: fileBuffer,
+                is_public: validData.is_public
+            })
 
             return successResponse({ message: 'Asset uploaded successfully' })
         } catch (error) {
             return errorResponse(error)
+        } finally {
+            if (req?.file?.path) {
+                await this.cleanupTempFile(req.file.path)
+            }
         }
     }
 

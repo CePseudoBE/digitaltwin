@@ -82,13 +82,18 @@ test.group('TilesetManager — upload validation', (group) => {
         const storage = new LocalStorageService('.test-tileset-auth')
         manager.setDependencies(db, storage)
 
+        const tempPath = path.join(os.tmpdir(), `tileset-auth-${Date.now()}.zip`)
+        await fs.writeFile(tempPath, 'zip')
+
         const response = await manager.handleUpload({
             body: { description: 'Test' },
-            headers: {}
+            headers: {},
+            file: { path: tempPath, originalname: 'tileset.zip' }
         })
 
         assert.equal(response.status, 401)
         assert.include(JSON.parse(response.content as string).error, 'Authentication required')
+        assert.isFalse(await fs.access(tempPath).then(() => true, () => false))
     })
 
     test('rejects missing description', async ({ assert }) => {

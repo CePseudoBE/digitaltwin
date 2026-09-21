@@ -81,6 +81,10 @@ interface EngineOptions {
     server?: {
         port: number                            // default: 3000
         host?: string                           // default: '0.0.0.0'
+        bodyLimit?: number                      // default: 50 MiB
+    }
+    upload?: {
+        maxFileSize?: number                    // default: 100 MiB, multipart routes answer 413 above it
     }
 
     // Logging
