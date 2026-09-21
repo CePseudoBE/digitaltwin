@@ -20,7 +20,7 @@
     "build": "tsc",
     "dev": "tsx src/bin.ts",
     "clean": "rimraf dist",
-    "test": "node --import tsx bin/test.ts",
+    "test": "node -r ./bin/set-test-env.cjs --import tsx bin/test.ts",
     "prepare": "npm run build"
   },
   "keywords": [
