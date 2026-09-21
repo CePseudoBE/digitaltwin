@@ -17,6 +17,7 @@ import type { StartedRedisContainer } from '@testcontainers/redis'
 import { DigitalTwinEngine } from '@cepseudo/engine'
 import { LogLevel, Logger } from '@cepseudo/shared'
 import { registerNgsiLd } from '@cepseudo/ngsi-ld'
+import type { NgsiLdHandle } from '@cepseudo/ngsi-ld'
 import { setupInfrastructure, type E2EInfrastructure } from './helpers/setup.js'
 import { NgsiLdWeatherCollector } from './helpers/test_components.js'
 
@@ -80,6 +81,7 @@ test.group('NGSI-LD E2E — engine + real HTTP', group => {
     let collector: NgsiLdWeatherCollector
     let baseUrl: string
     let webhook: WebhookServer
+    let ngsiLd: NgsiLdHandle
 
     group.setup(async () => {
         infra = await setupInfrastructure()
@@ -103,16 +105,17 @@ test.group('NGSI-LD E2E — engine + real HTTP', group => {
             // auto-discovery (dynamic import) from resolving @cepseudo/ngsi-ld from its own context.
             // Plugins run before the server listens, since Fastify refuses routes added afterwards.
             plugins: [
-                engine =>
-                    registerNgsiLd({
-                        router: engine.getRouter(),
+                async engine => {
+                    ngsiLd = await registerNgsiLd({
+                        fastify: engine.getServer(),
                         db: engine.getDatabase(),
                         redis: engine.getRedisConfig(),
                         components: engine.getAllComponents(),
                         logger: new Logger('ngsi-ld'),
                         authMiddleware: engine.getAuthMiddleware(),
                         allowPrivateWebhooks: true, // the webhook receiver below listens on 127.0.0.1
-                    }),
+                    })
+                }
             ],
         })
 
@@ -126,7 +129,7 @@ test.group('NGSI-LD E2E — engine + real HTTP', group => {
         await webhook.stop()
         try {
             await Promise.race([
-                engine.stop(),
+                engine.stop().then(() => ngsiLd.close()),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('stop timeout')), 5000)),
             ])
         } catch { /* ignore */ }

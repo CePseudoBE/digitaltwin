@@ -89,12 +89,10 @@ test.group('Engine HTTP server', () => {
             plugins: [
                 engine => {
                     sawAuth = engine.getAuthMiddleware() !== undefined
-                    engine.getRouter().get('/plugin/:id', async (req, res) => {
-                        res.status(201).setHeader('Location', `/plugin/${req.params.id}`).json({ id: req.params.id, q: req.query.q })
+                    engine.getServer().get<{ Params: { id: string }; Querystring: { q?: string } }>('/plugin/:id', async (req, reply) => {
+                        return reply.code(201).header('Location', `/plugin/${req.params.id}`).send({ id: req.params.id, q: req.query.q })
                     })
-                    engine.getRouter().delete('/plugin/:id', async (_req, res) => {
-                        res.status(204).end()
-                    })
+                    engine.getServer().delete('/plugin/:id', async (_req, reply) => reply.code(204).send())
                 }
             ]
         }, async engine => {
