@@ -8,7 +8,10 @@ import {
     validateIdParam,
     validateAssetUpload,
     validateAssetUpdate,
-    validateAssetBatchUpload
+    validateAssetBatchUpload,
+    validateDateRangeQuery,
+    validateCustomRecordCreate,
+    validatePresignedUploadRequest
 } from '../../src/validation/index.js'
 import { ValidationError } from '../../src/errors/index.js'
 
@@ -322,5 +325,61 @@ test.group('Asset Batch Upload Schema', () => {
         const result = await validateData(validateAssetBatchUpload, data)
 
         assert.isUndefined(result.assets)
+    })
+})
+
+test.group('Conversion follows the schema', () => {
+    test('a numeric-looking query string stays a string when the schema says string', async ({ assert }) => {
+        const result = await validateQuery<{ startDate?: string; limit?: number }>(validateDateRangeQuery, {
+            startDate: '2024',
+            limit: '10'
+        })
+
+        assert.strictEqual(result.startDate, '2024')
+        assert.strictEqual(result.limit, 10)
+    })
+
+    test('custom record bodies keep every property', async ({ assert }) => {
+        const result = await validateData<Record<string, unknown>>(validateCustomRecordCreate, { name: 'a', value: 3 })
+
+        assert.deepEqual(result, { name: 'a', value: 3 })
+    })
+
+    test('presigned upload request rejects a non-positive size', async ({ assert }) => {
+        const result = await safeValidate(validatePresignedUploadRequest, {
+            fileName: 'model.glb',
+            fileSize: 0,
+            contentType: 'model/gltf-binary'
+        })
+
+        assert.isFalse(result.success)
+        if (!result.success) {
+            assert.deepEqual(result.errors.map(e => e.field), ['fileSize'])
+        }
+    })
+})
+
+test.group('ValidationError shape', () => {
+    test('lists every failing field in context.errors and in the message', async ({ assert }) => {
+        try {
+            await validateData(validatePagination, { limit: 5000, offset: -1 }, 'Pagination')
+            assert.fail('Should have thrown')
+        } catch (error) {
+            assert.instanceOf(error, ValidationError)
+            const { message, context } = error as ValidationError
+            const errors = context?.errors as Array<{ field: string; message: string }>
+            assert.deepEqual(errors.map(e => e.field), ['limit', 'offset'])
+            assert.include(message, 'Pagination: limit:')
+            assert.include(message, 'offset:')
+        }
+    })
+
+    test('nested fields use dotted paths', async ({ assert }) => {
+        const result = await safeValidate(validateAssetBatchUpload, { assets: [{ source: 'nope' }] })
+
+        assert.isFalse(result.success)
+        if (!result.success) {
+            assert.equal(result.errors[0].field, 'assets.0.source')
+        }
     })
 })

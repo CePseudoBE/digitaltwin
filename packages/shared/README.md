@@ -58,7 +58,7 @@ Helpers: `isDigitalTwinError(err)` type guard, `wrapError(err)` to normalize unk
 
 ### Validation
 
-VineJS-based schemas and validators for common inputs.
+TypeBox schemas and compiled validators for common inputs. The schemas are JSON Schema objects, so they can also be attached to a route's `EndpointSchema`.
 
 | Export | Description |
 |---|---|
@@ -66,11 +66,10 @@ VineJS-based schemas and validators for common inputs.
 | `idParamSchema` | Numeric `:id` route param |
 | `assetUploadSchema`, `assetUpdateSchema` | Asset CRUD payloads |
 | `presignedUploadRequestSchema` | Presigned URL request body |
-| `validateData(schema, data)` | Validate and return typed result or throw |
-| `safeValidate(schema, data)` | Validate and return `{ success, data?, error? }` |
-| `validateQuery(schema, req)` | Validate `req.query` |
-| `validateParams(schema, req)` | Validate `req.params` |
-| `vine` | Re-exported VineJS instance for custom schemas |
+| `validateData(validator, data)` | Validate and return typed result or throw `ValidationError` |
+| `safeValidate(validator, data)` | Validate and return `{ success, data }` or `{ success, errors }` |
+| `validateQuery(validator, query)` | Convert query strings to the schema's types, then validate |
+| `validateParams(validator, params)` | Convert path params to the schema's types, then validate |
 
 ### Utils
 
@@ -153,22 +152,23 @@ try {
 ### Validation schemas
 
 ```typescript
-import { validateData, paginationSchema, vine } from '@cepseudo/shared'
+import { validateQuery, validateData, validatePagination } from '@cepseudo/shared'
+import { Type } from 'typebox'
+import { Compile } from 'typebox/compile'
 
-// Use a built-in schema
-const pagination = await validateData(paginationSchema, req.query)
-// pagination.page and pagination.limit are typed numbers
+// Use a built-in validator
+const pagination = await validateQuery<{ limit?: number; offset?: number }>(validatePagination, req.query)
 
 // Define a custom schema
-const createSensorSchema = vine.compile(
-  vine.object({
-    name: vine.string().minLength(1).maxLength(255),
-    latitude: vine.number().min(-90).max(90),
-    longitude: vine.number().min(-180).max(180),
+const createSensor = Compile(
+  Type.Object({
+    name: Type.String({ minLength: 1, maxLength: 255 }),
+    latitude: Type.Number({ minimum: -90, maximum: 90 }),
+    longitude: Type.Number({ minimum: -180, maximum: 180 })
   })
 )
 
-const body = await validateData(createSensorSchema, req.body)
+const body = await validateData<{ name: string; latitude: number; longitude: number }>(createSensor, req.body)
 ```
 
 ## License

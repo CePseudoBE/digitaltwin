@@ -1,114 +1,62 @@
-import vine from '@vinejs/vine'
+import { Type } from 'typebox'
+import { Compile } from 'typebox/compile'
 
-// ============================================
-// Common schemas
-// ============================================
+const positiveNumber = Type.Number({ exclusiveMinimum: 0 })
+const description = Type.Optional(Type.String({ maxLength: 1000 }))
+const source = Type.Optional(Type.String({ format: 'uri' }))
+const isPublic = Type.Optional(Type.Boolean())
 
-/**
- * Pagination query parameters schema
- */
-export const paginationSchema = vine.object({
-    limit: vine.number().positive().max(1000).optional(),
-    offset: vine.number().min(0).optional()
+/** Pagination query parameters */
+export const paginationSchema = Type.Object({
+    limit: Type.Optional(Type.Number({ exclusiveMinimum: 0, maximum: 1000 })),
+    offset: Type.Optional(Type.Number({ minimum: 0 }))
 })
 
-/**
- * ID parameter schema
- */
-export const idParamSchema = vine.object({
-    id: vine.number().positive().withoutDecimals()
+/** Numeric `:id` route parameter */
+export const idParamSchema = Type.Object({
+    id: Type.Integer({ minimum: 1 })
 })
 
-// ============================================
-// Assets Manager schemas
-// ============================================
+/** Asset upload body */
+export const assetUploadSchema = Type.Object({ description, source, is_public: isPublic })
 
-/**
- * Asset upload body schema
- */
-export const assetUploadSchema = vine.object({
-    description: vine.string().maxLength(1000).optional(),
-    source: vine.string().url().optional(),
-    is_public: vine.boolean().optional()
+/** Asset update body */
+export const assetUpdateSchema = Type.Object({ description, source, is_public: isPublic })
+
+/** Batch upload body */
+export const assetBatchUploadSchema = Type.Object({
+    assets: Type.Optional(Type.Array(assetUploadSchema))
 })
 
-/**
- * Asset update body schema
- */
-export const assetUpdateSchema = vine.object({
-    description: vine.string().maxLength(1000).optional(),
-    source: vine.string().url().optional(),
-    is_public: vine.boolean().optional()
+/** Presigned upload request body */
+export const presignedUploadRequestSchema = Type.Object({
+    fileName: Type.String({ maxLength: 255 }),
+    fileSize: positiveNumber,
+    contentType: Type.String(),
+    description,
+    source,
+    is_public: isPublic
 })
 
-/**
- * Batch upload body schema
- */
-export const assetBatchUploadSchema = vine.object({
-    assets: vine
-        .array(
-            vine.object({
-                description: vine.string().maxLength(1000).optional(),
-                source: vine.string().url().optional(),
-                is_public: vine.boolean().optional()
-            })
-        )
-        .optional()
+/** Custom record create body: columns are dynamic, so any property is accepted */
+export const customRecordCreateSchema = Type.Object({}, { additionalProperties: true })
+
+/** Custom record update body */
+export const customRecordUpdateSchema = Type.Object({}, { additionalProperties: true })
+
+/** Date range query parameters */
+export const dateRangeQuerySchema = Type.Object({
+    startDate: Type.Optional(Type.String()),
+    endDate: Type.Optional(Type.String()),
+    limit: Type.Optional(Type.Number({ exclusiveMinimum: 0, maximum: 1000 }))
 })
 
-// ============================================
-// Presigned upload schemas
-// ============================================
-
-/**
- * Presigned upload request body schema
- */
-export const presignedUploadRequestSchema = vine.object({
-    fileName: vine.string().maxLength(255),
-    fileSize: vine.number().positive(),
-    contentType: vine.string(),
-    description: vine.string().maxLength(1000).optional(),
-    source: vine.string().url().optional(),
-    is_public: vine.boolean().optional()
-})
-
-// ============================================
-// Custom Table Manager schemas
-// ============================================
-
-/**
- * Custom record create schema (allows passthrough for dynamic fields)
- */
-export const customRecordCreateSchema = vine.object({}).allowUnknownProperties()
-
-/**
- * Custom record update schema
- */
-export const customRecordUpdateSchema = vine.object({}).allowUnknownProperties()
-
-// ============================================
-// Query parameter schemas
-// ============================================
-
-/**
- * Date range query schema
- */
-export const dateRangeQuerySchema = vine.object({
-    startDate: vine.string().optional(),
-    endDate: vine.string().optional(),
-    limit: vine.number().positive().max(1000).optional()
-})
-
-// ============================================
-// Compiled validators (for performance)
-// ============================================
-
-export const validatePagination = vine.compile(paginationSchema)
-export const validateIdParam = vine.compile(idParamSchema)
-export const validateAssetUpload = vine.compile(assetUploadSchema)
-export const validateAssetUpdate = vine.compile(assetUpdateSchema)
-export const validateAssetBatchUpload = vine.compile(assetBatchUploadSchema)
-export const validateCustomRecordCreate = vine.compile(customRecordCreateSchema)
-export const validateCustomRecordUpdate = vine.compile(customRecordUpdateSchema)
-export const validateDateRangeQuery = vine.compile(dateRangeQuerySchema)
-export const validatePresignedUploadRequest = vine.compile(presignedUploadRequestSchema)
+export const validatePagination = Compile(paginationSchema)
+export const validateIdParam = Compile(idParamSchema)
+export const validateAssetUpload = Compile(assetUploadSchema)
+export const validateAssetUpdate = Compile(assetUpdateSchema)
+export const validateAssetBatchUpload = Compile(assetBatchUploadSchema)
+export const validateCustomRecordCreate = Compile(customRecordCreateSchema)
+export const validateCustomRecordUpdate = Compile(customRecordUpdateSchema)
+export const validateDateRangeQuery = Compile(dateRangeQuerySchema)
+export const validatePresignedUploadRequest = Compile(presignedUploadRequestSchema)

@@ -98,7 +98,6 @@
     "@cepseudo/engine": "workspace:*",
     "@cepseudo/shared": "workspace:*",
     "@cepseudo/storage": "workspace:*",
-    "@vinejs/vine": "^4.2.0",
     "bullmq": "^5.56.5",
     "compression": "^1.7.5",
     "cors": "^2.8.5",

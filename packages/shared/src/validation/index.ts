@@ -15,8 +15,11 @@ export {
     validateAssetBatchUpload,
     validateCustomRecordCreate,
     validateCustomRecordUpdate,
-    validateDateRangeQuery
+    validateDateRangeQuery,
+    presignedUploadRequestSchema,
+    validatePresignedUploadRequest
 } from './schemas.js'
 
 // Validation helpers
-export { validateData, safeValidate, validateQuery, validateParams, vine } from './validate.js'
+export { validateData, safeValidate, validateQuery, validateParams } from './validate.js'
+export type { FieldError } from './validate.js'
