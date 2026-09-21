@@ -45,7 +45,7 @@ await engine.start()
 - **BullMQ scheduling** -- cron-based and event-driven scheduling across 4 queues (collectors, harvesters, priority, uploads)
 - **HTTP server** -- Fastify 5 server with automatic endpoint registration from components
 - **Health checks** -- aggregated health status for Kubernetes readiness/liveness probes (database, Redis, storage)
-- **OpenAPI generation** -- auto-generates OpenAPI 3.0.3 specs from registered components
+- **OpenAPI document** -- generated from route schemas and component specs, served as JSON, YAML and Swagger UI
 - **Graceful shutdown** -- handles SIGTERM/SIGINT with configurable timeout and ordered resource cleanup
 - **Dynamic component loading** -- loads components from user project directories at runtime
 
@@ -135,20 +135,23 @@ The engine automatically registers health endpoints:
 - `GET /health` -- full health status (readiness probe)
 - `GET /health/live` -- lightweight liveness probe
 
-### OpenAPI spec generation
+### OpenAPI document
+
+The engine generates an OpenAPI 3.0.3 document from the registered routes with `@fastify/swagger`
+and merges each component's `getOpenAPISpec()` (summaries, tags, schemas) into it. A route's
+TypeBox `schema` wins over the component spec for the parts it declares.
+
+- `GET /api/openapi.json` and `GET /api/openapi.yaml` -- the document
+- `GET /api/docs` -- Swagger UI, when `openapi.ui` is enabled
 
 ```typescript
-import { OpenAPIGenerator } from '@cepseudo/engine'
-
-const generator = new OpenAPIGenerator({
-    title: 'My Digital Twin API',
-    version: '1.0.0',
-    description: 'Digital twin for city infrastructure'
+const engine = new DigitalTwinEngine({
+    // ...
+    openapi: {
+        info: { title: 'My Digital Twin API', version: '1.0.0' },
+        ui: true
+    }
 })
-
-// Components expose their endpoint schemas via getConfiguration()
-const spec = generator.generate(components)
-// Returns an OpenAPI 3.0.3 JSON object
 ```
 
 ### Graceful shutdown

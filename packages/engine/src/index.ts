@@ -57,5 +57,6 @@ export { GlobalAssetsHandler } from './global_assets_handler.js'
 export { loadComponents } from './loader/component_loader.js'
 export type { LoadComponentsOptions, LoadComponentsResult } from './loader/component_loader.js'
 
-// OpenAPI Generator
-export { OpenAPIGenerator } from './openapi/generator.js'
+// OpenAPI
+export { registerOpenApi } from './openapi.js'
+export type { OpenApiOptions } from './openapi.js'
