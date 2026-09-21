@@ -8,7 +8,6 @@ import {
     notFoundResponse,
     forbiddenResponse,
     safeAsync,
-    safeCleanup,
     Logger,
     parseBoolean
 } from '@cepseudo/shared'
@@ -117,6 +116,8 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
      * - Files >= 50MB: Queued for async processing (returns 202)
      */
     override async handleUpload(req: TypedRequest): Promise<DataResponse> {
+        const filePath = req?.file?.path
+        let queued = false
         try {
             if (!req?.body) {
                 return badRequestResponse('Invalid request: missing request body')
@@ -131,7 +132,6 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
             // Validate request
             const body = req.body as Record<string, string | boolean | undefined>
             const description = body.description as string | undefined
-            const filePath = req.file?.path
             const fileBuffer = req.file?.buffer
             const filename = (req.file?.originalname || body.filename) as string | undefined
             const fileSize = req.file?.size || fileBuffer?.length || 0
@@ -140,18 +140,12 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 return badRequestResponse('Missing required field: ZIP file')
             }
             if (!description) {
-                if (filePath)
-                    await safeAsync(() => fs.unlink(filePath), 'cleanup temp file on validation error', logger)
                 return badRequestResponse('Missing required field: description')
             }
             if (!filename) {
-                if (filePath)
-                    await safeAsync(() => fs.unlink(filePath), 'cleanup temp file on validation error', logger)
                 return badRequestResponse('Filename could not be determined from uploaded file')
             }
             if (!filename.toLowerCase().endsWith('.zip')) {
-                if (filePath)
-                    await safeAsync(() => fs.unlink(filePath), 'cleanup temp file on validation error', logger)
                 return badRequestResponse('Invalid file extension. Expected: .zip')
             }
 
@@ -160,13 +154,19 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
 
             // Route to async or sync based on file size and queue availability
             if (this.uploadQueue && filePath && fileSize >= ASYNC_UPLOAD_THRESHOLD) {
-                return await this.handleAsyncUpload(userId, filePath, filename, description, isPublic, config)
+                const response = await this.handleAsyncUpload(userId, filePath, filename, description, isPublic, config)
+                queued = true
+                return response
             }
 
             return await this.handleSyncUpload(userId, filePath, fileBuffer, filename, description, isPublic, config)
         } catch (error) {
-            if (req.file?.path) await safeAsync(() => fs.unlink(req.file!.path!), 'cleanup temp file on error', logger)
             return errorResponse(error)
+        } finally {
+            // The queued job reads the temp file later and removes it itself
+            if (filePath && !queued) {
+                await safeAsync(() => fs.unlink(filePath), 'cleanup temp file', logger)
+            }
         }
     }
 
@@ -244,17 +244,10 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 headers: { 'Content-Type': 'application/json' }
             }
         } catch (error) {
-            await safeCleanup(
-                [
-                    {
-                        operation: () =>
-                            recordId !== null ? this.db.delete(String(recordId), config.name) : Promise.resolve(),
-                        context: 'delete record on async upload error'
-                    },
-                    { operation: () => fs.unlink(filePath), context: 'cleanup temp file on async upload error' }
-                ],
-                logger
-            )
+            if (recordId !== null) {
+                const id = recordId
+                await safeAsync(() => this.db.delete(String(id), config.name), 'delete record on async upload error', logger)
+            }
             throw error
         }
     }
@@ -283,56 +276,48 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
             )
         }
 
-        try {
-            // Generate unique base path using timestamp
-            const basePath = `${config.name}/${Date.now()}`
+        // Generate unique base path using timestamp
+        const basePath = `${config.name}/${Date.now()}`
 
-            // Extract ZIP and upload all files to storage
-            const extractResult = await extractAndStoreArchive(zipBuffer, this.storage, basePath, config.extraction)
+        // Extract ZIP and upload all files to storage
+        const extractResult = await extractAndStoreArchive(zipBuffer, this.storage, basePath, config.extraction)
 
-            if (!extractResult.root_file) {
-                // Clean up uploaded files
-                await safeAsync(
-                    () => this.storage.deleteByPrefix(basePath),
-                    'cleanup storage on invalid tileset',
-                    logger
-                )
-                return badRequestResponse('Invalid tileset: no tileset.json found in the ZIP archive')
-            }
-
-            // Build the public URL for tileset.json
-            const tilesetPath = `${basePath}/${extractResult.root_file}`
-            const tilesetUrl = this.storage.getPublicUrl(tilesetPath)
-
-            // Save metadata to database (url = basePath for deletion)
-            const metadata: TilesetMetadataRow = {
-                name: config.name,
-                type: 'application/json',
-                url: basePath,
-                tileset_url: tilesetUrl,
-                date: new Date(),
-                description,
-                filename,
-                owner_id: userId,
-                is_public: isPublic,
-                upload_status: 'completed'
-            }
-
-            const savedRecord = await this.db.save(metadata as unknown as MetadataRow)
-
-            // Clean up temp file
-            if (filePath) await safeAsync(() => fs.unlink(filePath), 'cleanup temp file after sync upload', logger)
-
-            return successResponse({
-                message: 'Tileset uploaded successfully',
-                id: savedRecord.id,
-                tileset_url: tilesetUrl,
-                file_count: extractResult.file_count
-            })
-        } catch (error) {
-            if (filePath) await safeAsync(() => fs.unlink(filePath), 'cleanup temp file on sync upload error', logger)
-            throw error
+        if (!extractResult.root_file) {
+            // Clean up uploaded files
+            await safeAsync(
+                () => this.storage.deleteByPrefix(basePath),
+                'cleanup storage on invalid tileset',
+                logger
+            )
+            return badRequestResponse('Invalid tileset: no tileset.json found in the ZIP archive')
         }
+
+        // Build the public URL for tileset.json
+        const tilesetPath = `${basePath}/${extractResult.root_file}`
+        const tilesetUrl = this.storage.getPublicUrl(tilesetPath)
+
+        // Save metadata to database (url = basePath for deletion)
+        const metadata: TilesetMetadataRow = {
+            name: config.name,
+            type: 'application/json',
+            url: basePath,
+            tileset_url: tilesetUrl,
+            date: new Date(),
+            description,
+            filename,
+            owner_id: userId,
+            is_public: isPublic,
+            upload_status: 'completed'
+        }
+
+        const savedRecord = await this.db.save(metadata as unknown as MetadataRow)
+
+        return successResponse({
+            message: 'Tileset uploaded successfully',
+            id: savedRecord.id,
+            tileset_url: tilesetUrl,
+            file_count: extractResult.file_count
+        })
     }
 
     /**

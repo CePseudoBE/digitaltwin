@@ -98,6 +98,21 @@ test.group('AssetsManager — upload', (group) => {
         assert.equal(db.getRecordCount(), 1)
     })
 
+    test('handleUpload() removes the temp file when the request is rejected', async ({ assert }) => {
+        const { manager, db } = createManager()
+        const tempPath = '.test-assets-rejected.bin'
+        await fs.writeFile(tempPath, 'content')
+
+        const response = await manager.handleUpload({
+            body: { description: 'no source' },
+            file: { path: tempPath, originalname: 'upload.bin' }
+        })
+
+        assert.equal(response.status, 400)
+        assert.equal(db.getRecordCount(), 0)
+        assert.isFalse(await fs.access(tempPath).then(() => true, () => false))
+    })
+
     test('handleUpload() rejects request missing required fields', async ({ assert }) => {
         const { manager } = createManager()
 

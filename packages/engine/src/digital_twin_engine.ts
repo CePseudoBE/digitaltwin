@@ -158,6 +158,11 @@ export interface EngineOptions {
         /** Maximum request body size in bytes (default: 50 MiB) */
         bodyLimit?: number
     }
+    /** Multipart upload limits */
+    upload?: {
+        /** Largest file accepted on multipart routes, in bytes (default: 100 MiB) */
+        maxFileSize?: number
+    }
     /** Run after components and auth are initialised, before the server listens */
     plugins?: EnginePlugin[]
     /** OpenAPI document served at /api/openapi.json and /api/openapi.yaml */
@@ -567,7 +572,7 @@ export class DigitalTwinEngine {
         await this.#server.register(cors, this.#corsOptions())
         await registerOpenApi(this.#server, this.#allComponents, this.#options.openapi)
 
-        await exposeEndpoints(this.#server, this.#allComponents, { authMiddleware })
+        await exposeEndpoints(this.#server, this.#allComponents, { authMiddleware, maxFileSize: this.#options.upload?.maxFileSize })
 
         // Setup component scheduling with queue manager (only if we have active components)
         if (this.#activeComponents.length > 0 && this.#queueManager) {
