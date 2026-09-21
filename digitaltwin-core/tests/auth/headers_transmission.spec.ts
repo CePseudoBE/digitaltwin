@@ -29,7 +29,7 @@ class HeaderTestAssetsManager extends AssetsManager {
   }
 }
 
-test.group('Headers Transmission via ultimate-express', group => {
+test.group('Headers Transmission through the HTTP layer', group => {
     // Some tests in this group require auth to be enabled
     group.setup(() => {
         delete process.env.DIGITALTWIN_DISABLE_AUTH
@@ -49,7 +49,7 @@ test.group('Headers Transmission via ultimate-express', group => {
     const assetsManager = new HeaderTestAssetsManager()
     assetsManager.setDependencies(db, storage)
 
-    // Simulate request object as received by ultimate-express
+    // Simulate the request object as the engine builds it
     const mockRequest = {
       headers: {
         'host': 'apisix:9080',
@@ -177,7 +177,7 @@ test.group('Ultimate-Express Integration Simulation', (group) => {
   })
 
   test('simulate complete flow from HTTP request to AssetsManager', async ({ assert }) => {
-    // This simulates what ultimate-express does
+    // This simulates what the engine does
     const incomingHttpHeaders = {
       'host': 'apisix:9080',
       'x-real-ip': '172.18.0.2',
@@ -189,8 +189,8 @@ test.group('Ultimate-Express Integration Simulation', (group) => {
       'content-type': 'application/json'
     }
 
-    // Ultimate-express creates request object like this
-    const expressRequestObject = {
+    // The engine builds the request object like this
+    const requestObject = {
       headers: incomingHttpHeaders,
       body: { description: 'Test', source: 'https://example.com' },
       params: {},
@@ -204,7 +204,7 @@ test.group('Ultimate-Express Integration Simulation', (group) => {
     assetsManager.setDependencies(db, storage)
 
     // This is what happens inside the handler
-    const result = await assetsManager.testHeaderAccess(expressRequestObject)
+    const result = await assetsManager.testHeaderAccess(requestObject)
 
     // Verify all APISIX headers are available
     assert.equal(result.userId, '6e06a527-a89d-4390-95cd-10ae63cfc939')
@@ -214,7 +214,7 @@ test.group('Ultimate-Express Integration Simulation', (group) => {
     
     // Verify ApisixAuthParser can parse them
     const { ApisixAuthParser } = await import('../../src/auth/apisix_parser.js')
-    const authUser = ApisixAuthParser.parseAuthHeaders(expressRequestObject.headers)
+    const authUser = ApisixAuthParser.parseAuthHeaders(requestObject.headers)
     
     assert.isNotNull(authUser)
     assert.equal(authUser!.id, '6e06a527-a89d-4390-95cd-10ae63cfc939')

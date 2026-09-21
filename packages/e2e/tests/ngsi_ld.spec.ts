@@ -21,8 +21,6 @@ import type { NgsiLdHandle } from '@cepseudo/ngsi-ld'
 import { setupInfrastructure, type E2EInfrastructure } from './helpers/setup.js'
 import { NgsiLdWeatherCollector } from './helpers/test_components.js'
 
-const ENGINE_PORT = 19878
-
 // ── Webhook server helper ─────────────────────────────────────────────────────
 
 interface WebhookServer {
@@ -98,7 +96,7 @@ test.group('NGSI-LD E2E — engine + real HTTP', group => {
                 host: redis.getHost(),
                 port: redis.getMappedPort(6379),
             },
-            server: { port: ENGINE_PORT },
+            server: { port: 0 },
             logging: { level: LogLevel.SILENT },
             queues: { multiQueue: true },
             // Explicitly register the NGSI-LD plugin: pnpm strict isolation prevents the engine's
@@ -122,7 +120,7 @@ test.group('NGSI-LD E2E — engine + real HTTP', group => {
         // DIGITALTWIN_DISABLE_AUTH is already set to 'true' by setupInfrastructure()
         await engine.start()
 
-        baseUrl = `http://localhost:${ENGINE_PORT}`
+        baseUrl = `http://127.0.0.1:${engine.getPort()}`
     })
 
     group.teardown(async () => {

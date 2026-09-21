@@ -45,7 +45,7 @@ test.group('Engine Authentication Integration', () => {
       database: db,
       storage: storage,
       assetsManagers: [assetsManager],
-      server: { port: 3001 },
+      server: { port: 0 },
       queues: { multiQueue: false, workers: { collectors: 1, harvesters: 1 } }
     })
 
@@ -94,7 +94,7 @@ test.group('Engine Authentication Integration', () => {
       database: db,
       storage: storage,
       assetsManagers: [assetsManager],
-      server: { port: 3002 },
+      server: { port: 0 },
       queues: { multiQueue: false, workers: { collectors: 1, harvesters: 1 } },
       dryRun: true
     })

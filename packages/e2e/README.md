@@ -53,7 +53,7 @@ Each test group starts its own PostgreSQL and MinIO infrastructure, injects depe
 
 | File                          | Description                                                                                      |
 |-------------------------------|--------------------------------------------------------------------------------------------------|
-| `http_integration.spec.ts`    | Boots a full `DigitalTwinEngine` with Express, Redis queues, and registered components. Sends real HTTP requests with `x-user-id` / `x-user-roles` headers (simulating the APISIX gateway) and validates status codes, response bodies, and ownership enforcement (401, 403, 404). |
+| `http_integration.spec.ts`    | Boots a full `DigitalTwinEngine` on its Fastify server with Redis queues and registered components. Sends real HTTP requests with `x-user-id` / `x-user-roles` headers (simulating the APISIX gateway) and validates status codes, response bodies, and ownership enforcement (401, 403, 404). |
 
 ## Running tests
 
