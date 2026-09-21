@@ -22,3 +22,5 @@ export {
 // Validation helpers
 export { validateData, safeValidate, validateQuery, validateParams } from './validate.js'
 export type { FieldError } from './validate.js'
+export { Type } from './validate.js'
+export type { Static } from './validate.js'
