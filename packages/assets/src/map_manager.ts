@@ -1,6 +1,6 @@
-import { AssetsManager } from './assets_manager.js'
+import { AssetsManager, type AssetsEndpoint } from './assets_manager.js'
 import type { DataResponse, TypedRequest, DataRecord } from '@cepseudo/shared'
-import { sanitizeFilename } from '@cepseudo/shared'
+import { mapLayerUploadSchema, sanitizeFilename } from '@cepseudo/shared'
 
 /**
  * Extended metadata for map layer assets
@@ -39,6 +39,14 @@ export interface MapLayerMetadataRow {
  * - GET /{name}/:id/download - Download layer data
  */
 export abstract class MapManager extends AssetsManager {
+    /** The upload route receives a JSON layer instead of a multipart file, so it gets a body schema. */
+    override getEndpoints(): AssetsEndpoint[] {
+        const uploadPath = `/${this.getConfiguration().endpoint}`
+        return super.getEndpoints().map(endpoint =>
+            endpoint.method === 'post' && endpoint.path === uploadPath ? { ...endpoint, schema: { body: mapLayerUploadSchema } } : endpoint
+        )
+    }
+
     /**
      * Override the upload handler to process JSON layer objects instead of files.
      *

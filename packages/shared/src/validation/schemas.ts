@@ -38,6 +38,13 @@ export const presignedUploadRequestSchema = Type.Object({
     is_public: isPublic
 })
 
+/** Map layer upload body: the layer is any JSON object, analysed by the map manager */
+export const mapLayerUploadSchema = Type.Object({
+    layer: Type.Object({}, { additionalProperties: true }),
+    description: Type.Optional(Type.String({ maxLength: 1000 })),
+    source: Type.Optional(Type.String())
+})
+
 /** Custom record create body: columns are dynamic, so any property is accepted */
 export const customRecordCreateSchema = Type.Object({}, { additionalProperties: true })
 
