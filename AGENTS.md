@@ -382,7 +382,7 @@ knex                      Database query builder (PostgreSQL, SQLite)
 @aws-sdk/s3-request-presigner  Presigned URL generation
 multer                    File upload handling (legacy, replaced by presigned URLs for large files)
 jsonwebtoken              JWT validation
-@vinejs/vine              Input validation
+typebox                   Input validation (JSON Schema, shared with Fastify routes and OpenAPI)
 jszip                     ZIP handling for tilesets
 cors                      CORS middleware
 lodash/debounce           Utility
