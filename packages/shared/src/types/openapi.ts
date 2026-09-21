@@ -163,24 +163,6 @@ export interface OpenAPIComponentSpec {
 }
 
 /**
- * Options for OpenAPI generation
- */
-export interface OpenAPIGeneratorOptions {
-    /** API information */
-    info: OpenAPIInfo
-    /** Server URLs */
-    servers?: OpenAPIServer[]
-    /** Components to document */
-    components: OpenAPIDocumentable[]
-    /** Additional schemas to merge (e.g., from external file) */
-    additionalSchemas?: Record<string, OpenAPISchema>
-    /** Additional tags to include */
-    additionalTags?: OpenAPITag[]
-    /** Include security scheme for authentication */
-    includeAuth?: boolean
-}
-
-/**
  * Interface for components that can provide OpenAPI documentation
  */
 export interface OpenAPIDocumentable {

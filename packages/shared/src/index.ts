@@ -123,7 +123,6 @@ export type {
     OpenAPIComponents,
     OpenAPIDocument,
     OpenAPIComponentSpec,
-    OpenAPIGeneratorOptions,
     OpenAPIDocumentable
 } from './types/openapi.js'
 export { isOpenAPIDocumentable } from './types/openapi.js'

@@ -26,6 +26,7 @@ import { UserService, AuthMiddleware } from '@cepseudo/auth'
 import { exposeEndpoints } from './endpoints.js'
 import { registerErrorHandler, registerRequestLogging } from './error_handler.js'
 import { createLegacyRouter, type LegacyRouter } from './legacy_router.js'
+import { registerOpenApi, type OpenApiOptions } from './openapi.js'
 import { scheduleComponents } from './scheduler.js'
 import { LogLevel, engineEventBus } from '@cepseudo/shared'
 import type { QueueConfig } from './queue_manager.js'
@@ -159,6 +160,8 @@ export interface EngineOptions {
     }
     /** Run after components and auth are initialised, before the server listens */
     plugins?: EnginePlugin[]
+    /** OpenAPI document served at /api/openapi.json and /api/openapi.yaml */
+    openapi?: OpenApiOptions
     /** Logging configuration */
     logging?: {
         /** Log level (default: LogLevel.INFO) */
@@ -562,6 +565,7 @@ export class DigitalTwinEngine {
             await this.#server.register(compress, { threshold: 1024 })
         }
         await this.#server.register(cors, this.#corsOptions())
+        await registerOpenApi(this.#server, this.#allComponents, this.#options.openapi)
 
         await exposeEndpoints(this.#server, this.#allComponents, { authMiddleware })
 

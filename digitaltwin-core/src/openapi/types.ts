@@ -15,7 +15,6 @@ export type {
     OpenAPIComponents,
     OpenAPIDocument,
     OpenAPIComponentSpec,
-    OpenAPIGeneratorOptions,
     OpenAPIDocumentable
 } from '@cepseudo/shared'
 export { isOpenAPIDocumentable } from '@cepseudo/shared'

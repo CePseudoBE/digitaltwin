@@ -479,20 +479,8 @@ engine.removeHealthCheck('external-api')
 
 ### OpenAPI Specification
 
-Generate OpenAPI 3.0 specs from your components:
-
-```typescript
-import { OpenAPIGenerator } from 'digitaltwin-core'
-
-const spec = OpenAPIGenerator.generate({
-  info: { title: 'My API', version: '1.0.0' },
-  components: [collector, assetsManager, handler]
-})
-
-// Output as JSON or YAML
-const json = OpenAPIGenerator.toJSON(spec)
-const yaml = OpenAPIGenerator.toYAML(spec)
-```
+The engine serves the generated document at `GET /api/openapi.json` and `GET /api/openapi.yaml`
+(see the `openapi` option of `DigitalTwinEngine`).
 
 ## Server Configuration
 

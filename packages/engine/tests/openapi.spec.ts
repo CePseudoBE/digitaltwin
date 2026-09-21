@@ -1,171 +1,166 @@
 import { test } from '@japa/runner'
-import { OpenAPIGenerator } from '../src/openapi/generator.js'
-import type { OpenAPIDocumentable, OpenAPIComponentSpec } from '@cepseudo/shared'
+import { Validator } from '@seriousme/openapi-schema-validator'
+import { parse } from 'yaml'
+import { Type } from 'typebox'
+import { Handler } from '@cepseudo/components'
+import { LogLevel, servableEndpoint } from '@cepseudo/shared'
+import type { ComponentConfiguration, DataResponse, OpenAPIComponentSpec, TypedRequest } from '@cepseudo/shared'
+import type { EngineOptions } from '../src/digital_twin_engine.js'
+import { DigitalTwinEngine } from '../src/digital_twin_engine.js'
+import { TestCustomTableManager } from './fixtures/mock_components.js'
+import { MockDatabaseAdapter } from './fixtures/mock_database.js'
+import { MockStorageService } from './fixtures/mock_storage.js'
 
-class MockDocumentable implements OpenAPIDocumentable {
-    constructor(private spec: OpenAPIComponentSpec) {}
-    getOpenAPISpec() { return this.spec }
+interface Operation {
+    summary?: string
+    tags?: string[]
+    parameters?: Array<{ name: string; in: string }>
+    requestBody?: { content: Record<string, { schema: { properties?: Record<string, { type: string }> } }> }
+    responses: Record<string, { description: string }>
 }
 
-class FailingDocumentable implements OpenAPIDocumentable {
-    getConfiguration() { return { name: 'failing' } }
-    getOpenAPISpec(): OpenAPIComponentSpec { throw new Error('Spec generation failed') }
+interface Document {
+    openapi: string
+    info: { title: string }
+    paths: Record<string, Record<string, Operation>>
+    tags: Array<{ name: string }>
+    components: { schemas: Record<string, unknown>; securitySchemes: Record<string, unknown> }
 }
 
-test.group('OpenAPIGenerator.generate', () => {
-    test('produces valid OpenAPI 3.0.3 document', ({ assert }) => {
-        const doc = OpenAPIGenerator.generate({
-            info: { title: 'My API', version: '2.0.0' },
-            components: []
+class CalculatorHandler extends Handler {
+    getConfiguration(): ComponentConfiguration {
+        return { name: 'calc', description: 'Calculator', contentType: 'application/json' }
+    }
+
+    @servableEndpoint({
+        path: '/calc/sum',
+        method: 'post',
+        schema: {
+            body: Type.Object({ a: Type.Number(), b: Type.Number() }),
+            response: { 200: Type.Object({ sum: Type.Number() }) }
+        }
+    })
+    async sum(req: TypedRequest): Promise<DataResponse> {
+        const { a, b } = req.body as { a: number; b: number }
+        return { status: 200, content: JSON.stringify({ sum: a + b }), headers: { 'Content-Type': 'application/json' } }
+    }
+
+    @servableEndpoint({ path: '/calc/:id', method: 'get' })
+    async get(): Promise<DataResponse> {
+        return { status: 200, content: '{}', headers: { 'Content-Type': 'application/json' } }
+    }
+
+    override getOpenAPISpec(): OpenAPIComponentSpec {
+        return {
+            paths: {
+                '/calc/sum': {
+                    post: {
+                        summary: 'Add two numbers',
+                        tags: ['Calculator'],
+                        requestBody: { content: { 'text/plain': { schema: { type: 'string' } } } },
+                        responses: { '418': { description: 'Never generated' } }
+                    }
+                },
+                '/calc/{id}': {
+                    get: {
+                        summary: 'Authored parameters',
+                        parameters: [{ name: 'id', in: 'path', required: true, description: 'Authored', schema: { type: 'integer' } }],
+                        responses: { '200': { description: 'Authored response' } }
+                    }
+                },
+                '/calc/extra': {
+                    get: { summary: 'Documented without a route', responses: { '200': { description: 'OK' } } }
+                }
+            },
+            tags: [{ name: 'Calculator' }]
+        }
+    }
+}
+
+async function withEngine(options: Partial<EngineOptions>, run: (engine: DigitalTwinEngine) => Promise<void>): Promise<void> {
+    const engine = new DigitalTwinEngine({
+        database: new MockDatabaseAdapter(),
+        storage: new MockStorageService(),
+        logging: { level: LogLevel.SILENT },
+        server: { port: 0 },
+        ...options
+    })
+    await engine.start()
+    try {
+        await run(engine)
+    } finally {
+        await engine.stop()
+    }
+}
+
+const components: Partial<EngineOptions> = {
+    handlers: [new CalculatorHandler()],
+    customTableManagers: [new TestCustomTableManager('sensors')]
+}
+
+test.group('OpenAPI document', () => {
+    test('validates against the OpenAPI 3 schema', async ({ assert }) => {
+        await withEngine(components, async engine => {
+            const res = await engine.inject('/api/openapi.json')
+            assert.equal(res.statusCode, 200)
+            const result = await new Validator().validate(res.json())
+            assert.isTrue(result.valid, JSON.stringify(result.errors, null, 2))
         })
-
-        assert.equal(doc.openapi, '3.0.3')
-        assert.equal(doc.info.title, 'My API')
-        assert.deepEqual(doc.paths, {})
     })
 
-    test('aggregates paths, tags, and schemas from components', ({ assert }) => {
-        const comp = new MockDocumentable({
-            paths: { '/items': { get: { summary: 'List', responses: { '200': { description: 'OK' } } } } },
-            tags: [{ name: 'Items', description: 'Item endpoints' }],
-            schemas: { Item: { type: 'object', properties: { id: { type: 'integer' } } } }
+    test('merges component specs into the generated routes', async ({ assert }) => {
+        await withEngine(components, async engine => {
+            const doc = (await engine.inject('/api/openapi.json')).json() as Document
+
+            assert.equal(doc.paths['/sensors'].get.summary, 'List all sensors records')
+            assert.deepEqual(doc.paths['/sensors'].get.tags, ['sensors'])
+            assert.isDefined(doc.paths['/sensors'].post.requestBody?.content['application/json'])
+            assert.isDefined(doc.paths['/sensors/{id}'].get)
+            assert.isDefined(doc.components.schemas.sensorsRecord)
+            assert.isDefined(doc.components.securitySchemes.ApiKeyAuth)
+            assert.equal(doc.paths['/calc/extra'].get.summary, 'Documented without a route')
+            assert.deepEqual(doc.tags.map(tag => tag.name), ['Calculator', 'sensors'])
+            assert.isUndefined(doc.paths['/api/openapi.json'])
         })
+    })
 
-        const doc = OpenAPIGenerator.generate({
-            info: { title: 'T', version: '1.0.0' },
-            components: [comp]
+    test('route schemas win over the component spec for what they declare', async ({ assert }) => {
+        await withEngine(components, async engine => {
+            const doc = (await engine.inject('/api/openapi.json')).json() as Document
+
+            const sum = doc.paths['/calc/sum'].post
+            assert.equal(sum.summary, 'Add two numbers')
+            assert.equal(sum.requestBody?.content['application/json'].schema.properties?.a.type, 'number')
+            assert.isUndefined(sum.requestBody?.content['text/plain'])
+            assert.isDefined(sum.responses['200'])
+            assert.isUndefined(sum.responses['418'])
+
+            const get = doc.paths['/calc/{id}'].get
+            assert.equal(get.parameters?.[0].name, 'id')
+            assert.equal(get.responses['200'].description, 'Authored response')
         })
-
-        assert.isDefined(doc.paths['/items']?.get)
-        assert.equal(doc.tags![0].name, 'Items')
-        assert.isDefined(doc.components?.schemas?.Item)
     })
 
-    test('merges operations on same path from different components', ({ assert }) => {
-        const comp1 = new MockDocumentable({ paths: { '/x': { get: { summary: 'GET', responses: {} } } } })
-        const comp2 = new MockDocumentable({ paths: { '/x': { post: { summary: 'POST', responses: {} } } } })
-
-        const doc = OpenAPIGenerator.generate({
-            info: { title: 'T', version: '1.0.0' },
-            components: [comp1, comp2]
+    test('serves YAML and honours the info option', async ({ assert }) => {
+        await withEngine({ ...components, openapi: { info: { title: 'Twin', version: '2.0.0' } } }, async engine => {
+            const res = await engine.inject('/api/openapi.yaml')
+            assert.equal(res.statusCode, 200)
+            assert.include(res.headers['content-type'], 'application/yaml')
+            const doc = parse(res.body) as Document
+            assert.equal(doc.openapi, '3.0.3')
+            assert.equal(doc.info.title, 'Twin')
+            assert.isDefined(doc.paths['/calc/sum'])
         })
-
-        assert.isDefined(doc.paths['/x'].get)
-        assert.isDefined(doc.paths['/x'].post)
     })
 
-    test('deduplicates tags', ({ assert }) => {
-        const comp = new MockDocumentable({ paths: {}, tags: [{ name: 'Dup' }] })
-        const doc = OpenAPIGenerator.generate({
-            info: { title: 'T', version: '1.0.0' },
-            components: [comp],
-            additionalTags: [{ name: 'Dup', description: 'duplicate' }]
+    test('Swagger UI is served only when enabled', async ({ assert }) => {
+        await withEngine({}, async engine => {
+            assert.equal((await engine.inject('/api/docs/')).statusCode, 404)
         })
-
-        assert.equal(doc.tags!.filter(t => t.name === 'Dup').length, 1)
-    })
-
-    test('sorts tags alphabetically', ({ assert }) => {
-        const c1 = new MockDocumentable({ paths: {}, tags: [{ name: 'Zebra' }] })
-        const c2 = new MockDocumentable({ paths: {}, tags: [{ name: 'Alpha' }] })
-
-        const doc = OpenAPIGenerator.generate({
-            info: { title: 'T', version: '1.0.0' },
-            components: [c1, c2]
+        await withEngine({ openapi: { ui: true } }, async engine => {
+            const res = await engine.inject('/api/docs/')
+            assert.equal(res.statusCode, 200)
+            assert.include(res.headers['content-type'], 'text/html')
         })
-
-        assert.equal(doc.tags![0].name, 'Alpha')
-        assert.equal(doc.tags![1].name, 'Zebra')
-    })
-
-    test('filters out non-documentable components', ({ assert }) => {
-        const documentable = new MockDocumentable({ paths: { '/ok': { get: { responses: {} } } } })
-        const plain = { getConfiguration: () => ({ name: 'plain' }) }
-
-        const doc = OpenAPIGenerator.generate({
-            info: { title: 'T', version: '1.0.0' },
-            components: [documentable, plain as any]
-        })
-
-        assert.equal(Object.keys(doc.paths).length, 1)
-    })
-
-    test('skips components that throw and keeps others', ({ assert }) => {
-        const failing = new FailingDocumentable()
-        const working = new MockDocumentable({ paths: { '/ok': { get: { responses: {} } } } })
-
-        const doc = OpenAPIGenerator.generate({
-            info: { title: 'T', version: '1.0.0' },
-            components: [failing, working]
-        })
-
-        assert.isDefined(doc.paths['/ok'])
-    })
-
-    test('includes default auth security schemes', ({ assert }) => {
-        const doc = OpenAPIGenerator.generate({
-            info: { title: 'T', version: '1.0.0' },
-            components: []
-        })
-
-        assert.isDefined(doc.components?.securitySchemes?.ApiKeyAuth)
-    })
-
-    test('excludes auth when includeAuth is false', ({ assert }) => {
-        const doc = OpenAPIGenerator.generate({
-            info: { title: 'T', version: '1.0.0' },
-            components: [],
-            includeAuth: false
-        })
-
-        assert.isUndefined(doc.components)
-    })
-})
-
-test.group('OpenAPIGenerator serialization', () => {
-    test('toJSON produces valid parseable JSON', ({ assert }) => {
-        const doc = OpenAPIGenerator.generate({ info: { title: 'T', version: '1' }, components: [] })
-        const json = OpenAPIGenerator.toJSON(doc)
-        const parsed = JSON.parse(json)
-        assert.equal(parsed.openapi, '3.0.3')
-    })
-
-    test('toYAML produces valid YAML output', ({ assert }) => {
-        const doc = OpenAPIGenerator.generate({ info: { title: 'Test API', version: '1' }, components: [] })
-        const yaml = OpenAPIGenerator.toYAML(doc)
-        assert.include(yaml, 'openapi:')
-        assert.include(yaml, 'title: Test API')
-    })
-
-    test('toYAML quotes strings containing special characters', ({ assert }) => {
-        const doc = OpenAPIGenerator.generate({ info: { title: 'Test: Special', version: '1' }, components: [] })
-        const yaml = OpenAPIGenerator.toYAML(doc)
-        assert.include(yaml, '"Test: Special"')
-    })
-})
-
-test.group('OpenAPIGenerator helpers', () => {
-    test('schemaRef creates $ref path', ({ assert }) => {
-        assert.deepEqual(OpenAPIGenerator.schemaRef('User'), { $ref: '#/components/schemas/User' })
-    })
-
-    test('successResponse creates 200 response with schema', ({ assert }) => {
-        const resp = OpenAPIGenerator.successResponse('application/json', { type: 'object' }, 'All good')
-        assert.equal(resp['200'].description, 'All good')
-        assert.isDefined(resp['200'].content['application/json'])
-    })
-
-    test('errorResponses creates responses for specified codes', ({ assert }) => {
-        const resp = OpenAPIGenerator.errorResponses([401, 404])
-        assert.equal(resp['401'].description, 'Unauthorized')
-        assert.equal(resp['404'].description, 'Not found')
-        assert.isUndefined(resp['400'])
-    })
-
-    test('commonSchemas includes Error and GeoJSON types', ({ assert }) => {
-        assert.isDefined(OpenAPIGenerator.commonSchemas.Error)
-        assert.isDefined(OpenAPIGenerator.commonSchemas.Point)
-        assert.isDefined(OpenAPIGenerator.commonSchemas.Feature)
-        assert.isDefined(OpenAPIGenerator.commonSchemas.FeatureCollection)
     })
 })
