@@ -1,6 +1,12 @@
-{{#expect name, className, endpoint, description, tags, method}}
-import { Handler, servableEndpoint } from 'digitaltwin-core'
-import type { DataResponse } from 'digitaltwin-core'
+{{#expect name, className, variableName, endpoint, description, tags, method, schemaKey, inputField}}
+import { Handler, servableEndpoint, Type } from 'digitaltwin-core'
+import type { DataResponse, Static, TypedRequest } from 'digitaltwin-core'
+
+/** Validated by the engine before handleRequest runs (400 on mismatch) and published in the OpenAPI document */
+const {{ variableName }}Input = Type.Object({
+  // TODO: describe the fields your endpoint accepts
+  example: Type.Optional(Type.String())
+})
 
 {{#if description}}
 /**
@@ -17,11 +23,15 @@ export class {{ className }} extends Handler {
       tags: [{{#each tags as tag, index}}'{{ tag }}'{{#if index < tags.length - 1}}, {{/if}}{{/each}}]
     }
   }
-  
-  @servableEndpoint({ path: '/api/{{ endpoint }}', method: '{{ method }}' })
-  async handleRequest(): Promise<DataResponse> {
+
+  @servableEndpoint({ path: '/api/{{ endpoint }}', method: '{{ method }}', schema: { {{ schemaKey }}: {{ variableName }}Input } })
+  async handleRequest(req: TypedRequest): Promise<DataResponse> {
+    const input = req.{{ inputField }} as Static<typeof {{ variableName }}Input>
     // TODO: Implement your endpoint logic here
-    // This method will be available at {{ method | upper }} /api/{{ endpoint }}
-    throw new Error('Handler endpoint not implemented')
+    return {
+      status: 200,
+      content: JSON.stringify({ received: input }),
+      headers: { 'Content-Type': 'application/json' }
+    }
   }
 }

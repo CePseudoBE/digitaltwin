@@ -63,12 +63,16 @@ export class MakeHandlerCommand extends BaseCommand {
       const endpointName = this.endpoint || StringUtils.toKebabCase(this.name)
       const methodName = (this.method || 'get').toLowerCase()
 
+      // GET and DELETE carry their input in the query string, the other methods in the body
+      const inputField = methodName === 'get' || methodName === 'delete' ? 'query' : 'body'
       const templateData = {
         name: this.name,
         description: this.componentDescription || `HTTP handler for ${this.name}`,
         method: methodName,
         tags: [],
         endpoint: endpointName,
+        schemaKey: inputField === 'query' ? 'querystring' : 'body',
+        inputField,
       }
 
       if (this.dryRun) {
@@ -84,6 +88,7 @@ export class MakeHandlerCommand extends BaseCommand {
 
       this.success(`Generated handler: ${path.relative(process.cwd(), filePath)}`)
       this.info(`Handler will be available at ${methodName.toUpperCase()} /api/${endpointName}`)
+      this.info('Its TypeBox schema is validated by the engine and published in the OpenAPI document')
       this.info('Remember to add it to your DigitalTwinEngine configuration!')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)

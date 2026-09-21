@@ -50,10 +50,10 @@ export class StubGenerator {
     const render = compile(template, { loose: true })
     
     // Add naming utilities to template data
+    // Naming variants are defaults: a value the command passes explicitly (an --endpoint flag) wins
     const templateData = {
-      ...data,
-      // Generate all naming variants if name is provided
       ...(data.name ? StringUtils.generateNamingVariants(data.name) : {}),
+      ...data,
       // Helper functions available in templates
       helpers: {
         pascalCase: StringUtils.toPascalCase,

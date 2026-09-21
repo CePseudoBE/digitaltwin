@@ -45,12 +45,15 @@
   },
   "dependencies": {
     "@adonisjs/ace": "^13.4.0",
-    "tempura": "^0.4.1",
-    "fs-extra": "^11.3.0"
+    "fs-extra": "^11.3.0",
+    "tempura": "^0.4.1"
   },
   "devDependencies": {
-    "@japa/runner": "^4.3.0",
+    "@cepseudo/engine": "workspace:*",
     "@japa/assert": "^4.1.0",
-    "@types/fs-extra": "^11.0.4"
+    "@japa/runner": "^4.3.0",
+    "@types/fs-extra": "^11.0.4",
+    "digitaltwin-core": "workspace:*",
+    "fastify": "^5.12.5"
   }
 }
