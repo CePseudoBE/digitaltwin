@@ -105,30 +105,56 @@ Handlers expose stateless HTTP endpoints. They do not write to the database and 
 
 ```typescript
 import { Handler } from '@cepseudo/components'
-import { servableEndpoint } from '@cepseudo/shared'
-import type { ComponentConfiguration, DataResponse } from '@cepseudo/shared'
+import { servableEndpoint, Type } from '@cepseudo/shared'
+import type { ComponentConfiguration, DataResponse, Static, TypedRequest } from '@cepseudo/shared'
 
-class HealthHandler extends Handler {
+const sumInput = Type.Object({ a: Type.Number(), b: Type.Number() })
+
+class CalculatorHandler extends Handler {
   getConfiguration(): ComponentConfiguration {
     return {
-      name: 'health-handler',
-      type: 'handler',
+      name: 'calculator',
+      description: 'Adds numbers',
       contentType: 'application/json'
     }
   }
 
-  @servableEndpoint({ path: '/health', method: 'get' })
-  async checkHealth(): Promise<DataResponse> {
+  @servableEndpoint({ path: '/calc/sum', method: 'post', schema: { body: sumInput } })
+  async sum(req: TypedRequest): Promise<DataResponse> {
+    const { a, b } = req.body as Static<typeof sumInput>
     return {
       status: 200,
-      content: JSON.stringify({
-        status: 'ok',
-        uptime: process.uptime()
-      })
+      content: JSON.stringify({ sum: a + b }),
+      headers: { 'Content-Type': 'application/json' }
     }
   }
 }
 ```
+
+#### The request contract
+
+Every endpoint handler receives a `TypedRequest` and returns a `DataResponse`. Both are plain
+objects defined in `@cepseudo/shared`, so a component never imports the HTTP framework.
+
+| `TypedRequest` field | Content |
+|---|---|
+| `params` | Path parameters (`/things/:id` gives `{ id }`) |
+| `query` | Query string, values as strings unless a `querystring` schema converts them |
+| `body` | Parsed JSON body, or the text fields of a multipart form |
+| `headers` | Request headers |
+| `user` | The caller identified from the headers, `undefined` for anonymous requests |
+| `file` | Metadata and temp path of an uploaded file on multipart routes |
+
+`DataResponse` is `{ status, content, headers? }`: the engine writes it back as-is.
+
+The optional `schema` on `@servableEndpoint` takes JSON Schema for `params`, `querystring`, `body`
+and `response`. Write it with the `Type` builder exported by `@cepseudo/shared`. The engine validates
+the request before the handler runs, answers `400` with a structured error on mismatch, converts
+`params` and `querystring` values to the declared types, and publishes the schema in the OpenAPI
+document served at `/api/openapi.json`.
+
+Deliberately not exposed: the raw framework request and reply, streams, and sockets. A component
+that needs them belongs in the engine or in a Fastify plugin registered through `engine.getServer()`.
 
 ### CustomTableManager
 
@@ -182,8 +208,8 @@ getConfiguration(): StoreConfiguration {
   }
 }
 
-async handleGetByType(req: any): Promise<DataResponse> {
-  const type = req.query?.type
+async handleGetByType(req: TypedRequest): Promise<DataResponse> {
+  const type = req.query.type
   const records = await this.findByColumn('type', type)
   return {
     status: 200,
