@@ -7,7 +7,7 @@ import type { Kysely } from 'kysely'
 
 function registerUserRepositoryTests(label: string, factory: KyselyFactory) {
     test.group(`KyselyUserRepository [${label}]`, group => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         let db: Kysely<any>
         let dialect: 'postgres' | 'sqlite'
         let cleanup: () => Promise<void>

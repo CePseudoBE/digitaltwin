@@ -162,7 +162,7 @@ export abstract class MapManager extends AssetsManager {
      * @param layer - The layer object to analyze
      * @returns Layer metadata information
      */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     private analyzeLayerContent(layer: Record<string, any>): {
         layer_type: string
         layer_name: string

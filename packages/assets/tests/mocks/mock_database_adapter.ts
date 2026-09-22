@@ -238,7 +238,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
     async ensureColumns(_tableName: string, _columns: Record<string, string>): Promise<void> {}
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     async findByConditions(tableName: string, conditions: Record<string, any>): Promise<DataRecord[]> {
         return Array.from(this.records.values())
             .filter(record => {
@@ -255,7 +255,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
             .sort((a, b) => b.date.getTime() - a.date.getTime())
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     async updateById(tableName: string, id: number, data: Record<string, any>): Promise<void> {
         const record = this.records.get(id.toString())
         if (record && record.name === tableName) {
@@ -267,7 +267,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
     async migrateTableSchema(_name: string): Promise<string[]> { return [] }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     async findCustomTableRecords(tableName: string, conditions?: Record<string, any>): Promise<any[]> {
         return Array.from(this.records.values())
             .filter(record => {
@@ -280,18 +280,18 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
             })
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     async getCustomTableRecordById(tableName: string, id: number): Promise<any | null> {
         const record = this.records.get(id.toString())
         if (record && record.name === tableName) return record
         return null
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     async insertCustomTableRecord(tableName: string, data: Record<string, any>): Promise<number> {
         const id = Math.floor(Date.now() + this.idCounter++)
         const now = new Date()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const record = {
             id, name: tableName, ...data,
             created_at: now, updated_at: now, date: now,

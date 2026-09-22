@@ -816,7 +816,7 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
             const isNotNull = lower.includes('not null')
 
             await this.#knex.schema.alterTable(tableName, table => {
-                let col: any
+                let col: Knex.ColumnBuilder
                 if (lower.includes('integer')) col = table.integer(colName)
                 else if (lower.includes('boolean')) col = table.boolean(colName)
                 else if (lower.includes('timestamp') || lower.includes('datetime')) col = table.timestamp(colName)
@@ -826,10 +826,10 @@ export class KnexDatabaseAdapter extends DatabaseAdapter {
                     col = varchMatch ? table.string(colName, parseInt(varchMatch[1])) : table.text(colName)
                 }
 
-                col = col.nullable()
+                col.nullable()
                 if (isNotNull) {
                     const implicitDefault = (lower.includes('integer') || lower.includes('boolean')) ? 0 : ''
-                    col = col.notNullable().defaultTo(implicitDefault)
+                    col.notNullable().defaultTo(implicitDefault)
                 }
             })
         }

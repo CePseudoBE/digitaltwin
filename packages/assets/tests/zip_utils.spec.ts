@@ -103,7 +103,7 @@ test.group('extractZipContentStream', () => {
         const corruptBuffer = Buffer.from('this is not a zip file at all')
 
         await assert.rejects(async () => {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+             
             for await (const _entry of extractZipContentStream(corruptBuffer)) {
                 // should not reach here
             }

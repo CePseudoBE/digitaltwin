@@ -687,7 +687,7 @@ test.group('TilesetManager — async upload queue', () => {
 
         assert.isFalse(manager.hasUploadQueue())
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const mockQueue = { add: async () => ({ id: 'job-1' }) } as any
         manager.setUploadQueue(mockQueue)
 
