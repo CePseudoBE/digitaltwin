@@ -627,7 +627,7 @@ export class DigitalTwinEngine {
             // Using a computed specifier prevents TypeScript from requiring the module at compile time.
             // The engine works correctly whether or not this optional package is installed.
             const ngsiLdPkg = '@cepseudo/ngsi-ld'
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const ngsiLd = await import(ngsiLdPkg) as any
             const { Logger } = await import('@cepseudo/shared')
             this.#ngsiLd = await ngsiLd.registerNgsiLd({

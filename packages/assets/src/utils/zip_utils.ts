@@ -276,7 +276,9 @@ export async function extractAndStoreArchive(
 
                 await Promise.all(
                     batch.map(async ([originalPath, normalizedPath]) => {
-                        const content = await inflateEntry(zipfile, byPath.get(originalPath)!)
+                        const entry = byPath.get(originalPath)
+                        if (!entry) throw new Error(`Archive entry disappeared: ${originalPath}`)
+                        const content = await inflateEntry(zipfile, entry)
                         const storagePath = `${basePath}/${normalizedPath}`
                         await storage.saveWithPath(content, storagePath)
                         uploadedPaths.push(storagePath)

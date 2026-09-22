@@ -6,7 +6,7 @@ import type { DataResolver } from '@cepseudo/shared'
 const dataResolver: DataResolver = async () => Buffer.alloc(0)
 
 export type AdapterFactory = () => Promise<{ db: KyselyDatabaseAdapter; cleanup: () => Promise<void> }>
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export type KyselyFactory = () => Promise<{ db: Kysely<any>; dialect: 'postgres' | 'sqlite'; cleanup: () => Promise<void> }>
 
 function pgConfig() {
@@ -41,18 +41,18 @@ export const postgresAdapterFactory: AdapterFactory = async () => {
 
 export const sqliteKyselyFactory: KyselyFactory = async () => {
     const sqliteDb = new Database(':memory:')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const db = new Kysely<any>({ dialect: new SqliteDialect({ database: sqliteDb }) })
     return { db, dialect: 'sqlite', cleanup: () => db.destroy() }
 }
 
 export const postgresKyselyFactory: KyselyFactory = async () => {
     const pg = await import('pg')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const Pool = (pg.default as any)?.Pool ?? pg.Pool
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const pool = new Pool(pgConfig())
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const db = new Kysely<any>({ dialect: new PostgresDialect({ pool: pool as any }) })
     return { db, dialect: 'postgres', cleanup: () => db.destroy() }
 }

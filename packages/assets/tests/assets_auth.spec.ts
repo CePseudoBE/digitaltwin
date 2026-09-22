@@ -73,7 +73,7 @@ test.group('AssetsManager — authentication required', (group) => {
 
         const response: DataResponse = await manager.handleUpload({
             headers: {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                 
                 'x-user-id': null as any,
                 'x-user-roles': 'user'
             },
@@ -333,7 +333,7 @@ test.group('AssetsManager — admin override', (group) => {
 
         assert.equal(response.status, 200)
         const result = JSON.parse(response.content.toString())
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         assert.equal(result.results.filter((r: any) => r.success).length, 3)
         assert.deepEqual(deletedIds.sort(), ['1', '2', '3'])
     })
@@ -346,7 +346,7 @@ test.group('AssetsManager — auth error handling', (group) => {
     test('handleUpload() returns 500 when auth middleware throws', async ({ assert }) => {
         const { manager } = createManager()
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         ;(manager as any).authMiddleware = {
             authenticate: async () => { throw new Error('Database connection failed') }
         }

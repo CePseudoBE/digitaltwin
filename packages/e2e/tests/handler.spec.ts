@@ -36,7 +36,7 @@ test.group('Handler E2E', () => {
         const endpoints = handler.getEndpoints()
         const healthEndpoint = endpoints.find(e => e.path === '/e2e-calculator/health')!
 
-        const response = await healthEndpoint.handler()
+        const response = await healthEndpoint.handler({} as TypedRequest)
         assert.equal(response.status, 200)
 
         const parsed = JSON.parse(response.content as string)

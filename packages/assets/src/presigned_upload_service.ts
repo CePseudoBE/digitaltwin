@@ -3,7 +3,6 @@ import type {
     DataRecord,
     TypedRequest,
     PresignedUploadRequestBody,
-    AuthResult,
     AssetsManagerConfiguration
 } from '@cepseudo/shared'
 import {

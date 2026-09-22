@@ -1,10 +1,9 @@
 import { AssetsManager, type AssetsEndpoint } from './assets_manager.js'
-import type { DataResponse, OpenAPIComponentSpec, HttpMethod, TypedRequest, DataRecord, MetadataRow, AssetsManagerConfiguration } from '@cepseudo/shared'
+import type { DataResponse, OpenAPIComponentSpec, TypedRequest, DataRecord, MetadataRow, AssetsManagerConfiguration } from '@cepseudo/shared'
 import {
     successResponse,
     errorResponse,
     badRequestResponse,
-    unauthorizedResponse,
     notFoundResponse,
     forbiddenResponse,
     safeAsync,
