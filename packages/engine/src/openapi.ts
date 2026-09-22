@@ -20,7 +20,7 @@ interface Document {
 }
 
 const SECURITY_SCHEMES = {
-    ApiKeyAuth: { type: 'apiKey', in: 'header', name: 'x-user-id', description: 'Keycloak user ID (forwarded by APISIX)' }
+    BearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'Access token issued by the configured OIDC provider' }
 } as const
 
 function toOpenApiPath(url: string): string {

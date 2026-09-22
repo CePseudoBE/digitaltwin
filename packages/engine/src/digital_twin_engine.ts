@@ -568,7 +568,7 @@ export class DigitalTwinEngine {
         }
 
         // Fastify attaches hooks only to routes registered after the plugin, so these come first
-        // Compression is off by default: API gateways (APISIX, Kong, ...) usually handle it
+        // Compression is off by default: API gateways (Kong, Nginx, ...) usually handle it
         if (process.env.DIGITALTWIN_ENABLE_COMPRESSION === 'true') {
             await this.#server.register(compress, { threshold: 1024 })
         }

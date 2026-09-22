@@ -39,7 +39,7 @@ import {
 } from '@cepseudo/shared'
 import type { StorageService } from '@cepseudo/storage'
 import type { DatabaseAdapter, MetadataRow } from '@cepseudo/database'
-import { ApisixAuthParser, AuthMiddleware, createAuthProvider, UserService, type HeadersLike } from '@cepseudo/auth'
+import { AuthMiddleware, createAuthProvider, UserService } from '@cepseudo/auth'
 import { PresignedUploadService } from './presigned_upload_service.js'
 import { generateAssetsOpenAPISpec } from './assets_openapi.js'
 import fs from 'fs/promises'
@@ -184,17 +184,15 @@ export interface UpdateAssetRequest {
  *
  * ## Authentication & Authorization
  *
- * - **Write Operations** (POST, PUT, DELETE): Require authentication via Apache APISIX headers
- * - **User Management**: Automatically creates/updates user records from Keycloak data
+ * - **Write Operations** (POST, PUT, DELETE): Require a caller resolved by the engine's `AuthMiddleware`
+ * - **User Management**: Automatically creates/updates user records from the identity the provider returns
  * - **Access Control**: Users can only modify/delete their own assets (ownership-based)
  * - **Resource Linking**: Assets are automatically linked to their owners via user_id foreign key
  *
- * ## Required Headers for Authenticated Endpoints
+ * ## Credentials
  *
- * - `x-user-id`: Keycloak user UUID (required)
- * - `x-user-roles`: Comma-separated list of user roles (optional)
- *
- * These headers are automatically added by Apache APISIX after successful Keycloak authentication.
+ * Whatever the configured `AuthProvider` expects (Bearer token, trusted proxy headers).
+ * Managers never read headers themselves; admin rights come from `AuthResult.isAdmin`.
  *
  * @abstract
  * @class AssetsManager
@@ -277,7 +275,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             authMiddleware: this.authMiddleware,
             getConfiguration: () => this.getConfiguration(),
             getAssetById: (id: string) => this.getAssetById(id),
-            validateOwnership: (asset, userId, headers) => this.validateOwnership(asset, userId, headers),
+            validateOwnership: (asset, userId, isAdmin) => this.validateOwnership(asset, userId, isAdmin),
             validateFileExtension: (filename: string) => this.validateFileExtension(filename)
         })
     }
@@ -424,9 +422,9 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      * Authenticates a request and returns the user record.
      *
      * This method consolidates the authentication flow:
-     * 1. Validates APISIX headers are present
-     * 2. Parses authentication headers
-     * 3. Finds or creates user record in database
+     * 1. Resolves the caller through the configured AuthProvider
+     * 2. Finds or creates the user record in the database
+     * 3. Decides whether the caller holds the admin role
      *
      * @param req - HTTP request object
      * @returns AuthResult with either userRecord on success or DataResponse on failure
@@ -534,16 +532,11 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      *
      * @param asset - Asset record to check
      * @param userId - User ID to validate against
-     * @param headers - HTTP request headers (optional, for admin check)
+     * @param isAdmin - Whether the caller holds the admin role
      * @returns DataResponse with error if not owner/admin, undefined if valid
      */
-    protected validateOwnership(
-        asset: DataRecord,
-        userId: number,
-        headers?: HeadersLike
-    ): DataResponse | undefined {
-        // Admins can modify any asset
-        if (headers && ApisixAuthParser.isAdmin(headers)) {
+    protected validateOwnership(asset: DataRecord, userId: number, isAdmin = false): DataResponse | undefined {
+        if (isAdmin) {
             return undefined
         }
 
@@ -570,15 +563,14 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             return undefined
         }
 
-        // Admins can access everything
-        if (ApisixAuthParser.isAdmin(req.headers || {})) {
-            return undefined
-        }
-
         // Private asset - require authentication
         const authResult = await this.authMiddleware.authenticate(req)
         if (!authResult.success) {
             return unauthorizedResponse('Authentication required for private assets')
+        }
+
+        if (authResult.isAdmin) {
+            return undefined
         }
 
         if (asset.owner_id !== authResult.user.id) {
@@ -705,21 +697,11 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             }
 
             const assets = await this.getAllAssets()
-            const isAdmin = req && ApisixAuthParser.isAdmin(req.headers || {})
+            const caller = await this.identifyCaller(req)
 
-            // Admin can see everything
-            let visibleAssets: DataRecord[]
-            if (isAdmin) {
-                visibleAssets = assets
-            } else {
-                // Get authenticated user ID if available
-                const authenticatedUserId = await this.getAuthenticatedUserId(req)
-
-                // Filter to visible assets only
-                visibleAssets = assets.filter(
-                    asset => asset.is_public || (authenticatedUserId !== null && asset.owner_id === authenticatedUserId)
-                )
-            }
+            const visibleAssets = caller.isAdmin
+                ? assets
+                : assets.filter(asset => asset.is_public || (caller.userId !== null && asset.owner_id === caller.userId))
 
             // Apply pagination
             const offset = pagination.offset ?? 0
@@ -732,17 +714,12 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
         }
     }
 
-    /**
-     * Gets the authenticated user's database ID from request headers.
-     *
-     * @param req - HTTP request object
-     * @returns User ID or null if not authenticated
-     */
-    private async getAuthenticatedUserId(req: TypedRequest | undefined): Promise<number | null> {
-        if (!req) return null
+    /** Who is asking, for read endpoints that also answer anonymous callers. */
+    private async identifyCaller(req: TypedRequest | undefined): Promise<{ userId: number | null; isAdmin: boolean }> {
+        if (!req) return { userId: null, isAdmin: false }
         const authResult = await this.authMiddleware.authenticate(req)
-        if (!authResult.success) return null
-        return authResult.user.id || null
+        if (!authResult.success) return { userId: null, isAdmin: false }
+        return { userId: authResult.user.id || null, isAdmin: authResult.isAdmin }
     }
 
     /**
@@ -1244,7 +1221,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             }
 
             // Check ownership (admins can modify any asset)
-            const ownershipError = this.validateOwnership(asset, userId, req.headers)
+            const ownershipError = this.validateOwnership(asset, userId, authResult.isAdmin)
             if (ownershipError) {
                 return ownershipError
             }
@@ -1367,7 +1344,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             }
 
             // Check ownership (admins can delete any asset)
-            const ownershipError = this.validateOwnership(asset, userId, req.headers)
+            const ownershipError = this.validateOwnership(asset, userId, authResult.isAdmin)
             if (ownershipError) {
                 return ownershipError
             }
@@ -1516,7 +1493,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             }
 
             // Process deletions (admins can delete any asset)
-            const results = await this.processBatchDeletes(ids, userId, req.headers)
+            const results = await this.processBatchDeletes(ids, userId, authResult.isAdmin)
 
             const successCount = results.filter(r => r.success).length
             const failureCount = results.length - successCount
@@ -1539,16 +1516,15 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      *
      * @param ids - Array of asset IDs to delete
      * @param userId - User ID for ownership validation
-     * @param headers - HTTP request headers (for admin check)
+     * @param isAdmin - Whether the caller holds the admin role
      * @returns Array of results for each deletion
      */
     private async processBatchDeletes(
         ids: string[],
         userId: number,
-        headers?: HeadersLike
+        isAdmin: boolean
     ): Promise<Array<{ success: boolean; id: string; error?: string }>> {
         const results: Array<{ success: boolean; id: string; error?: string }> = []
-        const isAdmin = headers && ApisixAuthParser.isAdmin(headers)
 
         for (const id of ids) {
             try {

@@ -35,7 +35,7 @@ export function generateAssetsOpenAPISpec(config: AssetsManagerConfiguration): O
                     summary: `Upload a new ${config.name} asset`,
                     description: 'Upload a new asset file with metadata. Requires authentication.',
                     tags: [tagName],
-                    security: [{ ApiKeyAuth: [] }],
+                    security: [{ BearerAuth: [] }],
                     requestBody: {
                         required: true,
                         content: {
@@ -109,7 +109,7 @@ export function generateAssetsOpenAPISpec(config: AssetsManagerConfiguration): O
                     description:
                         'Update asset description, source, or visibility. Requires authentication and ownership.',
                     tags: [tagName],
-                    security: [{ ApiKeyAuth: [] }],
+                    security: [{ BearerAuth: [] }],
                     parameters: [
                         {
                             name: 'id',
@@ -153,7 +153,7 @@ export function generateAssetsOpenAPISpec(config: AssetsManagerConfiguration): O
                     summary: `Delete ${config.name} asset`,
                     description: 'Delete an asset. Requires authentication and ownership.',
                     tags: [tagName],
-                    security: [{ ApiKeyAuth: [] }],
+                    security: [{ BearerAuth: [] }],
                     parameters: [
                         {
                             name: 'id',
@@ -210,7 +210,7 @@ export function generateAssetsOpenAPISpec(config: AssetsManagerConfiguration): O
                     summary: `Batch upload ${config.name} assets`,
                     description: 'Upload multiple assets in one request. Files must be base64 encoded.',
                     tags: [tagName],
-                    security: [{ ApiKeyAuth: [] }],
+                    security: [{ BearerAuth: [] }],
                     requestBody: {
                         required: true,
                         content: {
@@ -254,7 +254,7 @@ export function generateAssetsOpenAPISpec(config: AssetsManagerConfiguration): O
                     description:
                         'Delete multiple assets by IDs. Requires authentication and ownership. Pass IDs as comma-separated query parameter.',
                     tags: [tagName],
-                    security: [{ ApiKeyAuth: [] }],
+                    security: [{ BearerAuth: [] }],
                     parameters: [
                         {
                             name: 'ids',
@@ -280,7 +280,7 @@ export function generateAssetsOpenAPISpec(config: AssetsManagerConfiguration): O
                     description:
                         'Generate a presigned PUT URL for direct client-to-storage upload. Only available when storage supports presigned URLs (S3-compatible).',
                     tags: [tagName],
-                    security: [{ ApiKeyAuth: [] }],
+                    security: [{ BearerAuth: [] }],
                     requestBody: {
                         required: true,
                         content: {
@@ -328,7 +328,7 @@ export function generateAssetsOpenAPISpec(config: AssetsManagerConfiguration): O
                     description:
                         'Confirm that a file has been uploaded via the presigned URL. Verifies the file exists on storage and updates the record status.',
                     tags: [tagName],
-                    security: [{ ApiKeyAuth: [] }],
+                    security: [{ BearerAuth: [] }],
                     parameters: [
                         {
                             name: 'fileId',

@@ -834,7 +834,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                     summary: `Create a new ${config.name} record`,
                     description: 'Create a new record. Requires authentication.',
                     tags: [tagName],
-                    security: [{ ApiKeyAuth: [] }],
+                    security: [{ BearerAuth: [] }],
                     requestBody: {
                         required: true,
                         content: {
@@ -893,7 +893,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                     summary: `Update ${config.name} record`,
                     description: 'Update a record. Requires authentication and ownership.',
                     tags: [tagName],
-                    security: [{ ApiKeyAuth: [] }],
+                    security: [{ BearerAuth: [] }],
                     parameters: [
                         {
                             name: 'id',
@@ -923,7 +923,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
                     summary: `Delete ${config.name} record`,
                     description: 'Delete a record. Requires authentication and ownership.',
                     tags: [tagName],
-                    security: [{ ApiKeyAuth: [] }],
+                    security: [{ BearerAuth: [] }],
                     parameters: [
                         {
                             name: 'id',

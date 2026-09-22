@@ -13,7 +13,6 @@ import {
     idParamSchema,
     presignedUploadRequestSchema
 } from '@cepseudo/shared'
-import { ApisixAuthParser } from '@cepseudo/auth'
 import { extractAndStoreArchive } from './utils/zip_utils.js'
 import type { ZipLimits } from './utils/zip_utils.js'
 
@@ -393,7 +392,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
             }
 
             // Check ownership
-            const ownershipError = this.validateOwnership(asset, userId, req.headers)
+            const ownershipError = this.validateOwnership(asset, userId, authResult.isAdmin)
             if (ownershipError) {
                 return ownershipError
             }
@@ -477,16 +476,9 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
     override async retrieve(req?: TypedRequest): Promise<DataResponse> {
         try {
             const assets = await this.getAllAssets()
-            const isAdmin = req && ApisixAuthParser.isAdmin(req.headers || {})
-
-            // Get authenticated user ID if available
-            let authenticatedUserId: number | null = null
-            if (req) {
-                const authResult = await this.authMiddleware.authenticate(req)
-                if (authResult.success) {
-                    authenticatedUserId = authResult.user.id || null
-                }
-            }
+            const authResult = req ? await this.authMiddleware.authenticate(req) : undefined
+            const isAdmin = authResult?.success === true && authResult.isAdmin
+            const authenticatedUserId = authResult?.success ? authResult.user.id || null : null
 
             // Filter to visible assets only (unless admin)
             const visibleAssets = isAdmin
@@ -537,11 +529,11 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
      */
     override async handleDelete(req: TypedRequest): Promise<DataResponse> {
         try {
-            // Authenticate user
-            const userId = await this.authenticateUser(req)
-            if (typeof userId !== 'number') {
-                return userId
+            const authResult = await this.authMiddleware.authenticate(req)
+            if (!authResult.success) {
+                return authResult.response
             }
+            const userId = authResult.user.id as number
 
             const { id } = req.params || {}
             if (!id) {
@@ -553,9 +545,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                 return notFoundResponse('Tileset not found')
             }
 
-            // Check ownership (admins can delete any)
-            const isAdmin = ApisixAuthParser.isAdmin(req.headers || {})
-            if (!isAdmin && asset.owner_id !== null && asset.owner_id !== userId) {
+            if (!authResult.isAdmin && asset.owner_id !== null && asset.owner_id !== userId) {
                 return forbiddenResponse('You can only delete your own assets')
             }
 
@@ -674,7 +664,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                         description:
                             'Upload a ZIP file containing a 3D Tiles tileset. Files < 50MB are processed synchronously, larger files are queued.',
                         tags: [tagName],
-                        security: [{ ApiKeyAuth: [] }],
+                        security: [{ BearerAuth: [] }],
                         requestBody: {
                             required: true,
                             content: {
@@ -773,7 +763,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                     put: {
                         summary: 'Update tileset metadata',
                         tags: [tagName],
-                        security: [{ ApiKeyAuth: [] }],
+                        security: [{ BearerAuth: [] }],
                         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
                         requestBody: {
                             content: {
@@ -799,7 +789,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
                         summary: 'Delete tileset',
                         description: 'Delete tileset and all files from storage',
                         tags: [tagName],
-                        security: [{ ApiKeyAuth: [] }],
+                        security: [{ BearerAuth: [] }],
                         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
                         responses: {
                             '200': { description: 'Deleted successfully' },
