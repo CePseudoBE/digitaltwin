@@ -1,4 +1,4 @@
-import { Env } from '@cepseudo/shared'
+import { Env, type AuthenticatedUser } from '@cepseudo/shared'
 
 /**
  * Authentication configuration for Digital Twin framework.
@@ -10,7 +10,7 @@ import { Env } from '@cepseudo/shared'
  * Environment variables:
  * - DIGITALTWIN_DISABLE_AUTH: Set to "true" or "1" to disable authentication (default: false)
  * - DIGITALTWIN_ANONYMOUS_USER_ID: User ID to use when auth is disabled (default: "anonymous")
- * - DIGITALTWIN_ADMIN_ROLE_NAME: Name of the admin role in Keycloak (default: "admin")
+ * - DIGITALTWIN_ADMIN_ROLE_NAME or AUTH_ADMIN_ROLE: Name of the admin role (default: "admin")
  *
  * @example
  * ```bash
@@ -63,11 +63,15 @@ export class AuthConfig {
             }),
             DIGITALTWIN_ADMIN_ROLE_NAME: Env.schema.string({
                 optional: true
+            }),
+            AUTH_ADMIN_ROLE: Env.schema.string({
+                optional: true
             })
         }) as {
             DIGITALTWIN_DISABLE_AUTH: boolean
             DIGITALTWIN_ANONYMOUS_USER_ID?: string
             DIGITALTWIN_ADMIN_ROLE_NAME?: string
+            AUTH_ADMIN_ROLE?: string
         }
 
         // Set default anonymous user ID if not provided
@@ -77,7 +81,7 @@ export class AuthConfig {
 
         // Set default admin role name if not provided
         if (!config.DIGITALTWIN_ADMIN_ROLE_NAME) {
-            config.DIGITALTWIN_ADMIN_ROLE_NAME = 'admin'
+            config.DIGITALTWIN_ADMIN_ROLE_NAME = config.AUTH_ADMIN_ROLE || 'admin'
         }
 
         this._config = config as {
@@ -149,12 +153,12 @@ export class AuthConfig {
      * import type { AuthenticatedUser } from './types.js'
      *
      * const anonymousUser: AuthenticatedUser = AuthConfig.getAnonymousUser()
-     * console.log(anonymousUser) // { id: "anonymous", roles: ["anonymous"] }
+     * console.log(anonymousUser) // { subject: "anonymous", roles: ["anonymous"] }
      * ```
      */
-    static getAnonymousUser() {
+    static getAnonymousUser(): AuthenticatedUser {
         return {
-            id: this.getAnonymousUserId(),
+            subject: this.getAnonymousUserId(),
             roles: ['anonymous']
         }
     }

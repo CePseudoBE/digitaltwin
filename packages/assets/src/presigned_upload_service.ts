@@ -69,7 +69,7 @@ export class PresignedUploadService {
             if (!authResult.success) {
                 return authResult.response
             }
-            const userId = authResult.userRecord.id
+            const userId = authResult.user.id
             if (!userId) {
                 return errorResponse('Failed to retrieve user information')
             }
@@ -145,7 +145,7 @@ export class PresignedUploadService {
             if (!authResult.success) {
                 return authResult.response
             }
-            const userId = authResult.userRecord.id
+            const userId = authResult.user.id
             if (!userId) {
                 return errorResponse('Failed to retrieve user information')
             }

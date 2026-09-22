@@ -35,7 +35,7 @@ export async function makeAuthRequest(
 ): Promise<{ headers: Record<string, string>; params: Record<string, string>; body: Record<string, unknown>; query: Record<string, string>; file?: FakeRequestOverrides['file']; userRecord: UserRecord }> {
     // Ensure user exists in the database
     const userRecord = await db.getUserRepository().findOrCreateUser({
-        id: keycloakId,
+        subject: keycloakId,
         roles,
     })
 

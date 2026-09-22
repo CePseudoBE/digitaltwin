@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 import Database from 'better-sqlite3'
 import { KyselyDatabaseAdapter } from '@cepseudo/database'
-import { AuthMiddleware, UserService } from '@cepseudo/auth'
+import { AuthMiddleware, GatewayAuthProvider, UserService } from '@cepseudo/auth'
 import type { AuthenticatedUser, StoreConfiguration, UserRecord, UserRepository } from '@cepseudo/shared'
 import { CustomTableManager } from '../src/custom_table_manager.js'
 
@@ -12,10 +12,10 @@ function createMockUserRepository(): UserRepository {
     return {
         async initializeTables() {},
         async findOrCreateUser(authUser: AuthenticatedUser) {
-            const existing = users.get(authUser.id)
+            const existing = users.get(authUser.subject)
             if (existing) return existing
-            const record: UserRecord = { id: nextId++, keycloak_id: authUser.id, roles: authUser.roles, created_at: new Date(), updated_at: new Date() }
-            users.set(authUser.id, record)
+            const record: UserRecord = { id: nextId++, keycloak_id: authUser.subject, roles: authUser.roles, created_at: new Date(), updated_at: new Date() }
+            users.set(authUser.subject, record)
             return record
         },
         async getUserById(id: number) {
@@ -51,7 +51,7 @@ test.group('CustomTableManager - request body sanitisation', group => {
         delete process.env.DIGITALTWIN_DISABLE_AUTH
         db = KyselyDatabaseAdapter.fromSQLiteDatabase(new Database(':memory:'), async () => Buffer.alloc(0), { enableForeignKeys: false })
         manager = new SensorsManager()
-        manager.setDependencies(db, new AuthMiddleware(new UserService(createMockUserRepository())))
+        manager.setDependencies(db, new AuthMiddleware(new GatewayAuthProvider(), new UserService(createMockUserRepository())))
         await manager.initializeTable()
     })
 

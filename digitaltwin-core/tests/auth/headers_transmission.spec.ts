@@ -34,13 +34,11 @@ test.group('Headers Transmission through the HTTP layer', group => {
     group.setup(() => {
         delete process.env.DIGITALTWIN_DISABLE_AUTH
         AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
 
     group.teardown(() => {
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
         AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
 
   test('AssetsManager should receive all headers from request object', async ({ assert }) => {
@@ -217,7 +215,7 @@ test.group('Ultimate-Express Integration Simulation', (group) => {
     const authUser = ApisixAuthParser.parseAuthHeaders(requestObject.headers)
     
     assert.isNotNull(authUser)
-    assert.equal(authUser!.id, '6e06a527-a89d-4390-95cd-10ae63cfc939')
+    assert.equal(authUser!.subject, '6e06a527-a89d-4390-95cd-10ae63cfc939')
     assert.deepEqual(authUser!.roles, ['default-roles-master', 'offline_access'])
   })
 })

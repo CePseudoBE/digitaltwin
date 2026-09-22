@@ -36,10 +36,6 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
         delete process.env.DIGITALTWIN_DISABLE_AUTH
         AuthConfig._resetConfig()
 
-        // Reset ApisixAuthParser cached provider
-        const { ApisixAuthParser } = await import('@cepseudo/auth')
-        ApisixAuthParser._resetProvider()
-
         // --- Components ---
         collector = new WeatherCollector()
         const handler = new CalculatorHandler()
@@ -151,7 +147,7 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
     test('POST /{table} with APISIX headers creates record', async ({ assert }) => {
         // Ensure user exists in DB first
         await infra.db.getUserRepository().findOrCreateUser({
-            id: 'http-user-1',
+            subject: 'http-user-1',
             roles: ['user'],
         })
 
@@ -183,7 +179,7 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
     test('GET /{table}/:id returns specific record', async ({ assert }) => {
         // Create a record first
         await infra.db.getUserRepository().findOrCreateUser({
-            id: 'http-user-2',
+            subject: 'http-user-2',
             roles: ['user'],
         })
 
@@ -208,7 +204,7 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
 
     test('PUT /{table}/:id as owner updates record', async ({ assert }) => {
         await infra.db.getUserRepository().findOrCreateUser({
-            id: 'http-user-3',
+            subject: 'http-user-3',
             roles: ['user'],
         })
 
@@ -238,11 +234,11 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
     test('PUT /{table}/:id as non-owner returns 403', async ({ assert }) => {
         // Create record as user A
         await infra.db.getUserRepository().findOrCreateUser({
-            id: 'http-owner-a',
+            subject: 'http-owner-a',
             roles: ['user'],
         })
         await infra.db.getUserRepository().findOrCreateUser({
-            id: 'http-owner-b',
+            subject: 'http-owner-b',
             roles: ['user'],
         })
 
@@ -272,7 +268,7 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
 
     test('DELETE /{table}/:id as owner succeeds', async ({ assert }) => {
         await infra.db.getUserRepository().findOrCreateUser({
-            id: 'http-user-del',
+            subject: 'http-user-del',
             roles: ['user'],
         })
 
@@ -303,11 +299,11 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
 
     test('DELETE /{table}/:id as non-owner returns 403', async ({ assert }) => {
         await infra.db.getUserRepository().findOrCreateUser({
-            id: 'http-del-owner',
+            subject: 'http-del-owner',
             roles: ['user'],
         })
         await infra.db.getUserRepository().findOrCreateUser({
-            id: 'http-del-attacker',
+            subject: 'http-del-attacker',
             roles: ['user'],
         })
 

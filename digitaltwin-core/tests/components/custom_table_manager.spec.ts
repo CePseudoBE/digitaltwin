@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 import { CustomTableManager } from '../../src/components/custom_table_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
-import { AuthConfig, ApisixAuthParser } from '../../src/auth/index.js'
+import { AuthConfig } from '../../src/auth/index.js'
 import type { StoreConfiguration, DataResponse } from '../../src/components/types.js'
 
 // Test implementation of CustomTableManager
@@ -50,13 +50,11 @@ class TestCustomEndpointManager extends CustomTableManager {
 function ensureAuthEnabled() {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 function restoreTestEnv() {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 test.group('CustomTableManager configuration', () => {

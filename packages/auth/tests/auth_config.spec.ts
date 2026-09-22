@@ -5,6 +5,7 @@ function resetEnv() {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     delete process.env.DIGITALTWIN_ADMIN_ROLE_NAME
+    delete process.env.AUTH_ADMIN_ROLE
     AuthConfig._resetConfig()
 }
 
@@ -42,10 +43,17 @@ test.group('AuthConfig', (group) => {
         assert.isTrue(AuthConfig.isAuthDisabled())
     })
 
+    test('AUTH_ADMIN_ROLE is honoured when DIGITALTWIN_ADMIN_ROLE_NAME is unset', ({ assert }) => {
+        process.env.AUTH_ADMIN_ROLE = 'operator'
+        AuthConfig._resetConfig()
+
+        assert.equal(AuthConfig.getAdminRoleName(), 'operator')
+    })
+
     test('getAnonymousUser() returns valid AuthenticatedUser', ({ assert }) => {
         const user = AuthConfig.getAnonymousUser()
 
-        assert.equal(user.id, 'anonymous')
+        assert.equal(user.subject, 'anonymous')
         assert.isArray(user.roles)
         assert.deepEqual(user.roles, ['anonymous'])
     })

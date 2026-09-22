@@ -66,7 +66,7 @@ async function readMultipart(request: FastifyRequest): Promise<{ body: Record<st
 }
 
 async function toTypedRequest(request: FastifyRequest, options: ExposeEndpointsOptions): Promise<TypedRequest> {
-    const user = options.authMiddleware?.identify(request.headers)
+    const user = await options.authMiddleware?.identify(request.headers)
     // Uploads are only ever authenticated writes, so an anonymous body is refused before it touches the disk
     if (request.isMultipart() && options.authMiddleware && !user) {
         throw new AuthenticationError('Authentication required')

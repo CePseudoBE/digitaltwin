@@ -22,7 +22,7 @@ import {
     isAssetsManager,
     isCustomTableManager
 } from './component_types.js'
-import { UserService, AuthMiddleware } from '@cepseudo/auth'
+import { UserService, AuthMiddleware, AuthProviderFactory, AuthConfig } from '@cepseudo/auth'
 import { exposeEndpoints } from './endpoints.js'
 import { registerErrorHandler, registerRequestLogging } from './error_handler.js'
 import { registerOpenApi, type OpenApiOptions } from './openapi.js'
@@ -510,7 +510,7 @@ export class DigitalTwinEngine {
         const userRepository = this.#database.getUserRepository()
         const userService = new UserService(userRepository)
         await userService.initializeTables()
-        const authMiddleware = new AuthMiddleware(userService)
+        const authMiddleware = new AuthMiddleware(AuthProviderFactory.fromEnv(), userService, { adminRole: AuthConfig.getAdminRoleName() })
         this.#authMiddleware = authMiddleware
 
         // Get autoMigration setting (default: true)

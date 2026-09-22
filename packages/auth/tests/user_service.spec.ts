@@ -1,7 +1,6 @@
 import { test } from '@japa/runner'
 import { UserService } from '../src/user_service.js'
 import { AuthConfig } from '../src/auth_config.js'
-import { ApisixAuthParser } from '../src/apisix_parser.js'
 import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/shared'
 
 /** In-memory UserRepository for testing UserService in isolation */
@@ -12,7 +11,7 @@ function createInMemoryUserRepository(): UserRepository {
     return {
         async initializeTables() {},
         async findOrCreateUser(authUser: AuthenticatedUser): Promise<UserRecord> {
-            const existing = users.get(authUser.id)
+            const existing = users.get(authUser.subject)
             if (existing) {
                 existing.roles = authUser.roles
                 existing.updated_at = new Date()
@@ -20,12 +19,12 @@ function createInMemoryUserRepository(): UserRepository {
             }
             const record: UserRecord = {
                 id: nextId++,
-                keycloak_id: authUser.id,
+                keycloak_id: authUser.subject,
                 roles: authUser.roles,
                 created_at: new Date(),
                 updated_at: new Date()
             }
-            users.set(authUser.id, record)
+            users.set(authUser.subject, record)
             return record
         },
         async getUserById(id: number) {
@@ -41,13 +40,11 @@ function ensureAuthEnabled() {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 function restoreTestEnv() {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 test.group('UserService', (group) => {
@@ -61,7 +58,7 @@ test.group('UserService', (group) => {
 
     test('findOrCreateUser() creates new user when not exists', async ({ assert }) => {
         const userService = new UserService(createInMemoryUserRepository())
-        const authUser: AuthenticatedUser = { id: '12345-abcde', roles: ['user', 'admin'] }
+        const authUser: AuthenticatedUser = { subject: '12345-abcde', roles: ['user', 'admin'] }
 
         const result = await userService.findOrCreateUser(authUser)
 
@@ -72,7 +69,7 @@ test.group('UserService', (group) => {
 
     test('findOrCreateUser() returns existing user when found', async ({ assert }) => {
         const userService = new UserService(createInMemoryUserRepository())
-        const authUser: AuthenticatedUser = { id: '12345-abcde', roles: ['user'] }
+        const authUser: AuthenticatedUser = { subject: '12345-abcde', roles: ['user'] }
 
         const firstResult = await userService.findOrCreateUser(authUser)
         const secondResult = await userService.findOrCreateUser(authUser)
@@ -83,7 +80,7 @@ test.group('UserService', (group) => {
 
     test('findOrCreateUser() syncs roles', async ({ assert }) => {
         const userService = new UserService(createInMemoryUserRepository())
-        const authUser: AuthenticatedUser = { id: '12345-abcde', roles: ['user', 'admin'] }
+        const authUser: AuthenticatedUser = { subject: '12345-abcde', roles: ['user', 'admin'] }
 
         const result = await userService.findOrCreateUser(authUser)
 
@@ -94,7 +91,7 @@ test.group('UserService', (group) => {
 
     test('getUserById() returns user with roles', async ({ assert }) => {
         const userService = new UserService(createInMemoryUserRepository())
-        const authUser: AuthenticatedUser = { id: '12345-abcde', roles: ['user', 'admin'] }
+        const authUser: AuthenticatedUser = { subject: '12345-abcde', roles: ['user', 'admin'] }
         const created = await userService.findOrCreateUser(authUser)
 
         const result = await userService.getUserById(created.id!)
@@ -114,7 +111,7 @@ test.group('UserService', (group) => {
 
     test('getUserByKeycloakId() finds user by keycloak ID', async ({ assert }) => {
         const userService = new UserService(createInMemoryUserRepository())
-        await userService.findOrCreateUser({ id: '12345-abcde', roles: ['user'] })
+        await userService.findOrCreateUser({ subject: '12345-abcde', roles: ['user'] })
 
         const result = await userService.getUserByKeycloakId('12345-abcde')
 

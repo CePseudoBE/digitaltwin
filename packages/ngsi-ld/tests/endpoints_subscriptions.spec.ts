@@ -63,7 +63,7 @@ function makeInput(overrides: Partial<SubscriptionCreate> = {}): SubscriptionCre
 
 const allowAll: NgsiLdAuthenticator = {
     async authenticate() {
-        return { success: true, userRecord: { id: 1, keycloak_id: 'tester', roles: [], created_at: new Date(), updated_at: new Date() } }
+        return { success: true, user: { id: 1, keycloak_id: 'tester', roles: [], created_at: new Date(), updated_at: new Date() }, isAdmin: false }
     }
 }
 

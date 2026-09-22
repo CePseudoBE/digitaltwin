@@ -4,9 +4,8 @@ import type { DataResponse } from './http.js'
 /**
  * Discriminated union for authentication results.
  *
- * Used by AuthMiddleware.authenticate() to return either
- * a successful result with the user record, or a failure
- * with a ready-to-send HTTP error response.
+ * Returned by AuthMiddleware.authenticate(): either the persisted user with the
+ * admin decision already taken, or a ready-to-send HTTP error response.
  *
  * @example
  * ```typescript
@@ -14,9 +13,10 @@ import type { DataResponse } from './http.js'
  * if (!result.success) {
  *     return result.response
  * }
- * const user = result.userRecord
+ * const owner = result.user
+ * if (result.isAdmin) { ... }
  * ```
  */
 export type AuthResult =
-    | { success: true; userRecord: UserRecord }
+    | { success: true; user: UserRecord; isAdmin: boolean }
     | { success: false; response: DataResponse }
