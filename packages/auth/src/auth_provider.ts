@@ -8,15 +8,17 @@
 
 import type { AuthenticatedUser } from '@cepseudo/shared'
 import type { OidcAuthProviderOptions } from './providers/oidc_auth_provider.js'
+import type { TrustedHeaderAuthProviderOptions } from './providers/trusted_header_auth_provider.js'
 
 /**
  * Authentication mode for the Digital Twin framework.
  *
- * - `gateway`: Parse authentication from gateway headers (x-user-id, x-user-roles)
  * - `oidc`: Validate Bearer JWTs against an OIDC issuer
+ * - `trusted-headers`: Read the identity from headers set by a proxy the app sits behind
+ * - `gateway`: Legacy alias of `trusted-headers` with fixed header names and no secret
  * - `none`: Disable authentication (development/testing only)
  */
-export type AuthMode = 'gateway' | 'oidc' | 'none'
+export type AuthMode = 'gateway' | 'oidc' | 'trusted-headers' | 'none'
 
 /**
  * Authentication configuration for the Digital Twin framework.
@@ -26,6 +28,8 @@ export interface AuthProviderConfig {
     mode: AuthMode
     /** OIDC configuration (required when mode is 'oidc') */
     oidc?: OidcAuthProviderOptions
+    /** Header names and shared secret for 'trusted-headers' mode */
+    trustedHeaders?: TrustedHeaderAuthProviderOptions
     /** Anonymous user ID for 'none' mode (default: 'anonymous') */
     anonymousUserId?: string
 }

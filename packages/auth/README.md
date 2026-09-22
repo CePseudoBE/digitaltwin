@@ -17,7 +17,8 @@ pnpm add @cepseudo/auth
 
 | Mode | `AUTH_MODE` | Use case | How it works |
 |------|------------|----------|--------------|
-| **Gateway** | `gateway` (default) | Production behind Apache APISIX or similar | Parses `x-user-id` and `x-user-roles` headers set by the API gateway |
+| **Trusted headers** | `trusted-headers` | Behind a reverse proxy or API gateway that authenticates the client and strips its identity headers | Reads the subject and roles from configurable headers; an optional shared secret in `x-auth-secret` proves the request came through the proxy |
+| **Gateway (legacy)** | `gateway` (default) | Same as trusted headers with fixed `x-user-id` / `x-user-roles` and no secret | Kept until the fail-closed defaults land; prefer `trusted-headers` |
 | **OIDC** | `oidc` | Resource server for any OIDC issuer (Keycloak, Auth0, Entra, Zitadel, ...) | Validates `Authorization: Bearer <JWT>` against the issuer's JWKS, discovered from `/.well-known/openid-configuration` |
 | **None** | `none` | Development and testing | Returns an anonymous user for every request, no credentials required |
 
@@ -89,7 +90,7 @@ const { user, isAdmin } = result
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AUTH_MODE` | Authentication mode: `gateway`, `oidc`, or `none` | `gateway` |
+| `AUTH_MODE` | Authentication mode: `oidc`, `trusted-headers`, `gateway` (legacy) or `none` | `gateway` |
 | `AUTH_ADMIN_ROLE` | Name of the admin role | `admin` |
 | `DIGITALTWIN_DISABLE_AUTH` | Set to `true` to disable auth (legacy, equivalent to `none`) | - |
 | `DIGITALTWIN_ANONYMOUS_USER_ID` | User ID for anonymous access in `none` mode | `anonymous` |
@@ -106,6 +107,16 @@ const { user, isAdmin } = result
 | `OIDC_PUBLIC_KEY` | PEM public key to use instead of any JWKS (air-gapped setups) | - |
 
 The subject is always the `sub` claim. Signing keys are cached and refetched when a token carries an unknown `kid`, so key rotation at the issuer needs no restart.
+
+### Trusted Headers Mode (behind a gateway)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AUTH_HEADER_SUBJECT` | Header carrying the subject | `x-user-id` |
+| `AUTH_HEADER_ROLES` | Header carrying the comma-separated roles | `x-user-roles` |
+| `AUTH_HEADER_SECRET` | Shared secret the proxy must send in `x-auth-secret`; requests without it are refused | - |
+
+Use this mode only when the application cannot be reached without going through the proxy that sets these headers, and make sure that proxy strips the same headers when they come from the client. The engine prints a warning at start-up to that effect. Set `AUTH_HEADER_SECRET` so a request that somehow bypasses the proxy still cannot claim an identity.
 
 ## License
 

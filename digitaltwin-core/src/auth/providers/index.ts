@@ -1,1 +1,1 @@
-export { GatewayAuthProvider, NoAuthProvider, OidcAuthProvider } from '@cepseudo/auth'
+export { GatewayAuthProvider, NoAuthProvider, OidcAuthProvider, TrustedHeaderAuthProvider } from '@cepseudo/auth'

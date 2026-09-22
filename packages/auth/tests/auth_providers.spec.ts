@@ -2,6 +2,7 @@ import { test } from '@japa/runner'
 import { GatewayAuthProvider } from '../src/providers/gateway_auth_provider.js'
 import { NoAuthProvider } from '../src/providers/no_auth_provider.js'
 import { OidcAuthProvider } from '../src/providers/oidc_auth_provider.js'
+import { TrustedHeaderAuthProvider } from '../src/providers/trusted_header_auth_provider.js'
 import { AuthProviderFactory } from '../src/auth_provider_factory.js'
 
 test.group('GatewayAuthProvider', () => {
@@ -39,7 +40,7 @@ test.group('AuthProviderFactory', (group) => {
     group.each.setup(() => {
         delete process.env.AUTH_MODE
         delete process.env.DIGITALTWIN_DISABLE_AUTH
-        for (const name of ['OIDC_ISSUER', 'OIDC_AUDIENCE', 'OIDC_ROLES_CLAIM', 'OIDC_CLOCK_TOLERANCE', 'OIDC_JWKS_URI', 'OIDC_PUBLIC_KEY']) {
+        for (const name of ['OIDC_ISSUER', 'OIDC_AUDIENCE', 'OIDC_ROLES_CLAIM', 'OIDC_CLOCK_TOLERANCE', 'OIDC_JWKS_URI', 'OIDC_PUBLIC_KEY', 'AUTH_HEADER_SUBJECT', 'AUTH_HEADER_ROLES', 'AUTH_HEADER_SECRET']) {
             delete process.env[name]
         }
     })
@@ -57,6 +58,23 @@ test.group('AuthProviderFactory', (group) => {
 
         const none = AuthProviderFactory.create({ mode: 'none' })
         assert.instanceOf(none, NoAuthProvider)
+
+        const trusted = AuthProviderFactory.create({ mode: 'trusted-headers', trustedHeaders: { secret: 's' } })
+        assert.instanceOf(trusted, TrustedHeaderAuthProvider)
+    })
+
+    test('fromEnv() with AUTH_MODE=trusted-headers reads the header names and the secret', async ({ assert }) => {
+        process.env.AUTH_MODE = 'trusted-headers'
+        process.env.AUTH_HEADER_SUBJECT = 'x-forwarded-user'
+        process.env.AUTH_HEADER_ROLES = 'x-forwarded-groups'
+        process.env.AUTH_HEADER_SECRET = 'proxy-secret'
+
+        const provider = AuthProviderFactory.fromEnv()
+
+        assert.instanceOf(provider, TrustedHeaderAuthProvider)
+        assert.isNull(await provider.authenticate({ headers: { 'x-forwarded-user': 'alice' } }))
+        const user = await provider.authenticate({ headers: { 'x-forwarded-user': 'alice', 'x-forwarded-groups': 'ops', 'x-auth-secret': 'proxy-secret' } })
+        assert.deepEqual(user, { subject: 'alice', roles: ['ops'] })
     })
 
     test('fromEnv() with DIGITALTWIN_DISABLE_AUTH creates NoAuthProvider', ({ assert }) => {
