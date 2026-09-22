@@ -162,13 +162,11 @@ test.group('Authentication Flow End-to-End', group => {
     group.setup(() => {
         delete process.env.DIGITALTWIN_DISABLE_AUTH
         AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
 
     group.teardown(() => {
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
         AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
 
   test('complete authentication flow from headers to database', async ({ assert }) => {
@@ -185,13 +183,13 @@ test.group('Authentication Flow End-to-End', group => {
     const authUser = ApisixAuthParser.parseAuthHeaders(mockHeaders)
     
     assert.isNotNull(authUser)
-    assert.equal(authUser!.id, '550e8400-e29b-41d4-a716-446655440000')
+    assert.equal(authUser!.subject, '550e8400-e29b-41d4-a716-446655440000')
     assert.deepEqual(authUser!.roles, ['user', 'manager'])
 
     // Step 2: User service would find/create user (mocked here)
     const mockUserRecord = {
       id: 123,
-      keycloak_id: authUser!.id,
+      keycloak_id: authUser!.subject,
       roles: authUser!.roles,
       created_at: new Date(),
       updated_at: new Date()

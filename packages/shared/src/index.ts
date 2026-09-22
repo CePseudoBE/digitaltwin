@@ -34,11 +34,7 @@ export type {
     TilesetListQuery,
     TilesetListRequest
 } from './types/http.js'
-export type {
-    AuthenticatedUser,
-    UserRecord,
-    AuthContext
-} from './types/auth.js'
+export type { AuthenticatedUser, UserRecord } from './types/auth.js'
 
 // Errors
 export {

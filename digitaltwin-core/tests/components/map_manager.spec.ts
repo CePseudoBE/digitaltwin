@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { MapManager } from '../../src/components/map_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
-import { AuthConfig, ApisixAuthParser } from '../../src/auth/index.js'
+import { AuthConfig } from '../../src/auth/index.js'
 import type { AssetsManagerConfiguration } from '../../src/components/types.js'
 
 // Test implementation of MapManager
@@ -22,13 +22,11 @@ class TestMapManager extends MapManager {
 function ensureAuthEnabled() {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 function restoreTestEnv() {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 test.group('MapManager', (group) => {
@@ -258,7 +256,6 @@ test.group('MapManager with auth disabled', group => {
     group.setup(() => {
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
         AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
 
     group.teardown(() => {

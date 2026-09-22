@@ -41,7 +41,7 @@ function registerUserRepositoryTests(label: string, factory: KyselyFactory) {
         test('findOrCreateUser() creates a new user with ID', async ({ assert }) => {
             const repo = new KyselyUserRepository(db, dialect)
             await repo.initializeTables()
-            const authUser: AuthenticatedUser = { id: 'keycloak-uuid-1', roles: ['user'] }
+            const authUser: AuthenticatedUser = { subject: 'keycloak-uuid-1', roles: ['user'] }
             const result = await repo.findOrCreateUser(authUser)
             assert.isDefined(result.id)
             assert.isNumber(result.id)
@@ -51,7 +51,7 @@ function registerUserRepositoryTests(label: string, factory: KyselyFactory) {
         test('findOrCreateUser() returns existing user for same keycloak_id', async ({ assert }) => {
             const repo = new KyselyUserRepository(db, dialect)
             await repo.initializeTables()
-            const authUser: AuthenticatedUser = { id: 'keycloak-uuid-2', roles: ['user'] }
+            const authUser: AuthenticatedUser = { subject: 'keycloak-uuid-2', roles: ['user'] }
             const first = await repo.findOrCreateUser(authUser)
             const second = await repo.findOrCreateUser(authUser)
             assert.equal(first.id, second.id)
@@ -60,7 +60,7 @@ function registerUserRepositoryTests(label: string, factory: KyselyFactory) {
         test('findOrCreateUser() synchronizes roles (add + remove)', async ({ assert }) => {
             const repo = new KyselyUserRepository(db, dialect)
             await repo.initializeTables()
-            const authUser: AuthenticatedUser = { id: 'keycloak-uuid-3', roles: ['user', 'editor'] }
+            const authUser: AuthenticatedUser = { subject: 'keycloak-uuid-3', roles: ['user', 'editor'] }
             const first = await repo.findOrCreateUser(authUser)
             assert.includeMembers(first.roles, ['user', 'editor'])
             authUser.roles = ['user', 'admin']
@@ -72,15 +72,15 @@ function registerUserRepositoryTests(label: string, factory: KyselyFactory) {
         test('findOrCreateUser() with empty roles clears all roles', async ({ assert }) => {
             const repo = new KyselyUserRepository(db, dialect)
             await repo.initializeTables()
-            await repo.findOrCreateUser({ id: 'keycloak-uuid-4', roles: ['user', 'admin'] })
-            const result = await repo.findOrCreateUser({ id: 'keycloak-uuid-4', roles: [] })
+            await repo.findOrCreateUser({ subject: 'keycloak-uuid-4', roles: ['user', 'admin'] })
+            const result = await repo.findOrCreateUser({ subject: 'keycloak-uuid-4', roles: [] })
             assert.deepEqual(result.roles, [])
         })
 
         test('getUserById() returns user with roles', async ({ assert }) => {
             const repo = new KyselyUserRepository(db, dialect)
             await repo.initializeTables()
-            const created = await repo.findOrCreateUser({ id: 'keycloak-uuid-5', roles: ['user', 'admin'] })
+            const created = await repo.findOrCreateUser({ subject: 'keycloak-uuid-5', roles: ['user', 'admin'] })
             const result = await repo.getUserById(created.id!)
             assert.isDefined(result)
             assert.equal(result!.id, created.id)
@@ -96,7 +96,7 @@ function registerUserRepositoryTests(label: string, factory: KyselyFactory) {
         test('getUserByKeycloakId() returns user with roles', async ({ assert }) => {
             const repo = new KyselyUserRepository(db, dialect)
             await repo.initializeTables()
-            await repo.findOrCreateUser({ id: 'keycloak-uuid-6', roles: ['editor'] })
+            await repo.findOrCreateUser({ subject: 'keycloak-uuid-6', roles: ['editor'] })
             const result = await repo.getUserByKeycloakId('keycloak-uuid-6')
             assert.isDefined(result)
             assert.includeMembers(result!.roles, ['editor'])
@@ -122,7 +122,7 @@ function registerUserRepositoryTests(label: string, factory: KyselyFactory) {
         test('timestamps are set on creation', async ({ assert }) => {
             const repo = new KyselyUserRepository(db, dialect)
             await repo.initializeTables()
-            const result = await repo.findOrCreateUser({ id: 'keycloak-uuid-7', roles: ['user'] })
+            const result = await repo.findOrCreateUser({ subject: 'keycloak-uuid-7', roles: ['user'] })
             assert.instanceOf(result.created_at, Date)
             assert.instanceOf(result.updated_at, Date)
             // Verify timestamps are recent (within 1 minute) — avoids clock skew issues between PG container and host

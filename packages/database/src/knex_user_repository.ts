@@ -59,7 +59,7 @@ export class KnexUserRepository implements UserRepository {
 
     async findOrCreateUser(authUser: AuthenticatedUser): Promise<UserRecord> {
         // 1. Find or create user
-        let userRecord = await this.#findUserByKeycloakId(authUser.id)
+        let userRecord = await this.#findUserByKeycloakId(authUser.subject)
 
         if (!userRecord) {
             userRecord = await this.#createUser(authUser)
@@ -108,7 +108,7 @@ export class KnexUserRepository implements UserRepository {
         const now = new Date()
 
         const userData = {
-            keycloak_id: authUser.id,
+            keycloak_id: authUser.subject,
             created_at: now,
             updated_at: now
         }
@@ -119,7 +119,7 @@ export class KnexUserRepository implements UserRepository {
 
         return {
             id,
-            keycloak_id: authUser.id,
+            keycloak_id: authUser.subject,
             roles: [],
             created_at: now,
             updated_at: now

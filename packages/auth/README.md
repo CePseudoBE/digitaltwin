@@ -48,14 +48,10 @@ const provider = AuthProviderFactory.create({
 
 ### Using the AuthProvider interface
 
-All providers implement the same `AuthProvider` interface:
+All providers implement the same `AuthProvider` interface, a single async method:
 
 ```typescript
-const user = provider.parseRequest(req) // AuthenticatedUser | null
-const valid = provider.hasValidAuth(req) // boolean
-const admin = provider.isAdmin(req)      // boolean
-const userId = provider.getUserId(req)   // string | null
-const roles = provider.getUserRoles(req) // string[]
+const user = await provider.authenticate(req) // AuthenticatedUser | null: { subject, roles, claims? }
 ```
 
 ### Setting up AuthMiddleware
@@ -63,12 +59,12 @@ const roles = provider.getUserRoles(req) // string[]
 `AuthMiddleware` is the single source of truth for authenticating HTTP requests across all components. It combines header/token parsing with user record management:
 
 ```typescript
-import { AuthMiddleware, UserService } from '@cepseudo/auth'
+import { AuthMiddleware, AuthProviderFactory, UserService } from '@cepseudo/auth'
 import type { UserRepository } from '@cepseudo/shared'
 
-// UserRepository is injected (typically KnexUserRepository from @cepseudo/database)
+// UserRepository is injected (typically KyselyUserRepository from @cepseudo/database)
 const userService = new UserService(userRepository)
-const authMiddleware = new AuthMiddleware(userService)
+const authMiddleware = new AuthMiddleware(AuthProviderFactory.fromEnv(), userService, { adminRole: 'admin' })
 ```
 
 ### Authenticating a request in a component
@@ -81,8 +77,9 @@ if (!result.success) {
     return result.response
 }
 
-// result.userRecord is the full UserRecord with id, keycloak_id, roles
-const { userRecord } = result
+// result.user is the full UserRecord with id, keycloak_id, roles
+// result.isAdmin is already decided from the configured admin role
+const { user, isAdmin } = result
 ```
 
 ## Environment Variables

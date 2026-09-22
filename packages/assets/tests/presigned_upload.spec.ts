@@ -3,7 +3,7 @@ import { AssetsManager } from '../src/assets_manager.js'
 import type { AssetsManagerConfiguration } from '@cepseudo/shared'
 import { MockDatabaseAdapter } from './mocks/mock_database_adapter.js'
 import { MockStorageService } from './mocks/mock_storage_service.js'
-import { AuthConfig, ApisixAuthParser } from '@cepseudo/auth'
+import { AuthConfig } from '@cepseudo/auth'
 
 class TestPresignedAssetsManager extends AssetsManager {
     getConfiguration(): AssetsManagerConfiguration {
@@ -20,7 +20,6 @@ class TestPresignedAssetsManager extends AssetsManager {
 function disableAuth() {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 function createManager(presigned = true) {

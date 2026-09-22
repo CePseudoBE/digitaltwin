@@ -55,7 +55,7 @@ export class AuthProviderFactory {
     static create(config: AuthProviderConfig): AuthProvider {
         switch (config.mode) {
             case 'gateway':
-                return new GatewayAuthProvider(config.adminRoleName)
+                return new GatewayAuthProvider()
 
             case 'jwt':
                 return new JwtAuthProvider(config)
@@ -73,7 +73,6 @@ export class AuthProviderFactory {
      *
      * Environment variables:
      * - `AUTH_MODE`: Authentication mode ('gateway', 'jwt', 'none'). Default: 'gateway'
-     * - `AUTH_ADMIN_ROLE`: Name of admin role. Default: 'admin'
      *
      * For JWT mode:
      * - `JWT_SECRET`: Secret key for HMAC algorithms
@@ -108,8 +107,6 @@ export class AuthProviderFactory {
      * ```
      */
     static fromEnv(): AuthProvider {
-        const adminRoleName = process.env.AUTH_ADMIN_ROLE || process.env.DIGITALTWIN_ADMIN_ROLE_NAME || 'admin'
-
         // Check if auth is disabled (legacy env var)
         if (process.env.DIGITALTWIN_DISABLE_AUTH === 'true') {
             return new NoAuthProvider(process.env.DIGITALTWIN_ANONYMOUS_USER_ID || 'anonymous')
@@ -122,7 +119,7 @@ export class AuthProviderFactory {
         }
 
         if (mode === 'gateway') {
-            return new GatewayAuthProvider(adminRoleName)
+            return new GatewayAuthProvider()
         }
 
         if (mode === 'jwt') {
@@ -142,7 +139,6 @@ export class AuthProviderFactory {
 
             return new JwtAuthProvider({
                 mode: 'jwt',
-                adminRoleName,
                 jwt: {
                     secret,
                     publicKey,

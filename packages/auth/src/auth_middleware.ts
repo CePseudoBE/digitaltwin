@@ -1,14 +1,18 @@
 import type { AuthenticatedUser, AuthResult } from '@cepseudo/shared'
 import { unauthorizedResponse, errorResponse } from '@cepseudo/shared'
-import { AuthConfig } from './auth_config.js'
-import { ApisixAuthParser, type HeadersLike } from './apisix_parser.js'
+import type { AuthProvider, AuthRequest } from './auth_provider.js'
 import type { UserService } from './user_service.js'
+
+export interface AuthMiddlewareOptions {
+    /** Role that grants access to every resource (default: 'admin') */
+    adminRole?: string
+}
 
 /**
  * Centralized authentication middleware for all components.
  *
- * Replaces the duplicated authenticateRequest/authenticateUser methods
- * found in AssetsManager, TilesetManager, MapManager, and CustomTableManager.
+ * The provider reads the credentials, the user service persists the caller.
+ * Components never touch headers themselves.
  *
  * @example
  * ```typescript
@@ -16,61 +20,42 @@ import type { UserService } from './user_service.js'
  * if (!result.success) {
  *     return result.response
  * }
- * const userRecord = result.userRecord
+ * const owner = result.user
+ * if (result.isAdmin) { ... }
  * ```
  */
 export class AuthMiddleware {
-    readonly #userService: UserService
+    readonly #provider: AuthProvider
+    readonly #users: UserService
+    readonly #adminRole: string
 
-    constructor(userService: UserService) {
-        this.#userService = userService
+    constructor(provider: AuthProvider, users: UserService, options: AuthMiddlewareOptions = {}) {
+        this.#provider = provider
+        this.#users = users
+        this.#adminRole = options.adminRole ?? 'admin'
     }
 
-    /**
-     * Authenticate a request and return the user record.
-     *
-     * Handles all auth modes:
-     * - Auth disabled → creates anonymous user via UserService
-     * - Gateway mode → parses APISIX headers
-     * - JWT mode → validates Bearer token
-     */
     /**
      * Reads the caller's identity from the request headers without touching the database.
      * Returns undefined when the request carries no valid credentials; components that
      * need the database record keep calling `authenticate()`.
      */
-    identify(headers: HeadersLike): AuthenticatedUser | undefined {
-        if (AuthConfig.isAuthDisabled()) {
-            return AuthConfig.getAnonymousUser()
-        }
-        if (!ApisixAuthParser.hasValidAuth(headers)) {
-            return undefined
-        }
-        return ApisixAuthParser.parseAuthHeaders(headers) ?? undefined
+    async identify(headers: AuthRequest['headers']): Promise<AuthenticatedUser | undefined> {
+        return (await this.#provider.authenticate({ headers })) ?? undefined
     }
 
-    async authenticate(req: { headers?: Record<string, string | string[] | undefined> }): Promise<AuthResult> {
-        // If auth is disabled, create an anonymous user
-        if (AuthConfig.isAuthDisabled()) {
-            const anonymousUser = AuthConfig.getAnonymousUser()
-            const userRecord = await this.#userService.findOrCreateUser(anonymousUser)
-            return { success: true, userRecord }
-        }
-
-        if (!ApisixAuthParser.hasValidAuth(req.headers || {})) {
+    /** Authenticates the request and returns the persisted user, or a ready-to-send error response. */
+    async authenticate(req: { headers?: AuthRequest['headers'] }): Promise<AuthResult> {
+        const authUser = await this.#provider.authenticate({ headers: req.headers ?? {} })
+        if (!authUser) {
             return { success: false, response: unauthorizedResponse() }
         }
 
-        const authUser = ApisixAuthParser.parseAuthHeaders(req.headers || {})
-        if (!authUser) {
-            return { success: false, response: unauthorizedResponse('Invalid authentication headers') }
-        }
-
-        const userRecord = await this.#userService.findOrCreateUser(authUser)
-        if (!userRecord.id) {
+        const user = await this.#users.findOrCreateUser(authUser)
+        if (!user.id) {
             return { success: false, response: errorResponse('Failed to retrieve user information') }
         }
 
-        return { success: true, userRecord }
+        return { success: true, user, isAdmin: authUser.roles.includes(this.#adminRole) }
     }
 }

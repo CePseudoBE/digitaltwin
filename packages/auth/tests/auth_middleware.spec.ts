@@ -1,8 +1,10 @@
 import { test } from '@japa/runner'
 import { AuthMiddleware } from '../src/auth_middleware.js'
 import { AuthConfig } from '../src/auth_config.js'
-import { ApisixAuthParser } from '../src/apisix_parser.js'
+import { GatewayAuthProvider } from '../src/providers/gateway_auth_provider.js'
+import { NoAuthProvider } from '../src/providers/no_auth_provider.js'
 import { UserService } from '../src/user_service.js'
+import type { AuthProvider } from '../src/auth_provider.js'
 import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/shared'
 
 /** In-memory UserRepository for tests */
@@ -13,19 +15,19 @@ function createMockUserRepository(): UserRepository {
     return {
         async initializeTables() {},
         async findOrCreateUser(authUser: AuthenticatedUser): Promise<UserRecord> {
-            const existing = users.get(authUser.id)
+            const existing = users.get(authUser.subject)
             if (existing) {
                 existing.roles = authUser.roles
                 return existing
             }
             const record: UserRecord = {
                 id: nextId++,
-                keycloak_id: authUser.id,
+                keycloak_id: authUser.subject,
                 roles: authUser.roles,
                 created_at: new Date(),
                 updated_at: new Date()
             }
-            users.set(authUser.id, record)
+            users.set(authUser.subject, record)
             return record
         },
         async getUserById(id: number) {
@@ -37,130 +39,111 @@ function createMockUserRepository(): UserRepository {
     }
 }
 
-function enableAuth() {
-    delete process.env.DIGITALTWIN_DISABLE_AUTH
-    AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
-}
-
-function disableAuth() {
-    process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-    AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
+function gatewayMiddleware(repository = createMockUserRepository(), adminRole?: string) {
+    return new AuthMiddleware(new GatewayAuthProvider(), new UserService(repository), { adminRole })
 }
 
 test.group('AuthMiddleware', (group) => {
+    group.each.setup(() => {
+        delete process.env.DIGITALTWIN_DISABLE_AUTH
+        AuthConfig._resetConfig()
+    })
     group.teardown(() => {
-        disableAuth()
+        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
+        AuthConfig._resetConfig()
     })
 
-    test('auth disabled returns success with anonymous user', async ({ assert }) => {
-        disableAuth()
-        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
+    test('the provider decides who the caller is', async ({ assert }) => {
+        const middleware = new AuthMiddleware(new NoAuthProvider('dev'), new UserService(createMockUserRepository()))
 
         const result = await middleware.authenticate({ headers: {} })
 
         assert.isTrue(result.success)
         if (result.success) {
-            assert.isDefined(result.userRecord)
-            assert.equal(result.userRecord.keycloak_id, 'anonymous')
-            assert.deepEqual(result.userRecord.roles, ['anonymous'])
+            assert.equal(result.user.keycloak_id, 'dev')
+            assert.deepEqual(result.user.roles, ['anonymous'])
+            assert.isFalse(result.isAdmin)
         }
     })
 
-    test('valid headers return success with userRecord', async ({ assert }) => {
-        enableAuth()
-        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
+    test('valid headers return success with the persisted user', async ({ assert }) => {
+        const middleware = gatewayMiddleware()
 
         const result = await middleware.authenticate({
-            headers: {
-                'x-user-id': 'uuid-123',
-                'x-user-roles': 'user, admin'
+            headers: { 'x-user-id': 'uuid-123', 'x-user-roles': 'user, admin' }
+        })
+
+        assert.isTrue(result.success)
+        if (result.success) {
+            assert.isDefined(result.user.id)
+            assert.equal(result.user.keycloak_id, 'uuid-123')
+            assert.includeMembers(result.user.roles, ['user', 'admin'])
+        }
+    })
+
+    test('isAdmin is computed once from the configured role', async ({ assert }) => {
+        const asAdmin = await gatewayMiddleware().authenticate({ headers: { 'x-user-id': 'u1', 'x-user-roles': 'user,admin' } })
+        const asUser = await gatewayMiddleware().authenticate({ headers: { 'x-user-id': 'u1', 'x-user-roles': 'user' } })
+        const customRole = await gatewayMiddleware(undefined, 'superadmin').authenticate({ headers: { 'x-user-id': 'u1', 'x-user-roles': 'admin' } })
+
+        assert.isTrue(asAdmin.success && asAdmin.isAdmin)
+        assert.isTrue(asUser.success && !asUser.isAdmin)
+        assert.isTrue(customRole.success && !customRole.isAdmin)
+    })
+
+    test('a provider that returns null yields 401', async ({ assert }) => {
+        const middleware = gatewayMiddleware()
+
+        const missing = await middleware.authenticate({ headers: {} })
+        const empty = await middleware.authenticate({ headers: { 'x-user-id': '', 'x-user-roles': 'user' } })
+        const noHeaders = await middleware.authenticate({})
+
+        for (const result of [missing, empty, noHeaders]) {
+            assert.isFalse(result.success)
+            if (!result.success) {
+                assert.equal(result.response.status, 401)
             }
-        })
-
-        assert.isTrue(result.success)
-        if (result.success) {
-            assert.isDefined(result.userRecord.id)
-            assert.equal(result.userRecord.keycloak_id, 'uuid-123')
-            assert.includeMembers(result.userRecord.roles, ['user', 'admin'])
         }
     })
 
-    test('missing headers return 401', async ({ assert }) => {
-        enableAuth()
-        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
+    test('the provider is awaited', async ({ assert }) => {
+        const slow: AuthProvider = {
+            authenticate: () => new Promise(resolve => setTimeout(() => resolve({ subject: 'late', roles: [] }), 5))
+        }
+        const middleware = new AuthMiddleware(slow, new UserService(createMockUserRepository()))
 
         const result = await middleware.authenticate({ headers: {} })
 
-        assert.isFalse(result.success)
-        if (!result.success) {
-            assert.equal(result.response.status, 401)
-        }
-    })
-
-    test('empty x-user-id returns 401', async ({ assert }) => {
-        enableAuth()
-        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
-
-        const result = await middleware.authenticate({
-            headers: { 'x-user-id': '', 'x-user-roles': 'user' }
-        })
-
-        assert.isFalse(result.success)
-        if (!result.success) {
-            assert.equal(result.response.status, 401)
-        }
+        assert.isTrue(result.success && result.user.keycloak_id === 'late')
     })
 
     test('UserService error propagates', async ({ assert }) => {
-        enableAuth()
         const failingRepo: UserRepository = {
             async initializeTables() {},
             async findOrCreateUser() { throw new Error('DB connection failed') },
             async getUserById() { return undefined },
             async getUserByKeycloakId() { return undefined }
         }
-        const middleware = new AuthMiddleware(new UserService(failingRepo))
+        const middleware = gatewayMiddleware(failingRepo)
 
         await assert.rejects(
-            () => middleware.authenticate({
-                headers: { 'x-user-id': 'uuid-123', 'x-user-roles': 'user' }
-            }),
+            () => middleware.authenticate({ headers: { 'x-user-id': 'uuid-123', 'x-user-roles': 'user' } }),
             /DB connection failed/
         )
     })
 
-    test('request without headers property returns 401', async ({ assert }) => {
-        enableAuth()
-        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
-
-        const result = await middleware.authenticate({} as any)
-
-        assert.isFalse(result.success)
-        if (!result.success) {
-            assert.equal(result.response.status, 401)
-        }
-    })
-
     test('x-user-id only (no roles) returns success with empty roles', async ({ assert }) => {
-        enableAuth()
-        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
-
-        const result = await middleware.authenticate({
-            headers: { 'x-user-id': 'uuid-456' }
-        })
+        const result = await gatewayMiddleware().authenticate({ headers: { 'x-user-id': 'uuid-456' } })
 
         assert.isTrue(result.success)
         if (result.success) {
-            assert.equal(result.userRecord.keycloak_id, 'uuid-456')
-            assert.deepEqual(result.userRecord.roles, [])
+            assert.equal(result.user.keycloak_id, 'uuid-456')
+            assert.deepEqual(result.user.roles, [])
         }
     })
 
     test('repeated calls for same user return consistent id', async ({ assert }) => {
-        enableAuth()
-        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
+        const middleware = gatewayMiddleware()
         const headers = { 'x-user-id': 'uuid-789', 'x-user-roles': 'user' }
 
         const first = await middleware.authenticate({ headers })
@@ -168,39 +151,30 @@ test.group('AuthMiddleware', (group) => {
 
         assert.isTrue(first.success && second.success)
         if (first.success && second.success) {
-            assert.equal(first.userRecord.id, second.userRecord.id)
+            assert.equal(first.user.id, second.user.id)
         }
     })
 })
 
-test.group('AuthMiddleware.identify', (group) => {
-    group.teardown(() => {
-        enableAuth()
+test.group('AuthMiddleware.identify', () => {
+    test('returns the caller resolved by the provider without touching the repository', async ({ assert }) => {
+        const failingRepo: UserRepository = {
+            async initializeTables() {},
+            async findOrCreateUser() { throw new Error('must not be called') },
+            async getUserById() { return undefined },
+            async getUserByKeycloakId() { return undefined }
+        }
+        const middleware = gatewayMiddleware(failingRepo)
+
+        const user = await middleware.identify({ 'x-user-id': 'uuid-1', 'x-user-roles': 'admin,user' })
+
+        assert.deepEqual(user, { subject: 'uuid-1', roles: ['admin', 'user'] })
     })
 
-    test('returns the anonymous user when auth is disabled', ({ assert }) => {
-        disableAuth()
-        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
+    test('returns undefined without valid credentials', async ({ assert }) => {
+        const middleware = gatewayMiddleware()
 
-        const user = middleware.identify({})
-
-        assert.equal(user?.id, AuthConfig.getAnonymousUserId())
-    })
-
-    test('returns the caller parsed from the gateway headers', ({ assert }) => {
-        enableAuth()
-        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
-
-        const user = middleware.identify({ 'x-user-id': 'uuid-1', 'x-user-roles': 'admin,user' })
-
-        assert.deepEqual(user, { id: 'uuid-1', roles: ['admin', 'user'] })
-    })
-
-    test('returns undefined without valid credentials', ({ assert }) => {
-        enableAuth()
-        const middleware = new AuthMiddleware(new UserService(createMockUserRepository()))
-
-        assert.isUndefined(middleware.identify({}))
-        assert.isUndefined(middleware.identify({ 'x-user-roles': 'admin' }))
+        assert.isUndefined(await middleware.identify({}))
+        assert.isUndefined(await middleware.identify({ 'x-user-roles': 'admin' }))
     })
 })
