@@ -2,7 +2,6 @@ import { test } from '@japa/runner'
 import { MapManager } from '../src/map_manager.js'
 import { MockDatabaseAdapter } from './mocks/mock_database_adapter.js'
 import { MockStorageService } from './mocks/mock_storage_service.js'
-import { AuthConfig } from '@cepseudo/auth'
 import type { AssetsManagerConfiguration } from '@cepseudo/shared'
 
 class TestMapManager extends MapManager {
@@ -18,13 +17,11 @@ class TestMapManager extends MapManager {
 }
 
 function enableAuth() {
-    delete process.env.DIGITALTWIN_DISABLE_AUTH
-    AuthConfig._resetConfig()
+    process.env.AUTH_MODE = 'gateway'
 }
 
 function disableAuth() {
-    process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-    AuthConfig._resetConfig()
+    process.env.AUTH_MODE = 'none'
 }
 
 function createManager() {

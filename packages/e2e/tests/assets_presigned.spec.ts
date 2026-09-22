@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { setupInfrastructure, type E2EInfrastructure } from './helpers/setup.js'
 import { makeAuthRequest } from './helpers/auth_helpers.js'
 import { E2EAssetsManager } from './helpers/test_components.js'
-import { AuthConfig, AuthMiddleware, AuthProviderFactory, UserService } from '@cepseudo/auth'
+import { AuthMiddleware, createAuthProvider, UserService } from '@cepseudo/auth'
 import type { TypedRequest } from '@cepseudo/shared'
 
 /** Helper to build a valid presigned upload request body (includes required fileSize) */
@@ -47,8 +47,7 @@ test.group('AssetsManager presigned upload E2E', (group) => {
 
     group.teardown(async () => {
         // Ensure auth is disabled again for cleanup
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
         await infra.cleanup()
     })
 
@@ -128,10 +127,9 @@ test.group('AssetsManager presigned upload E2E', (group) => {
         })
 
         // Re-enable auth: a manager built now reads the caller from the gateway headers
-        delete process.env.DIGITALTWIN_DISABLE_AUTH
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'gateway'
         const gatewayManager = new E2EAssetsManager()
-        gatewayManager.setDependencies(infra.db, infra.storage, new AuthMiddleware(AuthProviderFactory.fromEnv(), new UserService(infra.db.getUserRepository())))
+        gatewayManager.setDependencies(infra.db, infra.storage, new AuthMiddleware(createAuthProvider(), new UserService(infra.db.getUserRepository())))
 
         // User B (different subject) tries to confirm — should fail
         const reqB = await makeAuthRequest(infra.db, 'user-owner-b', ['user'], {
@@ -142,8 +140,7 @@ test.group('AssetsManager presigned upload E2E', (group) => {
         assert.equal(confirmResponse.status, 403)
 
         // Restore disabled auth
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
     })
 
     test('double confirm returns 409', async ({ assert }) => {

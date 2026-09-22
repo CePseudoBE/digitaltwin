@@ -122,8 +122,7 @@ pnpm lint
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DIGITALTWIN_ENABLE_COMPRESSION` | Enable HTTP gzip compression | `false` |
-| `DIGITALTWIN_DISABLE_AUTH` | Disable authentication | `false` |
-| `AUTH_MODE` | Auth mode: `gateway`, `jwt`, `none` | `gateway` |
+| `AUTH_MODE` | Auth mode: `oidc`, `trusted-headers`, `gateway` (legacy), `none`. Required in production | `none` outside production |
 | `CORS_ORIGIN` | CORS allowed origins | `*` |
 
 ## License

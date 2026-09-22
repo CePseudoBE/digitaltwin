@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { AssetsManager } from '../../src/components/assets_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
-import { AuthConfig, ApisixAuthParser } from '../../src/auth/index.js'
+import { ApisixAuthParser } from '../../src/auth/index.js'
 import type { AssetsManagerConfiguration } from '../../src/components/types.js'
 
 class HeaderTestAssetsManager extends AssetsManager {
@@ -32,13 +32,11 @@ class HeaderTestAssetsManager extends AssetsManager {
 test.group('Headers Transmission through the HTTP layer', group => {
     // Some tests in this group require auth to be enabled
     group.setup(() => {
-        delete process.env.DIGITALTWIN_DISABLE_AUTH
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'gateway'
     })
 
     group.teardown(() => {
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
     })
 
   test('AssetsManager should receive all headers from request object', async ({ assert }) => {
@@ -165,13 +163,11 @@ test.group('Headers Transmission through the HTTP layer', group => {
 test.group('Ultimate-Express Integration Simulation', (group) => {
   // This test requires auth to be enabled to properly test header parsing
   group.setup(() => {
-    delete process.env.DIGITALTWIN_DISABLE_AUTH
-    AuthConfig._resetConfig()
+    process.env.AUTH_MODE = 'gateway'
   })
 
   group.teardown(() => {
-    process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-    AuthConfig._resetConfig()
+    process.env.AUTH_MODE = 'none'
   })
 
   test('simulate complete flow from HTTP request to AssetsManager', async ({ assert }) => {

@@ -5,7 +5,7 @@ import * as reporters from '@japa/runner/reporters'
 // Set test environment
 process.env.NODE_ENV = 'test'
 // Disable authentication for tests (unless explicitly testing auth)
-process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
+process.env.AUTH_MODE = 'none'
 
 // Get file filter from CLI args (e.g., pnpm test -- tests/errors/*.spec.ts)
 // Filter out "--" separator from args

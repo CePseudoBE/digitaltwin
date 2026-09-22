@@ -23,7 +23,7 @@ interface FakeRequestOverrides {
 /**
  * Create a fake HTTP request that mimics an authenticated user.
  *
- * When DIGITALTWIN_DISABLE_AUTH=true (set by setup.ts), the AuthMiddleware
+ * When AUTH_MODE=none (set by setup.ts), the AuthMiddleware
  * creates an anonymous user automatically. This helper is still useful for
  * testing ownership scenarios where we need specific user IDs.
  */

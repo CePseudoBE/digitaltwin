@@ -3,7 +3,7 @@ import { DigitalTwinEngine } from '../../src/engine/digital_twin_engine.js'
 import { AssetsManager } from '../../src/components/assets_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
-import { AuthConfig, ApisixAuthParser } from '../../src/auth/index.js'
+import { ApisixAuthParser } from '../../src/auth/index.js'
 import type { AssetsManagerConfiguration } from '../../src/components/types.js'
 
 class TestAuthAssetsManager extends AssetsManager {
@@ -160,13 +160,11 @@ test.group('UserService Database Integration', () => {
 test.group('Authentication Flow End-to-End', group => {
     // This test requires auth to be enabled
     group.setup(() => {
-        delete process.env.DIGITALTWIN_DISABLE_AUTH
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'gateway'
     })
 
     group.teardown(() => {
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
     })
 
   test('complete authentication flow from headers to database', async ({ assert }) => {

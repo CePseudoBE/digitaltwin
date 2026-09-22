@@ -117,7 +117,7 @@ test.group('NGSI-LD E2E — engine + real HTTP', group => {
             ],
         })
 
-        // DIGITALTWIN_DISABLE_AUTH is already set to 'true' by setupInfrastructure()
+        // AUTH_MODE is already set to 'none' by setupInfrastructure()
         await engine.start()
 
         baseUrl = `http://127.0.0.1:${engine.getPort()}`

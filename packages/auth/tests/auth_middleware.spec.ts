@@ -1,6 +1,5 @@
 import { test } from '@japa/runner'
 import { AuthMiddleware } from '../src/auth_middleware.js'
-import { AuthConfig } from '../src/auth_config.js'
 import { GatewayAuthProvider } from '../src/providers/gateway_auth_provider.js'
 import { NoAuthProvider } from '../src/providers/no_auth_provider.js'
 import { UserService } from '../src/user_service.js'
@@ -45,12 +44,10 @@ function gatewayMiddleware(repository = createMockUserRepository(), adminRole?: 
 
 test.group('AuthMiddleware', (group) => {
     group.each.setup(() => {
-        delete process.env.DIGITALTWIN_DISABLE_AUTH
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'gateway'
     })
     group.teardown(() => {
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
     })
 
     test('the provider decides who the caller is', async ({ assert }) => {

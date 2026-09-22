@@ -7,32 +7,6 @@
  */
 
 import type { AuthenticatedUser } from '@cepseudo/shared'
-import type { OidcAuthProviderOptions } from './providers/oidc_auth_provider.js'
-import type { TrustedHeaderAuthProviderOptions } from './providers/trusted_header_auth_provider.js'
-
-/**
- * Authentication mode for the Digital Twin framework.
- *
- * - `oidc`: Validate Bearer JWTs against an OIDC issuer
- * - `trusted-headers`: Read the identity from headers set by a proxy the app sits behind
- * - `gateway`: Legacy alias of `trusted-headers` with fixed header names and no secret
- * - `none`: Disable authentication (development/testing only)
- */
-export type AuthMode = 'gateway' | 'oidc' | 'trusted-headers' | 'none'
-
-/**
- * Authentication configuration for the Digital Twin framework.
- */
-export interface AuthProviderConfig {
-    /** Authentication mode */
-    mode: AuthMode
-    /** OIDC configuration (required when mode is 'oidc') */
-    oidc?: OidcAuthProviderOptions
-    /** Header names and shared secret for 'trusted-headers' mode */
-    trustedHeaders?: TrustedHeaderAuthProviderOptions
-    /** Anonymous user ID for 'none' mode (default: 'anonymous') */
-    anonymousUserId?: string
-}
 
 /**
  * Request-like object for authentication parsing.
@@ -48,9 +22,9 @@ export interface AuthRequest {
 /**
  * Authentication provider interface.
  *
- * Implement it to plug a custom authentication mechanism into the framework.
- * The result is asynchronous so a provider can fetch signing keys or call an
- * identity service while validating credentials.
+ * Implement it to plug a custom authentication mechanism into the framework and
+ * pass the instance as `EngineOptions.auth`. The result is asynchronous so a
+ * provider can fetch signing keys or call an identity service while validating.
  *
  * @example
  * ```typescript

@@ -48,7 +48,7 @@ test.group('CustomTableManager - request body sanitisation', group => {
     let manager: SensorsManager
 
     group.setup(async () => {
-        delete process.env.DIGITALTWIN_DISABLE_AUTH
+        process.env.AUTH_MODE = 'gateway'
         db = KyselyDatabaseAdapter.fromSQLiteDatabase(new Database(':memory:'), async () => Buffer.alloc(0), { enableForeignKeys: false })
         manager = new SensorsManager()
         manager.setDependencies(db, new AuthMiddleware(new GatewayAuthProvider(), new UserService(createMockUserRepository())))

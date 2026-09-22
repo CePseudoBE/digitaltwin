@@ -22,7 +22,7 @@ import {
     isAssetsManager,
     isCustomTableManager
 } from './component_types.js'
-import { UserService, AuthMiddleware, AuthProviderFactory, AuthConfig } from '@cepseudo/auth'
+import { UserService, AuthMiddleware, createAuthProvider, adminRoleFromEnv, type AuthProvider } from '@cepseudo/auth'
 import { exposeEndpoints } from './endpoints.js'
 import { registerErrorHandler, registerRequestLogging } from './error_handler.js'
 import { registerOpenApi, type OpenApiOptions } from './openapi.js'
@@ -118,6 +118,8 @@ function createServer(bodyLimit: number) {
 type EngineServer = ReturnType<typeof createServer>
 
 export interface EngineOptions {
+    /** Authentication provider instance, instead of the one `AUTH_MODE` selects */
+    auth?: AuthProvider
     /** Array of data collectors to register with the engine */
     collectors?: Collector[]
     /** Array of data harvesters to register with the engine */
@@ -510,9 +512,9 @@ export class DigitalTwinEngine {
         const userRepository = this.#database.getUserRepository()
         const userService = new UserService(userRepository)
         await userService.initializeTables()
-        const authProvider = AuthProviderFactory.fromEnv()
+        const authProvider = this.#options.auth ?? createAuthProvider()
         await authProvider.ready?.()
-        const authMiddleware = new AuthMiddleware(authProvider, userService, { adminRole: AuthConfig.getAdminRoleName() })
+        const authMiddleware = new AuthMiddleware(authProvider, userService, { adminRole: adminRoleFromEnv() })
         this.#authMiddleware = authMiddleware
 
         // Get autoMigration setting (default: true)

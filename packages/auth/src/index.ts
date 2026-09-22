@@ -1,5 +1,5 @@
-export type { AuthProvider, AuthRequest, AuthMode, AuthProviderConfig } from './auth_provider.js'
-export { AuthProviderFactory } from './auth_provider_factory.js'
+export type { AuthProvider, AuthRequest } from './auth_provider.js'
+export { createAuthProvider, adminRoleFromEnv, AUTH_MODES, type AuthMode, type AuthEnv } from './create_auth_provider.js'
 export {
     GatewayAuthProvider,
     NoAuthProvider,
@@ -11,7 +11,6 @@ export {
 } from './providers/index.js'
 export { AuthMiddleware, type AuthMiddlewareOptions } from './auth_middleware.js'
 export { UserService } from './user_service.js'
-export { AuthConfig } from './auth_config.js'
 export { ApisixAuthParser, type HeadersLike } from './apisix_parser.js'
 
 // Types (re-exported from shared for convenience)

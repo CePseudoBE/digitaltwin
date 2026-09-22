@@ -18,34 +18,34 @@ pnpm add @cepseudo/auth
 | Mode | `AUTH_MODE` | Use case | How it works |
 |------|------------|----------|--------------|
 | **Trusted headers** | `trusted-headers` | Behind a reverse proxy or API gateway that authenticates the client and strips its identity headers | Reads the subject and roles from configurable headers; an optional shared secret in `x-auth-secret` proves the request came through the proxy |
-| **Gateway (legacy)** | `gateway` (default) | Same as trusted headers with fixed `x-user-id` / `x-user-roles` and no secret | Kept until the fail-closed defaults land; prefer `trusted-headers` |
+| **Gateway (legacy)** | `gateway` | Same as trusted headers with fixed `x-user-id` / `x-user-roles` and no secret | Kept until the fail-closed defaults land; prefer `trusted-headers` |
 | **OIDC** | `oidc` | Resource server for any OIDC issuer (Keycloak, Auth0, Entra, Zitadel, ...) | Validates `Authorization: Bearer <JWT>` against the issuer's JWKS, discovered from `/.well-known/openid-configuration` |
 | **None** | `none` | Development and testing | Returns an anonymous user for every request, no credentials required |
 
 ## Usage
 
-### Creating a provider with AuthProviderFactory
+### Creating a provider from the environment
 
-The factory reads environment variables to create the right provider:
+`createAuthProvider(env)` is the only place that reads auth variables. `AUTH_MODE` is required when `NODE_ENV=production`; elsewhere a missing value means `none`, with a warning.
 
 ```typescript
-import { AuthProviderFactory } from '@cepseudo/auth'
+import { createAuthProvider } from '@cepseudo/auth'
 
-// Auto-detect mode from AUTH_MODE env var (defaults to 'gateway')
-const provider = AuthProviderFactory.fromEnv()
-
-// Or configure explicitly
-const provider = AuthProviderFactory.create({
-    mode: 'oidc',
-    oidc: {
-        issuer: 'https://id.example.org/realms/city',
-        audience: 'digitaltwin',
-        rolesClaim: 'realm_access.roles',
-    },
-})
+const provider = createAuthProvider() // reads process.env
 
 // Resolve discovery and signing keys up front so a misconfiguration stops start-up
 await provider.ready?.()
+```
+
+To bypass the environment, instantiate a provider yourself and hand it to the engine:
+
+```typescript
+import { OidcAuthProvider } from '@cepseudo/auth'
+
+new DigitalTwinEngine({
+    auth: new OidcAuthProvider({ issuer: 'https://id.example.org/realms/city', audience: 'digitaltwin' }),
+    ...
+})
 ```
 
 ### Using the AuthProvider interface
@@ -61,12 +61,12 @@ const user = await provider.authenticate(req) // AuthenticatedUser | null: { sub
 `AuthMiddleware` is the single source of truth for authenticating HTTP requests across all components. It combines header/token parsing with user record management:
 
 ```typescript
-import { AuthMiddleware, AuthProviderFactory, UserService } from '@cepseudo/auth'
+import { AuthMiddleware, adminRoleFromEnv, createAuthProvider, UserService } from '@cepseudo/auth'
 import type { UserRepository } from '@cepseudo/shared'
 
 // UserRepository is injected (typically KyselyUserRepository from @cepseudo/database)
 const userService = new UserService(userRepository)
-const authMiddleware = new AuthMiddleware(AuthProviderFactory.fromEnv(), userService, { adminRole: 'admin' })
+const authMiddleware = new AuthMiddleware(createAuthProvider(), userService, { adminRole: adminRoleFromEnv() })
 ```
 
 ### Authenticating a request in a component
@@ -90,10 +90,9 @@ const { user, isAdmin } = result
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AUTH_MODE` | Authentication mode: `oidc`, `trusted-headers`, `gateway` (legacy) or `none` | `gateway` |
+| `AUTH_MODE` | Authentication mode: `oidc`, `trusted-headers`, `gateway` (legacy) or `none`. Required in production | `none` outside production, with a warning |
 | `AUTH_ADMIN_ROLE` | Name of the admin role | `admin` |
-| `DIGITALTWIN_DISABLE_AUTH` | Set to `true` to disable auth (legacy, equivalent to `none`) | - |
-| `DIGITALTWIN_ANONYMOUS_USER_ID` | User ID for anonymous access in `none` mode | `anonymous` |
+| `DIGITALTWIN_ANONYMOUS_USER_ID` | Subject of the anonymous user in `none` mode | `anonymous` |
 
 ### OIDC Mode
 
