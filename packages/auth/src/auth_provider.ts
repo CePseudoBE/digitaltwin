@@ -7,35 +7,16 @@
  */
 
 import type { AuthenticatedUser } from '@cepseudo/shared'
+import type { OidcAuthProviderOptions } from './providers/oidc_auth_provider.js'
 
 /**
  * Authentication mode for the Digital Twin framework.
  *
  * - `gateway`: Parse authentication from gateway headers (x-user-id, x-user-roles)
- * - `jwt`: Validate JWT tokens from Authorization header
+ * - `oidc`: Validate Bearer JWTs against an OIDC issuer
  * - `none`: Disable authentication (development/testing only)
  */
-export type AuthMode = 'gateway' | 'jwt' | 'none'
-
-/**
- * JWT-specific configuration options.
- */
-export interface JwtConfig {
-    /** Secret key for HMAC algorithms (HS256, HS384, HS512) */
-    secret?: string
-    /** Public key for RSA/EC algorithms (RS256, RS384, RS512, ES256, ES384, ES512) */
-    publicKey?: string
-    /** JWT algorithm (default: 'HS256') */
-    algorithm?: string
-    /** Expected token issuer for validation */
-    issuer?: string
-    /** Expected token audience for validation */
-    audience?: string
-    /** Claim name for user ID (default: 'sub') */
-    userIdClaim?: string
-    /** Claim name for roles (default: 'roles', supports nested paths like 'realm_access.roles') */
-    rolesClaim?: string
-}
+export type AuthMode = 'gateway' | 'oidc' | 'none'
 
 /**
  * Authentication configuration for the Digital Twin framework.
@@ -43,8 +24,8 @@ export interface JwtConfig {
 export interface AuthProviderConfig {
     /** Authentication mode */
     mode: AuthMode
-    /** JWT-specific configuration (required when mode is 'jwt') */
-    jwt?: JwtConfig
+    /** OIDC configuration (required when mode is 'oidc') */
+    oidc?: OidcAuthProviderOptions
     /** Anonymous user ID for 'none' mode (default: 'anonymous') */
     anonymousUserId?: string
 }
@@ -85,4 +66,11 @@ export interface AuthProvider {
      * @returns The authenticated user, or null when the request carries no valid credentials
      */
     authenticate(req: AuthRequest): Promise<AuthenticatedUser | null>
+
+    /**
+     * Optional start-up hook. The engine awaits it before listening so a provider
+     * that needs remote material (discovery document, signing keys) fails fast
+     * with a clear message instead of refusing every request later.
+     */
+    ready?(): Promise<void>
 }
