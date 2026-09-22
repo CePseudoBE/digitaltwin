@@ -2,7 +2,6 @@ import { test } from '@japa/runner'
 import { TilesetManager } from '../src/tileset_manager.js'
 import { MockDatabaseAdapter } from './mocks/mock_database_adapter.js'
 import { LocalStorageService } from '@cepseudo/storage'
-import { AuthConfig } from '@cepseudo/auth'
 import type { AssetsManagerConfiguration } from '@cepseudo/shared'
 import JSZip from 'jszip'
 import fs from 'fs/promises'
@@ -22,13 +21,11 @@ class TestTilesetManager extends TilesetManager {
 }
 
 function enableAuth() {
-    delete process.env.DIGITALTWIN_DISABLE_AUTH
-    AuthConfig._resetConfig()
+    process.env.AUTH_MODE = 'gateway'
 }
 
 function disableAuth() {
-    process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-    AuthConfig._resetConfig()
+    process.env.AUTH_MODE = 'none'
 }
 
 async function createTestTilesetZip(files: Record<string, string>): Promise<string> {

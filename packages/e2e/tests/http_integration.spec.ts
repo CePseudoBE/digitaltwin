@@ -10,7 +10,6 @@ import { RedisContainer } from '@testcontainers/redis'
 import type { StartedRedisContainer } from '@testcontainers/redis'
 import { setupInfrastructure, type E2EInfrastructure } from './helpers/setup.js'
 import { DigitalTwinEngine } from '@cepseudo/engine'
-import { AuthConfig } from '@cepseudo/auth'
 import { LogLevel } from '@cepseudo/shared'
 import {
     WeatherCollector,
@@ -33,8 +32,7 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
         redis = await new RedisContainer('redis:7-alpine').start()
 
         // --- Auth: ENABLED (not disabled) so APISIX header parsing is active ---
-        delete process.env.DIGITALTWIN_DISABLE_AUTH
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'gateway'
 
         // --- Components ---
         collector = new WeatherCollector()
@@ -78,8 +76,7 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
         }
 
         // Restore disabled auth for other test groups
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
 
         await redis.stop()
         await infra.cleanup()

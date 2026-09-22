@@ -8,7 +8,7 @@ import type {
     OpenAPIComponentSpec
 } from '@cepseudo/shared'
 import type { DatabaseAdapter } from '@cepseudo/database'
-import { UserService, AuthMiddleware, AuthProviderFactory } from '@cepseudo/auth'
+import { UserService, AuthMiddleware, createAuthProvider } from '@cepseudo/auth'
 import {
     validateIdParam,
     validateCustomRecordCreate,
@@ -129,7 +129,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
      */
     setDependencies(db: DatabaseAdapter, authMiddleware?: AuthMiddleware): void {
         this.db = db
-        this.authMiddleware = authMiddleware ?? new AuthMiddleware(AuthProviderFactory.fromEnv(), new UserService(db.getUserRepository()))
+        this.authMiddleware = authMiddleware ?? new AuthMiddleware(createAuthProvider(), new UserService(db.getUserRepository()))
         this.tableName = this.getConfiguration().name
     }
 

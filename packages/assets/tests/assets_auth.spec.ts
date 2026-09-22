@@ -2,7 +2,6 @@ import { test } from '@japa/runner'
 import { AssetsManager } from '../src/assets_manager.js'
 import { MockDatabaseAdapter } from './mocks/mock_database_adapter.js'
 import { MockStorageService } from './mocks/mock_storage_service.js'
-import { AuthConfig } from '@cepseudo/auth'
 import type { AssetsConfiguration, DataResponse } from '@cepseudo/shared'
 
 class TestAssetsManager extends AssetsManager {
@@ -18,14 +17,12 @@ class TestAssetsManager extends AssetsManager {
 }
 
 function enableAuth() {
-    delete process.env.DIGITALTWIN_DISABLE_AUTH
+    process.env.AUTH_MODE = 'gateway'
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
-    AuthConfig._resetConfig()
 }
 
 function disableAuth() {
-    process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-    AuthConfig._resetConfig()
+    process.env.AUTH_MODE = 'none'
 }
 
 function createManager() {

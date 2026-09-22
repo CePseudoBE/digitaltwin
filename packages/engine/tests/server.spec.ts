@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { RedisContainer } from '@testcontainers/redis'
 import type { StartedRedisContainer } from '@testcontainers/redis'
 import { Type } from 'typebox'
-import { AuthConfig } from '@cepseudo/auth'
+import type { AuthProvider } from '@cepseudo/auth'
 import { Collector, Harvester, Handler } from '@cepseudo/components'
 import { LogLevel, servableEndpoint } from '@cepseudo/shared'
 import type { CollectorConfiguration, ComponentConfiguration, DataResponse, HarvesterConfiguration, TypedRequest } from '@cepseudo/shared'
@@ -215,13 +215,11 @@ test.group('Engine serves every endpoint kind', group => {
     })
 
     group.each.teardown(() => {
-        delete process.env.DIGITALTWIN_DISABLE_AUTH
-        AuthConfig._resetConfig()
+        delete process.env.AUTH_MODE
     })
 
     test('collector, harvester, decorated handler, assets manager and custom table answer through inject()', async ({ assert }) => {
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
         const storage = new MockStorageService()
         const database = new MockDatabaseAdapter({ storage })
         const url = await storage.save(Buffer.from(JSON.stringify({ temp: 21 })), 'weather', 'json')
@@ -247,7 +245,7 @@ test.group('Engine serves every endpoint kind', group => {
 
             const sum = await engine.inject({ method: 'POST', url: '/calc/sum', payload: { a: 2, b: 3 } })
             assert.equal(sum.statusCode, 200)
-            assert.deepEqual(sum.json(), { sum: 5, user: AuthConfig.getAnonymousUserId() })
+            assert.deepEqual(sum.json(), { sum: 5, user: 'anonymous' })
 
             const invalid = await engine.inject({ method: 'POST', url: '/calc/sum', payload: { a: 'two' } })
             assert.equal(invalid.statusCode, 400)
@@ -270,6 +268,40 @@ test.group('Engine serves every endpoint kind', group => {
 
             const echoed = await engine.inject({ url: '/api/health/live', headers: { 'x-request-id': 'trace-1' } })
             assert.equal(echoed.headers['x-request-id'], 'trace-1')
+        })
+    })
+})
+
+test.group('Engine auth configuration', group => {
+    group.each.teardown(() => {
+        process.env.NODE_ENV = 'test'
+        delete process.env.AUTH_MODE
+    })
+
+    test('production without AUTH_MODE refuses to start', async ({ assert }) => {
+        process.env.NODE_ENV = 'production'
+        delete process.env.AUTH_MODE
+
+        await assert.rejects(() => createEngine().start(), /AUTH_MODE is required in production/)
+    })
+
+    test('a custom provider instance is used and readied instead of the env-selected one', async ({ assert }) => {
+        process.env.AUTH_MODE = 'none'
+        let readied = false
+        const auth: AuthProvider = {
+            ready: async () => { readied = true },
+            authenticate: async req => (req.headers['x-magic'] === 'yes' ? { subject: 'custom-subject', roles: ['admin'] } : null)
+        }
+        const whoami = new TestHandler('whoami', [{
+            method: 'get',
+            path: '/whoami',
+            handler: async (req: TypedRequest) => ({ status: 200, content: JSON.stringify({ user: req.user?.subject ?? null }), headers: { 'Content-Type': 'application/json' } })
+        }])
+
+        await withEngine({ auth, handlers: [whoami] }, async engine => {
+            assert.isTrue(readied)
+            assert.deepEqual((await engine.inject({ url: '/whoami', headers: { 'x-magic': 'yes' } })).json(), { user: 'custom-subject' })
+            assert.deepEqual((await engine.inject('/whoami')).json(), { user: null })
         })
     })
 })

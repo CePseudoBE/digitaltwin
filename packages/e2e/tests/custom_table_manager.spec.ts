@@ -2,7 +2,6 @@ import { test } from '@japa/runner'
 import { setupInfrastructure, type E2EInfrastructure } from './helpers/setup.js'
 import { makeAuthRequest } from './helpers/auth_helpers.js'
 import { E2ECustomTableManager } from './helpers/test_components.js'
-import { AuthConfig } from '@cepseudo/auth'
 
 test.group('CustomTableManager E2E', (group) => {
     let infra: E2EInfrastructure
@@ -16,8 +15,7 @@ test.group('CustomTableManager E2E', (group) => {
     })
 
     group.teardown(async () => {
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
         await infra.cleanup()
     })
 
@@ -149,12 +147,11 @@ test.group('CustomTableManager E2E', (group) => {
     })
 
     test('handleCreate returns 401 without auth', async ({ assert }) => {
-        delete process.env.DIGITALTWIN_DISABLE_AUTH
-        AuthConfig._resetConfig()
-        const { AuthProviderFactory, UserService, AuthMiddleware: AM } = await import('@cepseudo/auth')
+        process.env.AUTH_MODE = 'gateway'
+        const { createAuthProvider, UserService, AuthMiddleware: AM } = await import('@cepseudo/auth')
 
         // A fresh AuthMiddleware so the provider is built from the new env
-        const freshAuth = new AM(AuthProviderFactory.fromEnv(), new UserService(infra.db.getUserRepository()))
+        const freshAuth = new AM(createAuthProvider(), new UserService(infra.db.getUserRepository()))
         const freshManager = new E2ECustomTableManager()
         freshManager.setDependencies(infra.db, freshAuth)
         await freshManager.initializeTable()
@@ -166,7 +163,6 @@ test.group('CustomTableManager E2E', (group) => {
         assert.equal(response.status, 401)
 
         // Restore disabled auth
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
     })
 })

@@ -519,7 +519,7 @@ export JWT_SECRET=your-secret-key
 ### Disable Authentication
 
 ```bash
-export DIGITALTWIN_DISABLE_AUTH=true
+export AUTH_MODE=none
 # Or
 export AUTH_MODE=none
 ```

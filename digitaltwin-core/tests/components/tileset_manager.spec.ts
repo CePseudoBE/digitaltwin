@@ -2,7 +2,6 @@ import { test } from '@japa/runner'
 import { TilesetManager } from '../../src/components/tileset_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
-import { AuthConfig } from '../../src/auth/index.js'
 import type { AssetsManagerConfiguration } from '../../src/components/types.js'
 import JSZip from 'jszip'
 import fs from 'fs/promises'
@@ -24,13 +23,11 @@ class TestTilesetManager extends TilesetManager {
 
 // Helper functions
 function ensureAuthEnabled() {
-    delete process.env.DIGITALTWIN_DISABLE_AUTH
-    AuthConfig._resetConfig()
+    process.env.AUTH_MODE = 'gateway'
 }
 
 function restoreTestEnv() {
-    process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-    AuthConfig._resetConfig()
+    process.env.AUTH_MODE = 'none'
 }
 
 // Helper to create a test ZIP file with tileset.json
@@ -311,8 +308,7 @@ test.group('TilesetManager', (group) => {
 
 test.group('TilesetManager with auth disabled', group => {
     group.setup(() => {
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
     })
 
     group.teardown(() => {
@@ -348,8 +344,7 @@ test.group('TilesetManager with auth disabled', group => {
 
 test.group('TilesetManager.handleGetStatus', group => {
     group.setup(() => {
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
     })
 
     group.teardown(() => {
@@ -464,8 +459,7 @@ test.group('TilesetManager.handleGetStatus', group => {
 
 test.group('TilesetManager.handleDelete', group => {
     group.setup(() => {
-        process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
+        process.env.AUTH_MODE = 'none'
     })
 
     group.teardown(() => {

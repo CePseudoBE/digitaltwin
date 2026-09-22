@@ -39,7 +39,7 @@ import {
 } from '@cepseudo/shared'
 import type { StorageService } from '@cepseudo/storage'
 import type { DatabaseAdapter, MetadataRow } from '@cepseudo/database'
-import { ApisixAuthParser, AuthMiddleware, AuthProviderFactory, UserService, type HeadersLike } from '@cepseudo/auth'
+import { ApisixAuthParser, AuthMiddleware, createAuthProvider, UserService, type HeadersLike } from '@cepseudo/auth'
 import { PresignedUploadService } from './presigned_upload_service.js'
 import { generateAssetsOpenAPISpec } from './assets_openapi.js'
 import fs from 'fs/promises'
@@ -270,7 +270,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
     setDependencies(db: DatabaseAdapter, storage: StorageService, authMiddleware?: AuthMiddleware): void {
         this.db = db
         this.storage = storage
-        this.authMiddleware = authMiddleware ?? new AuthMiddleware(AuthProviderFactory.fromEnv(), new UserService(db.getUserRepository()))
+        this.authMiddleware = authMiddleware ?? new AuthMiddleware(createAuthProvider(), new UserService(db.getUserRepository()))
         this.presignedService = new PresignedUploadService({
             db: this.db,
             storage: this.storage,

@@ -1,6 +1,5 @@
 import { test } from '@japa/runner'
 import { UserService } from '../src/user_service.js'
-import { AuthConfig } from '../src/auth_config.js'
 import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/shared'
 
 /** In-memory UserRepository for testing UserService in isolation */
@@ -37,14 +36,12 @@ function createInMemoryUserRepository(): UserRepository {
 }
 
 function ensureAuthEnabled() {
-    delete process.env.DIGITALTWIN_DISABLE_AUTH
+    process.env.AUTH_MODE = 'gateway'
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
-    AuthConfig._resetConfig()
 }
 
 function restoreTestEnv() {
-    process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-    AuthConfig._resetConfig()
+    process.env.AUTH_MODE = 'none'
 }
 
 test.group('UserService', (group) => {

@@ -8,7 +8,7 @@ import { GenericContainer, Wait } from 'testcontainers'
 import type { StartedTestContainer } from 'testcontainers'
 import { KyselyDatabaseAdapter } from '@cepseudo/database'
 import { OvhS3StorageService } from '@cepseudo/storage'
-import { AuthMiddleware, AuthProviderFactory, UserService } from '@cepseudo/auth'
+import { AuthMiddleware, createAuthProvider, UserService } from '@cepseudo/auth'
 import type { DatabaseAdapter } from '@cepseudo/database'
 import type { StorageService } from '@cepseudo/storage'
 
@@ -146,9 +146,9 @@ export async function setupInfrastructure(): Promise<E2EInfrastructure> {
 
     // --- Auth ---
     // Disable auth for simpler E2E testing — auth_helpers.ts simulates it
-    process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
+    process.env.AUTH_MODE = 'none'
     const userService = new UserService(db.getUserRepository())
-    const authMiddleware = new AuthMiddleware(AuthProviderFactory.fromEnv(), userService)
+    const authMiddleware = new AuthMiddleware(createAuthProvider(), userService)
 
     return {
         db,
