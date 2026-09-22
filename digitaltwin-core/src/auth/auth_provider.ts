@@ -1,1 +1,1 @@
-export type { AuthProvider, AuthRequest, AuthMode, AuthProviderConfig, JwtConfig } from '@cepseudo/auth'
+export type { AuthProvider, AuthRequest, AuthMode, AuthProviderConfig } from '@cepseudo/auth'

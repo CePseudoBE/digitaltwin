@@ -1,11 +1,8 @@
 import { test } from '@japa/runner'
-import jwt from 'jsonwebtoken'
 import { GatewayAuthProvider } from '../src/providers/gateway_auth_provider.js'
-import { JwtAuthProvider } from '../src/providers/jwt_auth_provider.js'
 import { NoAuthProvider } from '../src/providers/no_auth_provider.js'
+import { OidcAuthProvider } from '../src/providers/oidc_auth_provider.js'
 import { AuthProviderFactory } from '../src/auth_provider_factory.js'
-
-const JWT_SECRET = 'test-secret-key-256-bits-long!!'
 
 test.group('GatewayAuthProvider', () => {
     test('parses x-user-id and x-user-roles headers', async ({ assert }) => {
@@ -28,43 +25,6 @@ test.group('GatewayAuthProvider', () => {
     })
 })
 
-test.group('JwtAuthProvider', () => {
-    test('rejects invalid token', async ({ assert }) => {
-        const provider = new JwtAuthProvider({ mode: 'jwt', jwt: { secret: JWT_SECRET } })
-
-        const user = await provider.authenticate({
-            headers: { authorization: 'Bearer invalid.token.here' }
-        })
-
-        assert.isNull(user)
-    })
-
-    test('rejects expired token', async ({ assert }) => {
-        const token = jwt.sign({ sub: 'user-1', roles: ['user'] }, JWT_SECRET, { expiresIn: -10 })
-        const provider = new JwtAuthProvider({ mode: 'jwt', jwt: { secret: JWT_SECRET } })
-
-        const user = await provider.authenticate({
-            headers: { authorization: `Bearer ${token}` }
-        })
-
-        assert.isNull(user)
-    })
-
-    test('accepts valid token and extracts claims', async ({ assert }) => {
-        const token = jwt.sign({ sub: 'user-42', roles: ['user', 'editor'] }, JWT_SECRET, { expiresIn: '1h' })
-        const provider = new JwtAuthProvider({ mode: 'jwt', jwt: { secret: JWT_SECRET } })
-
-        const user = await provider.authenticate({
-            headers: { authorization: `Bearer ${token}` }
-        })
-
-        assert.isNotNull(user)
-        assert.equal(user!.subject, 'user-42')
-        assert.deepEqual(user!.roles, ['user', 'editor'])
-        assert.equal(user!.claims?.sub, 'user-42')
-    })
-})
-
 test.group('NoAuthProvider', () => {
     test('always returns anonymous user', async ({ assert }) => {
         const provider = new NoAuthProvider()
@@ -78,8 +38,10 @@ test.group('NoAuthProvider', () => {
 test.group('AuthProviderFactory', (group) => {
     group.each.setup(() => {
         delete process.env.AUTH_MODE
-        delete process.env.JWT_SECRET
         delete process.env.DIGITALTWIN_DISABLE_AUTH
+        for (const name of ['OIDC_ISSUER', 'OIDC_AUDIENCE', 'OIDC_ROLES_CLAIM', 'OIDC_CLOCK_TOLERANCE', 'OIDC_JWKS_URI', 'OIDC_PUBLIC_KEY']) {
+            delete process.env[name]
+        }
     })
     group.teardown(() => {
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
@@ -89,8 +51,9 @@ test.group('AuthProviderFactory', (group) => {
         const gateway = AuthProviderFactory.create({ mode: 'gateway' })
         assert.instanceOf(gateway, GatewayAuthProvider)
 
-        const jwt = AuthProviderFactory.create({ mode: 'jwt', jwt: { secret: JWT_SECRET } })
-        assert.instanceOf(jwt, JwtAuthProvider)
+        const oidc = AuthProviderFactory.create({ mode: 'oidc', oidc: { issuer: 'https://id.example', audience: 'dt' } })
+        assert.instanceOf(oidc, OidcAuthProvider)
+        assert.throws(() => AuthProviderFactory.create({ mode: 'oidc' }), /OIDC configuration required/)
 
         const none = AuthProviderFactory.create({ mode: 'none' })
         assert.instanceOf(none, NoAuthProvider)
@@ -102,5 +65,22 @@ test.group('AuthProviderFactory', (group) => {
         const provider = AuthProviderFactory.fromEnv()
 
         assert.instanceOf(provider, NoAuthProvider)
+    })
+
+    test('fromEnv() with AUTH_MODE=oidc needs issuer and audience and a numeric tolerance', ({ assert }) => {
+        process.env.AUTH_MODE = 'oidc'
+        assert.throws(() => AuthProviderFactory.fromEnv(), /OIDC_ISSUER and OIDC_AUDIENCE/)
+
+        process.env.OIDC_ISSUER = 'https://id.example'
+        process.env.OIDC_AUDIENCE = 'dt'
+        assert.instanceOf(AuthProviderFactory.fromEnv(), OidcAuthProvider)
+
+        process.env.OIDC_CLOCK_TOLERANCE = 'soon'
+        assert.throws(() => AuthProviderFactory.fromEnv(), /OIDC_CLOCK_TOLERANCE must be a number/)
+    })
+
+    test('fromEnv() rejects an unknown AUTH_MODE', ({ assert }) => {
+        process.env.AUTH_MODE = 'jwt'
+        assert.throws(() => AuthProviderFactory.fromEnv(), /Unknown auth mode: jwt/)
     })
 })

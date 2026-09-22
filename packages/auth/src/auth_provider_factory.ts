@@ -1,31 +1,21 @@
 /**
- * @fileoverview Factory for creating authentication providers.
- *
- * This module provides a factory for creating the appropriate authentication
- * provider based on configuration or environment variables.
+ * @fileoverview Factory for creating authentication providers from configuration or environment.
  */
 
-import * as fs from 'fs'
 import type { AuthProvider, AuthProviderConfig, AuthMode } from './auth_provider.js'
 import { GatewayAuthProvider } from './providers/gateway_auth_provider.js'
-import { JwtAuthProvider } from './providers/jwt_auth_provider.js'
 import { NoAuthProvider } from './providers/no_auth_provider.js'
+import { OidcAuthProvider } from './providers/oidc_auth_provider.js'
 
 /**
- * Factory for creating authentication providers.
- *
- * Use this factory to create the appropriate authentication provider based on
- * configuration or environment variables.
- *
  * @example
  * ```typescript
- * // Create from environment variables (recommended)
  * const provider = AuthProviderFactory.fromEnv()
+ * await provider.ready?.()
  *
- * // Create from explicit configuration
- * const provider = AuthProviderFactory.create({
- *     mode: 'jwt',
- *     jwt: { secret: 'your-secret' }
+ * const explicit = AuthProviderFactory.create({
+ *     mode: 'oidc',
+ *     oidc: { issuer: 'https://id.example.org/realms/city', audience: 'digitaltwin' }
  * })
  * ```
  */
@@ -33,32 +23,18 @@ export class AuthProviderFactory {
     /**
      * Create an authentication provider from explicit configuration.
      *
-     * @param config - Authentication configuration
-     * @returns Configured authentication provider
-     * @throws Error if configuration is invalid
-     *
-     * @example
-     * ```typescript
-     * // Gateway mode (default)
-     * const provider = AuthProviderFactory.create({ mode: 'gateway' })
-     *
-     * // JWT mode
-     * const provider = AuthProviderFactory.create({
-     *     mode: 'jwt',
-     *     jwt: { secret: 'your-secret', algorithm: 'HS256' }
-     * })
-     *
-     * // No auth mode (development only)
-     * const provider = AuthProviderFactory.create({ mode: 'none' })
-     * ```
+     * @throws Error if the configuration is incomplete for the mode
      */
     static create(config: AuthProviderConfig): AuthProvider {
         switch (config.mode) {
             case 'gateway':
                 return new GatewayAuthProvider()
 
-            case 'jwt':
-                return new JwtAuthProvider(config)
+            case 'oidc':
+                if (!config.oidc) {
+                    throw new Error('OIDC configuration required for oidc auth mode')
+                }
+                return new OidcAuthProvider(config.oidc)
 
             case 'none':
                 return new NoAuthProvider(config.anonymousUserId)
@@ -71,86 +47,47 @@ export class AuthProviderFactory {
     /**
      * Create an authentication provider from environment variables.
      *
-     * Environment variables:
-     * - `AUTH_MODE`: Authentication mode ('gateway', 'jwt', 'none'). Default: 'gateway'
+     * - `AUTH_MODE`: 'gateway' (default), 'oidc' or 'none'
+     * - `DIGITALTWIN_DISABLE_AUTH=true`: same as `AUTH_MODE=none`
+     * - `DIGITALTWIN_ANONYMOUS_USER_ID`: subject of the anonymous user (default: 'anonymous')
      *
-     * For JWT mode:
-     * - `JWT_SECRET`: Secret key for HMAC algorithms
-     * - `JWT_PUBLIC_KEY`: Public key content for RSA/EC algorithms
-     * - `JWT_PUBLIC_KEY_FILE`: Path to public key file
-     * - `JWT_ALGORITHM`: Algorithm (default: 'HS256')
-     * - `JWT_ISSUER`: Expected token issuer
-     * - `JWT_AUDIENCE`: Expected token audience
-     * - `JWT_USER_ID_CLAIM`: Claim for user ID (default: 'sub')
-     * - `JWT_ROLES_CLAIM`: Claim for roles (default: 'roles')
+     * For `oidc`:
+     * - `OIDC_ISSUER` (required), `OIDC_AUDIENCE` (required)
+     * - `OIDC_ROLES_CLAIM`: dot path to the roles (default: 'roles'; Keycloak: 'realm_access.roles')
+     * - `OIDC_CLOCK_TOLERANCE`: accepted clock skew in seconds (default: 5)
+     * - `OIDC_JWKS_URI`: JWKS endpoint used instead of discovery
+     * - `OIDC_PUBLIC_KEY`: PEM public key used instead of any JWKS (air-gapped setups)
      *
-     * For no-auth mode:
-     * - `DIGITALTWIN_DISABLE_AUTH`: Set to 'true' to disable auth
-     * - `DIGITALTWIN_ANONYMOUS_USER_ID`: Anonymous user ID (default: 'anonymous')
-     *
-     * @returns Configured authentication provider
-     *
-     * @example
-     * ```typescript
-     * // Gateway mode (default, no env vars needed)
-     * // AUTH_MODE=gateway or not set
-     * const provider = AuthProviderFactory.fromEnv()
-     *
-     * // JWT mode
-     * // AUTH_MODE=jwt
-     * // JWT_SECRET=your-secret
-     * const provider = AuthProviderFactory.fromEnv()
-     *
-     * // Disable auth for development
-     * // DIGITALTWIN_DISABLE_AUTH=true
-     * const provider = AuthProviderFactory.fromEnv()
-     * ```
+     * @throws Error when `AUTH_MODE` is unknown or the mode's required variables are missing
      */
     static fromEnv(): AuthProvider {
-        // Check if auth is disabled (legacy env var)
         if (process.env.DIGITALTWIN_DISABLE_AUTH === 'true') {
             return new NoAuthProvider(process.env.DIGITALTWIN_ANONYMOUS_USER_ID || 'anonymous')
         }
 
         const mode = (process.env.AUTH_MODE || 'gateway') as AuthMode
 
-        if (mode === 'none') {
-            return new NoAuthProvider(process.env.DIGITALTWIN_ANONYMOUS_USER_ID || 'anonymous')
-        }
-
-        if (mode === 'gateway') {
-            return new GatewayAuthProvider()
-        }
-
-        if (mode === 'jwt') {
-            // Load public key from file if specified
-            let publicKey: string | undefined
-            if (process.env.JWT_PUBLIC_KEY_FILE) {
-                publicKey = fs.readFileSync(process.env.JWT_PUBLIC_KEY_FILE, 'utf-8')
-            } else if (process.env.JWT_PUBLIC_KEY) {
-                publicKey = process.env.JWT_PUBLIC_KEY
+        if (mode === 'oidc') {
+            const issuer = process.env.OIDC_ISSUER
+            const audience = process.env.OIDC_AUDIENCE
+            if (!issuer || !audience) {
+                throw new Error('AUTH_MODE=oidc requires OIDC_ISSUER and OIDC_AUDIENCE')
             }
-
-            const secret = process.env.JWT_SECRET
-
-            if (!secret && !publicKey) {
-                throw new Error('JWT mode requires either JWT_SECRET or JWT_PUBLIC_KEY/JWT_PUBLIC_KEY_FILE')
+            const rawTolerance = process.env.OIDC_CLOCK_TOLERANCE
+            const clockTolerance = rawTolerance ? Number(rawTolerance) : undefined
+            if (clockTolerance !== undefined && !Number.isFinite(clockTolerance)) {
+                throw new Error(`OIDC_CLOCK_TOLERANCE must be a number of seconds, got "${rawTolerance}"`)
             }
-
-            return new JwtAuthProvider({
-                mode: 'jwt',
-                jwt: {
-                    secret,
-                    publicKey,
-                    algorithm: process.env.JWT_ALGORITHM || 'HS256',
-                    issuer: process.env.JWT_ISSUER,
-                    audience: process.env.JWT_AUDIENCE,
-                    userIdClaim: process.env.JWT_USER_ID_CLAIM || 'sub',
-                    rolesClaim: process.env.JWT_ROLES_CLAIM || 'roles'
-                }
+            return new OidcAuthProvider({
+                issuer,
+                audience,
+                rolesClaim: process.env.OIDC_ROLES_CLAIM,
+                clockTolerance,
+                jwksUri: process.env.OIDC_JWKS_URI,
+                publicKey: process.env.OIDC_PUBLIC_KEY
             })
         }
 
-        throw new Error(`Unknown AUTH_MODE: ${mode}`)
+        return this.create({ mode, anonymousUserId: process.env.DIGITALTWIN_ANONYMOUS_USER_ID })
     }
 }

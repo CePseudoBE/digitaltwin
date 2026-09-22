@@ -510,7 +510,9 @@ export class DigitalTwinEngine {
         const userRepository = this.#database.getUserRepository()
         const userService = new UserService(userRepository)
         await userService.initializeTables()
-        const authMiddleware = new AuthMiddleware(AuthProviderFactory.fromEnv(), userService, { adminRole: AuthConfig.getAdminRoleName() })
+        const authProvider = AuthProviderFactory.fromEnv()
+        await authProvider.ready?.()
+        const authMiddleware = new AuthMiddleware(authProvider, userService, { adminRole: AuthConfig.getAdminRoleName() })
         this.#authMiddleware = authMiddleware
 
         // Get autoMigration setting (default: true)
