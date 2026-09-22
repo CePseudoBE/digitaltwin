@@ -6,6 +6,7 @@ import type { AuthProvider, AuthProviderConfig, AuthMode } from './auth_provider
 import { GatewayAuthProvider } from './providers/gateway_auth_provider.js'
 import { NoAuthProvider } from './providers/no_auth_provider.js'
 import { OidcAuthProvider } from './providers/oidc_auth_provider.js'
+import { TrustedHeaderAuthProvider } from './providers/trusted_header_auth_provider.js'
 
 /**
  * @example
@@ -30,6 +31,9 @@ export class AuthProviderFactory {
             case 'gateway':
                 return new GatewayAuthProvider()
 
+            case 'trusted-headers':
+                return new TrustedHeaderAuthProvider(config.trustedHeaders)
+
             case 'oidc':
                 if (!config.oidc) {
                     throw new Error('OIDC configuration required for oidc auth mode')
@@ -47,7 +51,7 @@ export class AuthProviderFactory {
     /**
      * Create an authentication provider from environment variables.
      *
-     * - `AUTH_MODE`: 'gateway' (default), 'oidc' or 'none'
+     * - `AUTH_MODE`: 'gateway' (default), 'oidc', 'trusted-headers' or 'none'
      * - `DIGITALTWIN_DISABLE_AUTH=true`: same as `AUTH_MODE=none`
      * - `DIGITALTWIN_ANONYMOUS_USER_ID`: subject of the anonymous user (default: 'anonymous')
      *
@@ -57,6 +61,11 @@ export class AuthProviderFactory {
      * - `OIDC_CLOCK_TOLERANCE`: accepted clock skew in seconds (default: 5)
      * - `OIDC_JWKS_URI`: JWKS endpoint used instead of discovery
      * - `OIDC_PUBLIC_KEY`: PEM public key used instead of any JWKS (air-gapped setups)
+     *
+     * For `trusted-headers`:
+     * - `AUTH_HEADER_SUBJECT`: header carrying the subject (default: 'x-user-id')
+     * - `AUTH_HEADER_ROLES`: header carrying the comma-separated roles (default: 'x-user-roles')
+     * - `AUTH_HEADER_SECRET`: shared secret the proxy must send in `x-auth-secret` (optional, strongly advised)
      *
      * @throws Error when `AUTH_MODE` is unknown or the mode's required variables are missing
      */
@@ -85,6 +94,14 @@ export class AuthProviderFactory {
                 clockTolerance,
                 jwksUri: process.env.OIDC_JWKS_URI,
                 publicKey: process.env.OIDC_PUBLIC_KEY
+            })
+        }
+
+        if (mode === 'trusted-headers') {
+            return new TrustedHeaderAuthProvider({
+                subjectHeader: process.env.AUTH_HEADER_SUBJECT,
+                rolesHeader: process.env.AUTH_HEADER_ROLES,
+                secret: process.env.AUTH_HEADER_SECRET
             })
         }
 

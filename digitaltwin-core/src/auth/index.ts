@@ -1,7 +1,7 @@
 // Auth providers (new system)
 export type { AuthProvider, AuthRequest, AuthMode, AuthProviderConfig } from '@cepseudo/auth'
 export { AuthProviderFactory } from '@cepseudo/auth'
-export { GatewayAuthProvider, NoAuthProvider, OidcAuthProvider } from '@cepseudo/auth'
+export { GatewayAuthProvider, NoAuthProvider, OidcAuthProvider, TrustedHeaderAuthProvider } from '@cepseudo/auth'
 
 // Backward-compatible API
 export { ApisixAuthParser, type HeadersLike } from '@cepseudo/auth'
