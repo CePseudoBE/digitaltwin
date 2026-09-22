@@ -28,7 +28,7 @@ export interface PresignedUploadDeps {
     authMiddleware: AuthMiddleware
     getConfiguration(): AssetsManagerConfiguration
     getAssetById(id: string): Promise<DataRecord | undefined>
-    validateOwnership(asset: DataRecord, userId: number, headers?: Record<string, string | string[] | undefined>): DataResponse | undefined
+    validateOwnership(asset: DataRecord, userId: number, isAdmin: boolean): DataResponse | undefined
     validateFileExtension(filename: string): boolean
 }
 
@@ -161,7 +161,7 @@ export class PresignedUploadService {
             }
 
             // Check ownership
-            const ownershipError = this.deps.validateOwnership(asset, userId, req.headers)
+            const ownershipError = this.deps.validateOwnership(asset, userId, authResult.isAdmin)
             if (ownershipError) {
                 return ownershipError
             }

@@ -117,7 +117,7 @@ test.group('OpenAPI document', () => {
             assert.isDefined(doc.paths['/sensors'].post.requestBody?.content['application/json'])
             assert.isDefined(doc.paths['/sensors/{id}'].get)
             assert.isDefined(doc.components.schemas.sensorsRecord)
-            assert.isDefined(doc.components.securitySchemes.ApiKeyAuth)
+            assert.isDefined(doc.components.securitySchemes.BearerAuth)
             assert.equal(doc.paths['/calc/extra'].get.summary, 'Documented without a route')
             assert.deepEqual(doc.tags.map(tag => tag.name), ['Calculator', 'sensors'])
             assert.isUndefined(doc.paths['/api/openapi.json'])

@@ -2,7 +2,7 @@
  * HTTP Integration Tests
  *
  * Starts the real DigitalTwinEngine on its Fastify server, sends HTTP requests
- * with x-user-id / x-user-roles headers (simulating APISIX gateway),
+ * with x-user-id / x-user-roles headers (simulating a gateway),
  * and verifies full-stack responses.
  */
 import { test } from '@japa/runner'
@@ -17,7 +17,7 @@ import {
     E2ECustomTableManager,
 } from './helpers/test_components.js'
 
-test.group('HTTP Integration — Engine + APISIX headers', (group) => {
+test.group('HTTP Integration — Engine + gateway headers', (group) => {
     let infra: E2EInfrastructure
     let redis: StartedRedisContainer
     let engine: DigitalTwinEngine
@@ -31,7 +31,7 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
         // Start Redis for queue manager
         redis = await new RedisContainer('redis:7-alpine').start()
 
-        // --- Auth: ENABLED (not disabled) so APISIX header parsing is active ---
+        // --- Auth: ENABLED (not disabled) so gateway header parsing is active ---
         process.env.AUTH_MODE = 'gateway'
 
         // --- Components ---
@@ -130,7 +130,7 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
         assert.equal(body.temperature, 22.5)
     })
 
-    // ── CustomTableManager CRUD with APISIX headers ────────────────────────
+    // ── CustomTableManager CRUD with gateway headers ────────────────────────
 
     test('POST /{table} without auth headers returns 401', async ({ assert }) => {
         const res = await fetch(`${baseUrl}/e2e_custom_records`, {
@@ -141,7 +141,7 @@ test.group('HTTP Integration — Engine + APISIX headers', (group) => {
         assert.equal(res.status, 401)
     })
 
-    test('POST /{table} with APISIX headers creates record', async ({ assert }) => {
+    test('POST /{table} with gateway headers creates record', async ({ assert }) => {
         // Ensure user exists in DB first
         await infra.db.getUserRepository().findOrCreateUser({
             subject: 'http-user-1',

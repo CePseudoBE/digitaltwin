@@ -11,7 +11,6 @@ export {
 } from './providers/index.js'
 export { AuthMiddleware, type AuthMiddlewareOptions } from './auth_middleware.js'
 export { UserService } from './user_service.js'
-export { ApisixAuthParser, type HeadersLike } from './apisix_parser.js'
 
 // Types (re-exported from shared for convenience)
 export type { AuthenticatedUser, UserRecord, AuthResult, UserRepository } from '@cepseudo/shared'

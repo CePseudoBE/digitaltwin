@@ -1,6 +1,7 @@
 import { test } from '@japa/runner'
 import { TilesetManager } from '../src/tileset_manager.js'
 import { MockDatabaseAdapter } from './mocks/mock_database_adapter.js'
+import { fakeAuth } from './mocks/fake_auth.js'
 import { LocalStorageService } from '@cepseudo/storage'
 import type { AssetsManagerConfiguration } from '@cepseudo/shared'
 import JSZip from 'jszip'
@@ -457,7 +458,7 @@ test.group('TilesetManager — delete with auth', (group) => {
         const manager = new TestTilesetManager()
         const db = new MockDatabaseAdapter()
         const storage = new LocalStorageService('.test-delete-noauth')
-        manager.setDependencies(db, storage)
+        manager.setDependencies(db, storage, fakeAuth(db).middleware)
 
         const record = await db.save({
             name: 'test-tilesets', type: 'application/json',
@@ -475,7 +476,9 @@ test.group('TilesetManager — delete with auth', (group) => {
         const manager = new TestTilesetManager()
         const db = new MockDatabaseAdapter()
         const storage = new LocalStorageService('.test-delete-forbidden')
-        manager.setDependencies(db, storage)
+        const auth = fakeAuth(db)
+        auth.actAs('other-user')
+        manager.setDependencies(db, storage, auth.middleware)
 
         const owner = await db.getUserRepository().findOrCreateUser({ subject: 'owner-1', roles: ['user'] })
         await db.getUserRepository().findOrCreateUser({ subject: 'other-user', roles: ['user'] })
@@ -490,7 +493,7 @@ test.group('TilesetManager — delete with auth', (group) => {
 
         const response = await manager.handleDelete({
             params: { id: String(record.id) },
-            headers: { 'x-user-id': 'other-user', 'x-user-roles': 'user' }
+            headers: {}
         })
 
         assert.equal(response.status, 403)
@@ -500,7 +503,9 @@ test.group('TilesetManager — delete with auth', (group) => {
         const manager = new TestTilesetManager()
         const db = new MockDatabaseAdapter()
         const storage = new LocalStorageService('.test-delete-admin')
-        manager.setDependencies(db, storage)
+        const auth = fakeAuth(db)
+        auth.actAs('admin-user', ['admin'])
+        manager.setDependencies(db, storage, auth.middleware)
 
         const owner = await db.getUserRepository().findOrCreateUser({ subject: 'owner-1', roles: ['user'] })
 
@@ -514,7 +519,7 @@ test.group('TilesetManager — delete with auth', (group) => {
 
         const response = await manager.handleDelete({
             params: { id: String(record.id) },
-            headers: { 'x-user-id': 'admin-user', 'x-user-roles': 'admin' }
+            headers: {}
         })
 
         assert.equal(response.status, 200)
@@ -530,7 +535,7 @@ test.group('TilesetManager — retrieve with visibility filtering', (group) => {
         const manager = new TestTilesetManager()
         const db = new MockDatabaseAdapter()
         const storage = new LocalStorageService('.test-retrieve')
-        manager.setDependencies(db, storage)
+        manager.setDependencies(db, storage, fakeAuth(db).middleware)
 
         await db.save({
             name: 'test-tilesets', type: 'application/json',
@@ -560,7 +565,9 @@ test.group('TilesetManager — retrieve with visibility filtering', (group) => {
         const manager = new TestTilesetManager()
         const db = new MockDatabaseAdapter()
         const storage = new LocalStorageService('.test-retrieve-admin')
-        manager.setDependencies(db, storage)
+        const auth = fakeAuth(db)
+        auth.actAs('admin-1', ['admin'])
+        manager.setDependencies(db, storage, auth.middleware)
 
         await db.save({
             name: 'test-tilesets', type: 'application/json',
@@ -577,7 +584,7 @@ test.group('TilesetManager — retrieve with visibility filtering', (group) => {
         })
 
         const response = await manager.retrieve({
-            headers: { 'x-user-id': 'admin-1', 'x-user-roles': 'admin' }
+            headers: {}
         })
 
         assert.equal(response.status, 200)
@@ -588,7 +595,9 @@ test.group('TilesetManager — retrieve with visibility filtering', (group) => {
         const manager = new TestTilesetManager()
         const db = new MockDatabaseAdapter()
         const storage = new LocalStorageService('.test-retrieve-owner')
-        manager.setDependencies(db, storage)
+        const auth = fakeAuth(db)
+        auth.actAs('owner-user')
+        manager.setDependencies(db, storage, auth.middleware)
 
         const user = await db.getUserRepository().findOrCreateUser({ subject: 'owner-user', roles: ['user'] })
 
@@ -600,7 +609,7 @@ test.group('TilesetManager — retrieve with visibility filtering', (group) => {
         })
 
         const response = await manager.retrieve({
-            headers: { 'x-user-id': 'owner-user', 'x-user-roles': 'user' }
+            headers: {}
         })
 
         assert.equal(response.status, 200)

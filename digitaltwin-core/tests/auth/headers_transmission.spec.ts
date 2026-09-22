@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { AssetsManager } from '../../src/components/assets_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
-import { ApisixAuthParser } from '../../src/auth/index.js'
+import { GatewayAuthProvider } from '../../src/auth/index.js'
 import type { AssetsManagerConfiguration } from '../../src/components/types.js'
 
 class HeaderTestAssetsManager extends AssetsManager {
@@ -206,9 +206,8 @@ test.group('Ultimate-Express Integration Simulation', (group) => {
     assert.isDefined(result.allHeaders['x-real-ip'])
     assert.isDefined(result.allHeaders['authorization'])
     
-    // Verify ApisixAuthParser can parse them
-    const { ApisixAuthParser } = await import('../../src/auth/apisix_parser.js')
-    const authUser = ApisixAuthParser.parseAuthHeaders(requestObject.headers)
+    // Verify the gateway provider can read them
+    const authUser = await new GatewayAuthProvider().authenticate({ headers: requestObject.headers })
     
     assert.isNotNull(authUser)
     assert.equal(authUser!.subject, '6e06a527-a89d-4390-95cd-10ae63cfc939')

@@ -3,7 +3,7 @@ import { DigitalTwinEngine } from '../../src/engine/digital_twin_engine.js'
 import { AssetsManager } from '../../src/components/assets_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
-import { ApisixAuthParser } from '../../src/auth/index.js'
+import { GatewayAuthProvider } from '../../src/auth/index.js'
 import type { AssetsManagerConfiguration } from '../../src/components/types.js'
 
 class TestAuthAssetsManager extends AssetsManager {
@@ -176,9 +176,8 @@ test.group('Authentication Flow End-to-End', group => {
       'x-user-roles': 'user,manager'
     }
 
-    // Step 1: Parse headers (already tested in apisix_parser.spec.ts)
-    const { ApisixAuthParser } = await import('../../src/auth/apisix_parser.js')
-    const authUser = ApisixAuthParser.parseAuthHeaders(mockHeaders)
+    // Step 1: the gateway provider reads the headers
+    const authUser = await new GatewayAuthProvider().authenticate({ headers: mockHeaders })
     
     assert.isNotNull(authUser)
     assert.equal(authUser!.subject, '550e8400-e29b-41d4-a716-446655440000')
