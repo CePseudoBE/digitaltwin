@@ -28,7 +28,7 @@ Request and response types for building type-safe HTTP handlers.
 | `DataRecord` | Core data structure for collected/harvested data |
 | `DataResolver` | Function that resolves data for a component |
 | `UserRepository` | Interface for user persistence (implemented in `@cepseudo/database`) |
-| `AuthResult`, `AuthContext`, `AuthenticatedUser` | Authentication-related types |
+| `AuthResult`, `AuthenticatedUser` | Authentication-related types |
 | `HttpMethod` | Union type of HTTP methods |
 | `OpenAPIDocument`, `OpenAPIDocumentable`, ... | OpenAPI 3.x specification types |
 | `Component`, `Servable`, `ScheduleRunnable` | Component model interfaces |

@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { TilesetManager } from '../src/tileset_manager.js'
 import { MockDatabaseAdapter } from './mocks/mock_database_adapter.js'
 import { LocalStorageService } from '@cepseudo/storage'
-import { AuthConfig, ApisixAuthParser } from '@cepseudo/auth'
+import { AuthConfig } from '@cepseudo/auth'
 import type { AssetsManagerConfiguration } from '@cepseudo/shared'
 import JSZip from 'jszip'
 import fs from 'fs/promises'
@@ -24,13 +24,11 @@ class TestTilesetManager extends TilesetManager {
 function enableAuth() {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 function disableAuth() {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 async function createTestTilesetZip(files: Record<string, string>): Promise<string> {
@@ -482,8 +480,8 @@ test.group('TilesetManager — delete with auth', (group) => {
         const storage = new LocalStorageService('.test-delete-forbidden')
         manager.setDependencies(db, storage)
 
-        const owner = await db.getUserRepository().findOrCreateUser({ id: 'owner-1', roles: ['user'] })
-        await db.getUserRepository().findOrCreateUser({ id: 'other-user', roles: ['user'] })
+        const owner = await db.getUserRepository().findOrCreateUser({ subject: 'owner-1', roles: ['user'] })
+        await db.getUserRepository().findOrCreateUser({ subject: 'other-user', roles: ['user'] })
 
         const record = await db.save({
             name: 'test-tilesets', type: 'application/json',
@@ -507,7 +505,7 @@ test.group('TilesetManager — delete with auth', (group) => {
         const storage = new LocalStorageService('.test-delete-admin')
         manager.setDependencies(db, storage)
 
-        const owner = await db.getUserRepository().findOrCreateUser({ id: 'owner-1', roles: ['user'] })
+        const owner = await db.getUserRepository().findOrCreateUser({ subject: 'owner-1', roles: ['user'] })
 
         const record = await db.save({
             name: 'test-tilesets', type: 'application/json',
@@ -595,7 +593,7 @@ test.group('TilesetManager — retrieve with visibility filtering', (group) => {
         const storage = new LocalStorageService('.test-retrieve-owner')
         manager.setDependencies(db, storage)
 
-        const user = await db.getUserRepository().findOrCreateUser({ id: 'owner-user', roles: ['user'] })
+        const user = await db.getUserRepository().findOrCreateUser({ subject: 'owner-user', roles: ['user'] })
 
         await db.save({
             name: 'test-tilesets', type: 'application/json',

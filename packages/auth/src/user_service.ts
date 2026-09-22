@@ -33,7 +33,7 @@ export class UserService {
         if (AuthConfig.isAuthDisabled()) {
             return {
                 id: 1,
-                keycloak_id: authUser.id,
+                keycloak_id: authUser.subject,
                 roles: authUser.roles,
                 created_at: new Date(),
                 updated_at: new Date()

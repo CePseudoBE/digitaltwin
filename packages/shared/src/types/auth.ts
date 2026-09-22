@@ -1,44 +1,29 @@
 /**
- * User information extracted from Keycloak JWT via Apache APISIX headers.
+ * The caller as resolved by an `AuthProvider`.
  *
- * This interface represents the authenticated user data parsed from APISIX
- * headers after Keycloak authentication. APISIX forwards these headers:
- * - `x-user-id`: The Keycloak user UUID
- * - `x-user-roles`: Comma-separated list of user roles
- *
- * @example
- * ```typescript
- * const authUser = ApisixAuthParser.parseAuthHeaders(req.headers)
- * if (authUser) {
- *   console.log(`User ${authUser.id} has roles: ${authUser.roles.join(', ')}`)
- * }
- * ```
+ * Providers read credentials (gateway headers, a Bearer token, nothing at all)
+ * and normalise them into this shape. The middleware then persists the user
+ * and decides whether the caller is an admin.
  */
 export interface AuthenticatedUser {
-    /** User ID from Keycloak (x-user-id header) - UUID format */
-    id: string
-    /** User roles from Keycloak (x-user-roles header, parsed from comma-separated string) */
+    /** Stable identifier of the caller at the identity provider (`sub` in OIDC) */
+    subject: string
+    /** Roles granted to the caller */
     roles: string[]
+    /** Raw claims the provider had access to, for components that need more than roles */
+    claims?: Record<string, unknown>
 }
 
 /**
  * User record stored in the database.
  *
- * Represents a user stored in the normalized user management system.
- * Users are created automatically when they first access the system
- * after being authenticated by Keycloak via APISIX.
- *
- * @example
- * ```typescript
- * const userService = new UserService(database)
- * const userRecord = await userService.findOrCreateUser(authenticatedUser)
- * console.log(`User ${userRecord.keycloak_id} has ${userRecord.roles.length} roles`)
- * ```
+ * Users are created automatically the first time an authenticated caller
+ * reaches a component; their roles are synchronised on every request.
  */
 export interface UserRecord {
     /** Primary key (auto-increment) */
     id?: number
-    /** Keycloak user ID (UUID, unique across system) */
+    /** Subject of the caller at the identity provider (unique across system) */
     keycloak_id: string
     /** User roles (populated from user_roles junction table) */
     roles: string[]
@@ -46,26 +31,4 @@ export interface UserRecord {
     created_at: Date
     /** Last time the user's roles were updated */
     updated_at: Date
-}
-
-/**
- * Authentication context passed to handlers.
- *
- * Contains both the raw authentication data from APISIX headers
- * and the corresponding database user record. Used internally
- * by components that need full user context.
- *
- * @example
- * ```typescript
- * const authContext: AuthContext = {
- *   user: authUser,
- *   userRecord: await userService.findOrCreateUser(authUser)
- * }
- * ```
- */
-export interface AuthContext {
-    /** Authenticated user information from APISIX headers */
-    user: AuthenticatedUser
-    /** Database user record with full role information */
-    userRecord: UserRecord
 }

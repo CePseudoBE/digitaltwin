@@ -8,7 +8,7 @@ import type {
     OpenAPIComponentSpec
 } from '@cepseudo/shared'
 import type { DatabaseAdapter } from '@cepseudo/database'
-import { UserService, AuthMiddleware } from '@cepseudo/auth'
+import { UserService, AuthMiddleware, AuthProviderFactory } from '@cepseudo/auth'
 import {
     validateIdParam,
     validateCustomRecordCreate,
@@ -129,7 +129,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
      */
     setDependencies(db: DatabaseAdapter, authMiddleware?: AuthMiddleware): void {
         this.db = db
-        this.authMiddleware = authMiddleware ?? new AuthMiddleware(new UserService(db.getUserRepository()))
+        this.authMiddleware = authMiddleware ?? new AuthMiddleware(AuthProviderFactory.fromEnv(), new UserService(db.getUserRepository()))
         this.tableName = this.getConfiguration().name
     }
 
@@ -546,7 +546,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
     protected async authenticateRequest(req: any): Promise<UserRecord | null> {
         const result = await this.authMiddleware.authenticate(req)
         if (!result.success) return null
-        return result.userRecord
+        return result.user
     }
 
     /**
@@ -1039,7 +1039,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
             if (!authResult.success) {
                 return authResult.response
             }
-            const userRecord = authResult.userRecord
+            const userRecord = authResult.user
 
             if (!req?.body) {
                 return {
@@ -1104,7 +1104,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
             if (!authResult.success) {
                 return authResult.response
             }
-            const userRecord = authResult.userRecord
+            const userRecord = authResult.user
 
             // Validate ID parameter (ValidationError bubbles up to global handler -> 422)
             const validatedParams = await validateParams<{ id: number }>(validateIdParam, req.params || {}, 'Record ID')
@@ -1161,7 +1161,7 @@ export abstract class CustomTableManager implements CustomTableComponent, Servab
             if (!authResult.success) {
                 return authResult.response
             }
-            const userRecord = authResult.userRecord
+            const userRecord = authResult.user
 
             // Validate ID parameter (ValidationError bubbles up to global handler -> 422)
             const validatedParams = await validateParams<{ id: number }>(validateIdParam, req.params || {}, 'Record ID')

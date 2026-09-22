@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { TilesetManager } from '../../src/components/tileset_manager.js'
 import { MockDatabaseAdapter } from '../mocks/mock_database_adapter.js'
 import { LocalStorageService } from '../../src/storage/adapters/local_storage_service.js'
-import { AuthConfig, ApisixAuthParser } from '../../src/auth/index.js'
+import { AuthConfig } from '../../src/auth/index.js'
 import type { AssetsManagerConfiguration } from '../../src/components/types.js'
 import JSZip from 'jszip'
 import fs from 'fs/promises'
@@ -26,13 +26,11 @@ class TestTilesetManager extends TilesetManager {
 function ensureAuthEnabled() {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 function restoreTestEnv() {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 // Helper to create a test ZIP file with tileset.json
@@ -315,7 +313,6 @@ test.group('TilesetManager with auth disabled', group => {
     group.setup(() => {
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
         AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
 
     group.teardown(() => {
@@ -353,7 +350,6 @@ test.group('TilesetManager.handleGetStatus', group => {
     group.setup(() => {
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
         AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
 
     group.teardown(() => {
@@ -470,7 +466,6 @@ test.group('TilesetManager.handleDelete', group => {
     group.setup(() => {
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
         AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
 
     group.teardown(() => {
@@ -648,8 +643,8 @@ test.group('TilesetManager.handleDelete with auth', group => {
         const storage = new LocalStorageService('.test-delete-forbidden')
         manager.setDependencies(db, storage)
 
-        const owner = await db.getUserRepository().findOrCreateUser({ id: 'owner-1', roles: ['user'] })
-        await db.getUserRepository().findOrCreateUser({ id: 'other-user', roles: ['user'] })
+        const owner = await db.getUserRepository().findOrCreateUser({ subject: 'owner-1', roles: ['user'] })
+        await db.getUserRepository().findOrCreateUser({ subject: 'other-user', roles: ['user'] })
 
         const record = await db.save({
             name: 'test-tilesets',
@@ -677,7 +672,7 @@ test.group('TilesetManager.handleDelete with auth', group => {
         const storage = new LocalStorageService('.test-delete-admin')
         manager.setDependencies(db, storage)
 
-        const owner = await db.getUserRepository().findOrCreateUser({ id: 'owner-1', roles: ['user'] })
+        const owner = await db.getUserRepository().findOrCreateUser({ subject: 'owner-1', roles: ['user'] })
 
         const record = await db.save({
             name: 'test-tilesets',
@@ -794,7 +789,7 @@ test.group('TilesetManager.retrieve filtering', group => {
         const storage = new LocalStorageService('.test-retrieve-owner')
         manager.setDependencies(db, storage)
 
-        const user = await db.getUserRepository().findOrCreateUser({ id: 'owner-user', roles: ['user'] })
+        const user = await db.getUserRepository().findOrCreateUser({ subject: 'owner-user', roles: ['user'] })
 
         await db.save({
             name: 'test-tilesets',

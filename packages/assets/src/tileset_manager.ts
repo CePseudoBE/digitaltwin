@@ -181,7 +181,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
         if (!authResult.success) {
             return authResult.response
         }
-        return authResult.userRecord.id as number
+        return authResult.user.id as number
     }
 
     /**
@@ -376,7 +376,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
             if (!authResult.success) {
                 return authResult.response
             }
-            const userId = authResult.userRecord.id
+            const userId = authResult.user.id
             if (!userId) {
                 return errorResponse('Failed to retrieve user information')
             }
@@ -484,7 +484,7 @@ export abstract class TilesetManager extends AssetsManager implements AsyncUploa
             if (req) {
                 const authResult = await this.authMiddleware.authenticate(req)
                 if (authResult.success) {
-                    authenticatedUserId = authResult.userRecord.id || null
+                    authenticatedUserId = authResult.user.id || null
                 }
             }
 

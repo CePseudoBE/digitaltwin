@@ -75,7 +75,7 @@ export abstract class MapManager extends AssetsManager {
             if (!authResult.success) {
                 return authResult.response
             }
-            const userRecord = authResult.userRecord
+            const userRecord = authResult.user
 
             const body = req.body as Record<string, unknown>
             const { layer, description } = body

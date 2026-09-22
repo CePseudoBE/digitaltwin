@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { AssetsManager } from '../src/assets_manager.js'
 import { MockDatabaseAdapter } from './mocks/mock_database_adapter.js'
 import { MockStorageService } from './mocks/mock_storage_service.js'
-import { AuthConfig, ApisixAuthParser } from '@cepseudo/auth'
+import { AuthConfig } from '@cepseudo/auth'
 import type { AssetsConfiguration, DataResponse } from '@cepseudo/shared'
 
 class TestAssetsManager extends AssetsManager {
@@ -21,13 +21,11 @@ function enableAuth() {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
     delete process.env.DIGITALTWIN_ANONYMOUS_USER_ID
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 function disableAuth() {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 function createManager() {
@@ -208,7 +206,7 @@ test.group('AssetsManager — owner happy path', (group) => {
         const { manager, db } = createManager()
 
         // Create owner user via the proper repository API
-        const owner = await db.getUserRepository().findOrCreateUser({ id: 'owner-user-id', roles: ['user'] })
+        const owner = await db.getUserRepository().findOrCreateUser({ subject: 'owner-user-id', roles: ['user'] })
 
         const existingAsset = {
             id: 1, name: 'test-assets', contentType: 'application/octet-stream',
@@ -235,7 +233,7 @@ test.group('AssetsManager — owner happy path', (group) => {
     test('handleDelete() allows owner to delete their own asset', async ({ assert }) => {
         const { manager, db } = createManager()
 
-        const owner = await db.getUserRepository().findOrCreateUser({ id: 'owner-user-id', roles: ['user'] })
+        const owner = await db.getUserRepository().findOrCreateUser({ subject: 'owner-user-id', roles: ['user'] })
 
         const existingAsset = {
             id: 1, name: 'test-assets', contentType: 'application/octet-stream',

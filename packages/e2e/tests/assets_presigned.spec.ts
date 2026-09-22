@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { setupInfrastructure, type E2EInfrastructure } from './helpers/setup.js'
 import { makeAuthRequest } from './helpers/auth_helpers.js'
 import { E2EAssetsManager } from './helpers/test_components.js'
-import { AuthConfig } from '@cepseudo/auth'
+import { AuthConfig, AuthMiddleware, AuthProviderFactory, UserService } from '@cepseudo/auth'
 import type { TypedRequest } from '@cepseudo/shared'
 
 /** Helper to build a valid presigned upload request body (includes required fileSize) */
@@ -127,18 +127,19 @@ test.group('AssetsManager presigned upload E2E', (group) => {
             headers: { 'Content-Type': 'application/octet-stream' },
         })
 
-        // Re-enable auth and reset cache so AuthMiddleware checks headers
+        // Re-enable auth: a manager built now reads the caller from the gateway headers
         delete process.env.DIGITALTWIN_DISABLE_AUTH
         AuthConfig._resetConfig()
+        const gatewayManager = new E2EAssetsManager()
+        gatewayManager.setDependencies(infra.db, infra.storage, new AuthMiddleware(AuthProviderFactory.fromEnv(), new UserService(infra.db.getUserRepository())))
 
-        // User B (different keycloak ID) tries to confirm — should fail
+        // User B (different subject) tries to confirm — should fail
         const reqB = await makeAuthRequest(infra.db, 'user-owner-b', ['user'], {
             params: { fileId: String(fileId) },
         })
 
-        const confirmResponse = await (manager as any).presignedService.handleConfirm(reqB as unknown as TypedRequest)
-        // 401 because APISIX header validation fails (no real gateway), or 403 if it passes
-        assert.oneOf(confirmResponse.status, [401, 403])
+        const confirmResponse = await (gatewayManager as any).presignedService.handleConfirm(reqB as unknown as TypedRequest)
+        assert.equal(confirmResponse.status, 403)
 
         // Restore disabled auth
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'

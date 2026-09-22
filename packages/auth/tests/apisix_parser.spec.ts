@@ -4,15 +4,12 @@ import { AuthConfig } from '../src/auth_config.js'
 
 function enableAuth() {
     delete process.env.DIGITALTWIN_DISABLE_AUTH
-    delete process.env.AUTH_MODE
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 function disableAuth() {
     process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
     AuthConfig._resetConfig()
-    ApisixAuthParser._resetProvider()
 }
 
 test.group('ApisixAuthParser', (group) => {
@@ -26,7 +23,7 @@ test.group('ApisixAuthParser', (group) => {
         })
 
         assert.isNotNull(user)
-        assert.equal(user!.id, 'uuid-abc')
+        assert.equal(user!.subject, 'uuid-abc')
         assert.deepEqual(user!.roles, ['admin', 'user', 'editor'])
     })
 
@@ -54,7 +51,7 @@ test.group('ApisixAuthParser', (group) => {
         const user = ApisixAuthParser.parseAuthHeaders({})
 
         assert.isNotNull(user)
-        assert.equal(user!.id, 'anonymous')
+        assert.equal(user!.subject, 'anonymous')
         assert.isTrue(ApisixAuthParser.hasValidAuth({}))
     })
 })

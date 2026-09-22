@@ -39,7 +39,7 @@ import {
 } from '@cepseudo/shared'
 import type { StorageService } from '@cepseudo/storage'
 import type { DatabaseAdapter, MetadataRow } from '@cepseudo/database'
-import { ApisixAuthParser, AuthMiddleware, UserService, type HeadersLike } from '@cepseudo/auth'
+import { ApisixAuthParser, AuthMiddleware, AuthProviderFactory, UserService, type HeadersLike } from '@cepseudo/auth'
 import { PresignedUploadService } from './presigned_upload_service.js'
 import { generateAssetsOpenAPISpec } from './assets_openapi.js'
 import fs from 'fs/promises'
@@ -270,7 +270,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
     setDependencies(db: DatabaseAdapter, storage: StorageService, authMiddleware?: AuthMiddleware): void {
         this.db = db
         this.storage = storage
-        this.authMiddleware = authMiddleware ?? new AuthMiddleware(new UserService(db.getUserRepository()))
+        this.authMiddleware = authMiddleware ?? new AuthMiddleware(AuthProviderFactory.fromEnv(), new UserService(db.getUserRepository()))
         this.presignedService = new PresignedUploadService({
             db: this.db,
             storage: this.storage,
@@ -437,7 +437,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
      * if (!authResult.success) {
      *     return authResult.response
      * }
-     * const userRecord = authResult.userRecord
+     * const userRecord = authResult.user
      * ```
      */
     protected async authenticateRequest(req: TypedRequest): Promise<AuthResult> {
@@ -581,7 +581,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             return unauthorizedResponse('Authentication required for private assets')
         }
 
-        if (asset.owner_id !== authResult.userRecord.id) {
+        if (asset.owner_id !== authResult.user.id) {
             return forbiddenResponse('This asset is private')
         }
 
@@ -742,7 +742,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
         if (!req) return null
         const authResult = await this.authMiddleware.authenticate(req)
         if (!authResult.success) return null
-        return authResult.userRecord.id || null
+        return authResult.user.id || null
     }
 
     /**
@@ -1139,7 +1139,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             if (!authResult.success) {
                 return authResult.response
             }
-            const userId = authResult.userRecord.id
+            const userId = authResult.user.id
             if (!userId) {
                 return errorResponse('Failed to retrieve user information')
             }
@@ -1214,7 +1214,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             if (!authResult.success) {
                 return authResult.response
             }
-            const userId = authResult.userRecord.id
+            const userId = authResult.user.id
             if (!userId) {
                 return errorResponse('Failed to retrieve user information')
             }
@@ -1352,7 +1352,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             if (!authResult.success) {
                 return authResult.response
             }
-            const userId = authResult.userRecord.id
+            const userId = authResult.user.id
             if (!userId) {
                 return errorResponse('Failed to retrieve user information')
             }
@@ -1393,7 +1393,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             if (!authResult.success) {
                 return authResult.response
             }
-            const userId = authResult.userRecord.id
+            const userId = authResult.user.id
             if (!userId) {
                 return errorResponse('Failed to retrieve user information')
             }
@@ -1505,7 +1505,7 @@ export abstract class AssetsManager implements Component, Servable, OpenAPIDocum
             if (!authResult.success) {
                 return authResult.response
             }
-            const userId = authResult.userRecord.id
+            const userId = authResult.user.id
             if (!userId) {
                 return errorResponse('Failed to retrieve user information')
             }

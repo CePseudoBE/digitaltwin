@@ -199,7 +199,7 @@ class CalculatorHandler extends Handler {
     @servableEndpoint({ path: '/calc/sum', method: 'post', schema: { body: Type.Object({ a: Type.Number(), b: Type.Number() }) } })
     async sum(req: TypedRequest): Promise<DataResponse> {
         const { a, b } = req.body as { a: number; b: number }
-        return { status: 200, content: JSON.stringify({ sum: a + b, user: req.user?.id ?? null }), headers: { 'Content-Type': 'application/json' } }
+        return { status: 200, content: JSON.stringify({ sum: a + b, user: req.user?.subject ?? null }), headers: { 'Content-Type': 'application/json' } }
     }
 }
 

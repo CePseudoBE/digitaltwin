@@ -78,7 +78,7 @@ export class KyselyUserRepository implements UserRepository {
         let userRow = await this.#db
             .selectFrom('users')
             .selectAll()
-            .where('keycloak_id', '=', authUser.id)
+            .where('keycloak_id', '=', authUser.subject)
             .executeTakeFirst()
 
         if (!userRow) {
@@ -86,13 +86,13 @@ export class KyselyUserRepository implements UserRepository {
             const nowStr = now.toISOString()
             const insertResult = await this.#db
                 .insertInto('users')
-                .values({ keycloak_id: authUser.id, created_at: nowStr, updated_at: nowStr })
+                .values({ keycloak_id: authUser.subject, created_at: nowStr, updated_at: nowStr })
                 .returning('id')
                 .executeTakeFirstOrThrow()
 
             userRow = {
                 id: (insertResult as any).id,
-                keycloak_id: authUser.id,
+                keycloak_id: authUser.subject,
                 created_at: nowStr,
                 updated_at: nowStr
             }
@@ -107,7 +107,7 @@ export class KyselyUserRepository implements UserRepository {
         // 3. Return user with current roles
         return (await this.#getUserWithRoles(userId)) || {
             id: userId,
-            keycloak_id: authUser.id,
+            keycloak_id: authUser.subject,
             roles: authUser.roles,
             created_at: new Date(userRow.created_at as string),
             updated_at: new Date(userRow.updated_at as string)

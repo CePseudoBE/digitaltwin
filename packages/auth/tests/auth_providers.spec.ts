@@ -4,78 +4,74 @@ import { GatewayAuthProvider } from '../src/providers/gateway_auth_provider.js'
 import { JwtAuthProvider } from '../src/providers/jwt_auth_provider.js'
 import { NoAuthProvider } from '../src/providers/no_auth_provider.js'
 import { AuthProviderFactory } from '../src/auth_provider_factory.js'
-import { AuthConfig } from '../src/auth_config.js'
-import { ApisixAuthParser } from '../src/apisix_parser.js'
 
 const JWT_SECRET = 'test-secret-key-256-bits-long!!'
 
 test.group('GatewayAuthProvider', () => {
-    test('parses x-user-id and x-user-roles headers', ({ assert }) => {
+    test('parses x-user-id and x-user-roles headers', async ({ assert }) => {
         const provider = new GatewayAuthProvider()
-        const user = provider.parseRequest({
+        const user = await provider.authenticate({
             headers: { 'x-user-id': 'uuid-1', 'x-user-roles': 'admin,user' }
         })
 
-        assert.isNotNull(user)
-        assert.equal(user!.id, 'uuid-1')
-        assert.deepEqual(user!.roles, ['admin', 'user'])
+        assert.deepEqual(user, { subject: 'uuid-1', roles: ['admin', 'user'] })
+    })
+
+    test('takes the first value of a repeated header and returns null without a subject', async ({ assert }) => {
+        const provider = new GatewayAuthProvider()
+
+        const repeated = await provider.authenticate({ headers: { 'x-user-id': ['uuid-1', 'uuid-2'] } })
+        const missing = await provider.authenticate({ headers: { 'x-user-roles': 'admin' } })
+
+        assert.equal(repeated?.subject, 'uuid-1')
+        assert.isNull(missing)
     })
 })
 
 test.group('JwtAuthProvider', () => {
-    test('rejects invalid token', ({ assert }) => {
+    test('rejects invalid token', async ({ assert }) => {
         const provider = new JwtAuthProvider({ mode: 'jwt', jwt: { secret: JWT_SECRET } })
 
-        const user = provider.parseRequest({
+        const user = await provider.authenticate({
             headers: { authorization: 'Bearer invalid.token.here' }
         })
 
         assert.isNull(user)
     })
 
-    test('rejects expired token', ({ assert }) => {
-        const token = jwt.sign(
-            { sub: 'user-1', roles: ['user'] },
-            JWT_SECRET,
-            { expiresIn: -10 }
-        )
+    test('rejects expired token', async ({ assert }) => {
+        const token = jwt.sign({ sub: 'user-1', roles: ['user'] }, JWT_SECRET, { expiresIn: -10 })
         const provider = new JwtAuthProvider({ mode: 'jwt', jwt: { secret: JWT_SECRET } })
 
-        const user = provider.parseRequest({
+        const user = await provider.authenticate({
             headers: { authorization: `Bearer ${token}` }
         })
 
         assert.isNull(user)
     })
 
-    test('accepts valid token and extracts claims', ({ assert }) => {
-        const token = jwt.sign(
-            { sub: 'user-42', roles: ['user', 'editor'] },
-            JWT_SECRET,
-            { expiresIn: '1h' }
-        )
+    test('accepts valid token and extracts claims', async ({ assert }) => {
+        const token = jwt.sign({ sub: 'user-42', roles: ['user', 'editor'] }, JWT_SECRET, { expiresIn: '1h' })
         const provider = new JwtAuthProvider({ mode: 'jwt', jwt: { secret: JWT_SECRET } })
 
-        const user = provider.parseRequest({
+        const user = await provider.authenticate({
             headers: { authorization: `Bearer ${token}` }
         })
 
         assert.isNotNull(user)
-        assert.equal(user!.id, 'user-42')
+        assert.equal(user!.subject, 'user-42')
         assert.deepEqual(user!.roles, ['user', 'editor'])
+        assert.equal(user!.claims?.sub, 'user-42')
     })
 })
 
 test.group('NoAuthProvider', () => {
-    test('always returns anonymous user', ({ assert }) => {
+    test('always returns anonymous user', async ({ assert }) => {
         const provider = new NoAuthProvider()
 
-        const user = provider.parseRequest({ headers: {} })
+        const user = await provider.authenticate({ headers: {} })
 
-        assert.isNotNull(user)
-        assert.equal(user!.id, 'anonymous')
-        assert.isTrue(provider.hasValidAuth({ headers: {} }))
-        assert.isFalse(provider.isAdmin({ headers: {} }))
+        assert.deepEqual(user, { subject: 'anonymous', roles: ['anonymous'] })
     })
 })
 
@@ -84,13 +80,9 @@ test.group('AuthProviderFactory', (group) => {
         delete process.env.AUTH_MODE
         delete process.env.JWT_SECRET
         delete process.env.DIGITALTWIN_DISABLE_AUTH
-        AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
     group.teardown(() => {
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
-        AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
 
     test('creates correct provider for each mode', ({ assert }) => {

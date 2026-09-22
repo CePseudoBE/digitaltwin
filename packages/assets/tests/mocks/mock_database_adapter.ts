@@ -315,7 +315,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
             async initializeTables(): Promise<void> {},
             async findOrCreateUser(authUser) {
                 for (const user of users.values()) {
-                    if (user.keycloak_id === authUser.id) {
+                    if (user.keycloak_id === authUser.subject) {
                         return {
                             id: user.id, keycloak_id: user.keycloak_id,
                             roles: authUser.roles, created_at: user.created_at, updated_at: user.updated_at
@@ -324,8 +324,8 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
                 }
                 const id = self.userIdCounter++
                 const now = new Date()
-                users.set(id, { id, keycloak_id: authUser.id, created_at: now, updated_at: now })
-                return { id, keycloak_id: authUser.id, roles: authUser.roles, created_at: now, updated_at: now }
+                users.set(id, { id, keycloak_id: authUser.subject, created_at: now, updated_at: now })
+                return { id, keycloak_id: authUser.subject, roles: authUser.roles, created_at: now, updated_at: now }
             },
             async getUserById(id: number) {
                 const user = users.get(id)

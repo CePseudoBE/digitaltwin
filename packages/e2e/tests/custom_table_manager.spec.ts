@@ -92,7 +92,7 @@ test.group('CustomTableManager E2E', (group) => {
         const { id } = JSON.parse(createResp.content as string)
 
         // Manually change owner_id to a different user to simulate different ownership
-        const otherUser = await infra.db.getUserRepository().findOrCreateUser({ id: 'user-ctm-other-owner', roles: ['user'] })
+        const otherUser = await infra.db.getUserRepository().findOrCreateUser({ subject: 'user-ctm-other-owner', roles: ['user'] })
         await infra.db.updateById('e2e_custom_records', id, { owner_id: otherUser.id })
 
         // Now try to update — the anonymous user (from auth disabled) has a different ID
@@ -129,7 +129,7 @@ test.group('CustomTableManager E2E', (group) => {
         const { id } = JSON.parse(createResp.content as string)
 
         // Change owner to a different user
-        const otherUser = await infra.db.getUserRepository().findOrCreateUser({ id: 'user-ctm-other-owner-2', roles: ['user'] })
+        const otherUser = await infra.db.getUserRepository().findOrCreateUser({ subject: 'user-ctm-other-owner-2', roles: ['user'] })
         await infra.db.updateById('e2e_custom_records', id, { owner_id: otherUser.id })
 
         // Try to delete — should fail because anonymous user doesn't own it
@@ -149,14 +149,12 @@ test.group('CustomTableManager E2E', (group) => {
     })
 
     test('handleCreate returns 401 without auth', async ({ assert }) => {
-        // Enable auth and reset ALL cached configs (AuthConfig + ApisixAuthParser provider)
         delete process.env.DIGITALTWIN_DISABLE_AUTH
         AuthConfig._resetConfig()
-        const { ApisixAuthParser, UserService, AuthMiddleware: AM } = await import('@cepseudo/auth')
-        ApisixAuthParser._resetProvider()
+        const { AuthProviderFactory, UserService, AuthMiddleware: AM } = await import('@cepseudo/auth')
 
-        // Create a fresh AuthMiddleware so it picks up the new config
-        const freshAuth = new AM(new UserService(infra.db.getUserRepository()))
+        // A fresh AuthMiddleware so the provider is built from the new env
+        const freshAuth = new AM(AuthProviderFactory.fromEnv(), new UserService(infra.db.getUserRepository()))
         const freshManager = new E2ECustomTableManager()
         freshManager.setDependencies(infra.db, freshAuth)
         await freshManager.initializeTable()
@@ -170,6 +168,5 @@ test.group('CustomTableManager E2E', (group) => {
         // Restore disabled auth
         process.env.DIGITALTWIN_DISABLE_AUTH = 'true'
         AuthConfig._resetConfig()
-        ApisixAuthParser._resetProvider()
     })
 })

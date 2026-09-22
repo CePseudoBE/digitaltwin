@@ -141,13 +141,13 @@ test.group('exposeEndpoints', () => {
     test('the caller identified by the auth middleware lands in req.user', async ({ assert }) => {
         const probe = capture()
         const authMiddleware = {
-            identify: (headers: Record<string, string | string[] | undefined>) =>
-                headers['x-user-id'] ? { id: String(headers['x-user-id']), roles: ['user'] } : undefined
+            identify: async (headers: Record<string, string | string[] | undefined>) =>
+                headers['x-user-id'] ? { subject: String(headers['x-user-id']), roles: ['user'] } : undefined
         }
         const fastify = await serve([new TestHandler('h', [{ method: 'get', path: '/me', handler: probe.handler }])], { authMiddleware })
 
         await fastify.inject({ method: 'GET', url: '/me', headers: { 'x-user-id': 'u7' } })
-        assert.deepEqual(probe.received().user, { id: 'u7', roles: ['user'] })
+        assert.deepEqual(probe.received().user, { subject: 'u7', roles: ['user'] })
 
         await fastify.inject({ method: 'GET', url: '/me' })
         assert.isUndefined(probe.received().user)
@@ -212,7 +212,7 @@ test.group('exposeEndpoints', () => {
         await withTempDir(async tempDir => {
             const probe = capture()
             const fastify = await serve([new TestHandler('h', [{ method: 'post', path: '/upload', handler: probe.handler }])], {
-                authMiddleware: { identify: headers => (headers['x-user-id'] ? { id: String(headers['x-user-id']), roles: [] } : undefined) }
+                authMiddleware: { identify: async headers => (headers['x-user-id'] ? { subject: String(headers['x-user-id']), roles: [] } : undefined) }
             })
 
             const anonymous = await fastify.inject({ method: 'POST', url: '/upload', ...multipartPayload('binarycontent') })
@@ -223,7 +223,7 @@ test.group('exposeEndpoints', () => {
             const { headers, payload } = multipartPayload('binarycontent')
             const identified = await fastify.inject({ method: 'POST', url: '/upload', headers: { ...headers, 'x-user-id': 'u1' }, payload })
             assert.equal(identified.statusCode, 200)
-            assert.equal(probe.received().user?.id, 'u1')
+            assert.equal(probe.received().user?.subject, 'u1')
         })
     })
 

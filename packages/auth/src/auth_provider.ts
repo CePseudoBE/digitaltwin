@@ -1,8 +1,9 @@
 /**
- * @fileoverview Authentication provider interface and types for the Digital Twin framework.
+ * @fileoverview Authentication provider contract for the Digital Twin framework.
  *
- * This module defines the contract for authentication providers, allowing the framework
- * to support multiple authentication mechanisms (gateway headers, JWT tokens, etc.).
+ * A provider turns request headers into an authenticated caller. It is the single
+ * place where credentials are read, so the middleware, the components and the
+ * plugins never look at headers themselves.
  */
 
 import type { AuthenticatedUser } from '@cepseudo/shared'
@@ -42,8 +43,6 @@ export interface JwtConfig {
 export interface AuthProviderConfig {
     /** Authentication mode */
     mode: AuthMode
-    /** Name of the admin role (default: 'admin') */
-    adminRoleName?: string
     /** JWT-specific configuration (required when mode is 'jwt') */
     jwt?: JwtConfig
     /** Anonymous user ID for 'none' mode (default: 'anonymous') */
@@ -54,7 +53,7 @@ export interface AuthProviderConfig {
  * Request-like object for authentication parsing.
  *
  * This interface allows the auth provider to work with any request object
- * that has headers, without requiring a full Express Request.
+ * that has headers, without requiring a full HTTP request.
  */
 export interface AuthRequest {
     /** Request headers */
@@ -64,64 +63,26 @@ export interface AuthRequest {
 /**
  * Authentication provider interface.
  *
- * Implement this interface to create custom authentication mechanisms.
- * The framework provides three built-in providers:
- * - GatewayAuthProvider: For API gateway authentication (Apache APISIX, KrakenD)
- * - JwtAuthProvider: For direct JWT token validation
- * - NoAuthProvider: For development/testing without authentication
+ * Implement it to plug a custom authentication mechanism into the framework.
+ * The result is asynchronous so a provider can fetch signing keys or call an
+ * identity service while validating credentials.
  *
  * @example
  * ```typescript
- * // Using the factory (recommended)
- * const provider = AuthProviderFactory.fromEnv()
- *
- * // In a handler
- * const user = provider.parseRequest(req)
- * if (!user) {
- *     return { status: 401, content: 'Authentication required' }
+ * class HeaderProvider implements AuthProvider {
+ *     async authenticate(req: AuthRequest) {
+ *         const subject = req.headers['x-subject']
+ *         return typeof subject === 'string' ? { subject, roles: [] } : null
+ *     }
  * }
  * ```
  */
 export interface AuthProvider {
     /**
-     * Parse the request and return the authenticated user.
+     * Resolve the caller from the request.
      *
      * @param req - Request object with headers
-     * @returns Authenticated user, or null if not authenticated or invalid
+     * @returns The authenticated user, or null when the request carries no valid credentials
      */
-    parseRequest(req: AuthRequest): AuthenticatedUser | null
-
-    /**
-     * Check if the request has valid authentication.
-     *
-     * This is a quick check that can be used before full parsing.
-     *
-     * @param req - Request object with headers
-     * @returns true if the request has valid authentication credentials
-     */
-    hasValidAuth(req: AuthRequest): boolean
-
-    /**
-     * Check if the authenticated user has admin privileges.
-     *
-     * @param req - Request object with headers
-     * @returns true if the user has the admin role
-     */
-    isAdmin(req: AuthRequest): boolean
-
-    /**
-     * Get the user ID from the request.
-     *
-     * @param req - Request object with headers
-     * @returns User ID, or null if not authenticated
-     */
-    getUserId(req: AuthRequest): string | null
-
-    /**
-     * Get the user roles from the request.
-     *
-     * @param req - Request object with headers
-     * @returns Array of role names, empty array if not authenticated
-     */
-    getUserRoles(req: AuthRequest): string[]
+    authenticate(req: AuthRequest): Promise<AuthenticatedUser | null>
 }
