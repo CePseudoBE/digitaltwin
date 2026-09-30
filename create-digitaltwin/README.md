@@ -6,7 +6,7 @@ TypeScript CLI tool to create Digital Twin applications with [digitaltwin-core](
 
 - **Interactive Setup** - Guided prompts for project configuration  
 - **Database Support** - SQLite (dev) and PostgreSQL (prod) options  
-- **Storage Options** - Local filesystem or OVH Object Storage  
+- **Storage Options** - Local filesystem or S3-compatible object storage  
 - **Queue Management** - Redis support for production workloads  
 - **Docker Ready** - Optional Docker and docker-compose configuration  
 - **Example Components** - Pre-built IoT sensor collector and data processor  
@@ -59,7 +59,7 @@ The CLI will guide you through configuration options:
 
 - **Project Name**: Name for your Digital Twin application
 - **Database**: SQLite (file-based) or PostgreSQL (production-ready)
-- **Storage**: Local filesystem or OVH Object Storage (S3-compatible)
+- **Storage**: Local filesystem or S3-compatible object storage (AWS S3, MinIO, Scaleway, ...)
 - **Redis**: Enable for distributed queue management
 - **Docker**: Include Docker configuration files
 - **Examples**: Include sample IoT components
@@ -94,7 +94,7 @@ npx create-digitaltwin my-app --yes \
 |--------|-------------|---------|
 | `-y, --yes` | Skip prompts, use defaults | `false` |
 | `--database <type>` | Database: `sqlite` or `postgresql` | `sqlite` |
-| `--storage <type>` | Storage: `local` or `ovh` | `local` |
+| `--storage <type>` | Storage: `local` or `s3` | `local` |
 | `--storage-path <path>` | Local storage directory | `./uploads` |
 | `--redis` | Enable Redis for queues | `true` |
 | `--docker` | Include Docker files | `false` |

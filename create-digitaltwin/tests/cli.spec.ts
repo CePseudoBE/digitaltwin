@@ -152,15 +152,15 @@ test.group('generateProject', (group) => {
     assert.property(packageJson.dependencies, 'ioredis')
   })
 
-  test('should include AWS SDK for OVH storage', async ({ assert }) => {
-    const projectName = 'test-ovh'
+  test('should include AWS SDK for S3 storage', async ({ assert }) => {
+    const projectName = 'test-s3'
     const projectPath = path.join(testDir, projectName)
 
     const answers: ProjectAnswers = {
       projectName,
       projectPath,
       database: 'sqlite',
-      storage: 'ovh',
+      storage: 's3',
       useRedis: false,
       includeDocker: false,
       includeExamples: false,
@@ -171,5 +171,10 @@ test.group('generateProject', (group) => {
     const packageJson = await fs.readJson(path.join(projectPath, 'package.json'))
 
     assert.property(packageJson.dependencies, '@aws-sdk/client-s3')
+
+    const index = await fs.readFile(path.join(projectPath, 'src', 'index.ts'), 'utf-8')
+    const env = await fs.readFile(path.join(projectPath, '.env.example'), 'utf-8')
+    assert.include(index, 'new S3StorageService(')
+    assert.include(env, 'S3_ENDPOINT=')
   })
 })
