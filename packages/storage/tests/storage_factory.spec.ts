@@ -37,10 +37,20 @@ test.group('StorageServiceFactory', (group) => {
         S3_BUCKET: 'test-bucket'
     }
 
-    test('"s3" creates an S3StorageService', ({ assert }) => {
+    test('"s3" creates an S3StorageService addressing the bucket in the host by default', ({ assert }) => {
         mockEnv(s3Env)
 
-        assert.instanceOf(StorageServiceFactory.create(), S3StorageService)
+        const storage = StorageServiceFactory.create()
+        assert.instanceOf(storage, S3StorageService)
+        assert.equal(storage.getPublicUrl('a/b.json'), 'http://test-bucket.127.0.0.1:1/a/b.json')
+    })
+
+    test('"s3" reads S3_FORCE_PATH_STYLE and S3_PUBLIC_URL', ({ assert }) => {
+        mockEnv({ ...s3Env, S3_FORCE_PATH_STYLE: 'true' })
+        assert.equal(StorageServiceFactory.create().getPublicUrl('a/b.json'), 'http://127.0.0.1:1/test-bucket/a/b.json')
+
+        mockEnv({ ...s3Env, S3_PUBLIC_URL: 'https://cdn.example.org' })
+        assert.equal(StorageServiceFactory.create().getPublicUrl('a/b.json'), 'https://cdn.example.org/a/b.json')
     })
 
     test('unknown config throws error', ({ assert }) => {

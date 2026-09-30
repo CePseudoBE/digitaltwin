@@ -26,7 +26,7 @@ These are **optional** -- only required when using `S3StorageService`. The local
 | Backend | Local filesystem | S3-compatible (AWS S3, MinIO, Scaleway, ...) |
 | Presigned URLs | No | Yes |
 | Batch delete | Sequential | S3 `DeleteObjects` (up to 1000/request) |
-| Public URLs | File path (requires static serving) | Direct HTTPS URL |
+| Public URLs | File path (requires static serving) | Bucket URL (virtual-hosted or path style) or `S3_PUBLIC_URL` |
 | Path traversal protection | Yes | N/A (S3 key-based) |
 | CORS configuration | N/A | Built-in `configureCors()` |
 | Use case | Development / testing | Production |
@@ -63,6 +63,7 @@ const storage = StorageServiceFactory.create()
 | `S3_SECRET_ACCESS_KEY` | -- | Secret key |
 | `S3_REGION` | `us-east-1` | Region |
 | `S3_FORCE_PATH_STYLE` | `false` | Address the bucket in the path (`<endpoint>/<bucket>/<key>`) instead of the host; MinIO needs `true` |
+| `S3_PUBLIC_URL` | -- | Base URL for public links (CDN or custom domain) instead of the bucket URL |
 
 ### Direct adapter instantiation
 
@@ -104,9 +105,11 @@ await storage.deleteBatch(['path/a.json', 'path/b.json'])
 // Delete all files under a prefix
 const count = await storage.deleteByPrefix('tilesets/42')
 
-// Get public URL
+// Get public URL (each path segment is URL-encoded)
 const url = storage.getPublicUrl('tilesets/42/tileset.json')
 // --> 'https://my-bucket.s3.eu-west-1.amazonaws.com/tilesets/42/tileset.json'
+// --> 'http://localhost:9000/my-bucket/tilesets/42/tileset.json' with pathStyle
+// --> 'https://cdn.example.org/tilesets/42/tileset.json' with publicUrl
 ```
 
 ### Presigned URL upload flow
@@ -183,6 +186,7 @@ interface S3StorageConfig {
     region?: string      // default 'us-east-1'
     bucket: string
     pathStyle?: boolean  // bucket in the path instead of the host (MinIO), default false
+    publicUrl?: string   // base URL for public links (CDN, custom domain)
 }
 ```
 

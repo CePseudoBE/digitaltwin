@@ -1,10 +1,11 @@
 /**
- * Integration tests for S3StorageService against a local MinIO container
- * (path style, as MinIO requires).
+ * Tests for S3StorageService: integration against a local MinIO container
+ * (path style, as MinIO requires), plus request-free checks of the public URL.
  */
 import { test } from '@japa/runner'
 import { GenericContainer, Wait } from 'testcontainers'
 import type { StartedTestContainer } from 'testcontainers'
+import { S3Client } from '@aws-sdk/client-s3'
 import { S3StorageService } from '../src/adapters/s3_storage_service.js'
 
 const MINIO_USER = 'minioadmin'
@@ -30,7 +31,7 @@ async function startMinio(): Promise<{ container: StartedTestContainer; endpoint
 
 async function createBucket(endpoint: string): Promise<void> {
     // Use the AWS SDK directly to create the bucket before tests
-    const { S3Client, CreateBucketCommand } = await import('@aws-sdk/client-s3')
+    const { CreateBucketCommand, PutBucketPolicyCommand } = await import('@aws-sdk/client-s3')
     const s3 = new S3Client({
         endpoint,
         region: 'us-east-1',
@@ -40,6 +41,12 @@ async function createBucket(endpoint: string): Promise<void> {
         responseChecksumValidation: 'WHEN_REQUIRED',
     })
     await s3.send(new CreateBucketCommand({ Bucket: BUCKET }))
+    // MinIO ignores object ACLs: a bucket policy is what lets the public URL test read anonymously
+    const policy = {
+        Version: '2012-10-17',
+        Statement: [{ Effect: 'Allow', Principal: { AWS: ['*'] }, Action: ['s3:GetObject'], Resource: [`arn:aws:s3:::${BUCKET}/*`] }]
+    }
+    await s3.send(new PutBucketPolicyCommand({ Bucket: BUCKET, Policy: JSON.stringify(policy) }))
     await s3.destroy()
 }
 
@@ -168,6 +175,15 @@ test.group('S3StorageService (MinIO integration)', group => {
 
     // ── generatePresignedUploadUrl ───────────────────────────────────────────
 
+    test('getPublicUrl() serves the object anonymously, keys with spaces and # included', async ({ assert }) => {
+        const key = 'tilesets/42/my tile #1.json'
+        await storage.saveWithPath(Buffer.from('{"asset":{}}'), key)
+
+        const response = await fetch(storage.getPublicUrl(key))
+        assert.equal(response.status, 200)
+        assert.equal(await response.text(), '{"asset":{}}')
+    })
+
     test('supportsPresignedUrls() returns true', ({ assert }) => {
         assert.isTrue(storage.supportsPresignedUrls())
     })
@@ -215,6 +231,26 @@ test.group('S3StorageService (MinIO integration)', group => {
 
     test('deleteBatch() with empty array is a no-op', async ({ assert }) => {
         await assert.doesNotReject(() => storage.deleteBatch([]))
+    })
+})
+
+test.group('S3StorageService - getPublicUrl() (no network)', () => {
+    const config = { accessKey: 'x', secretKey: 'x', bucket: 'city' }
+    const key = 'tilesets/42/my tile #1.json'
+
+    test('puts the bucket in the host by default and encodes each path segment', ({ assert }) => {
+        const storage = new S3StorageService({ ...config, endpoint: 'https://s3.example.org' })
+        assert.equal(storage.getPublicUrl(key), 'https://city.s3.example.org/tilesets/42/my%20tile%20%231.json')
+    })
+
+    test('puts the bucket in the path with pathStyle', ({ assert }) => {
+        const storage = new S3StorageService({ ...config, endpoint: 'http://localhost:9000/', pathStyle: true })
+        assert.equal(storage.getPublicUrl(key), 'http://localhost:9000/city/tilesets/42/my%20tile%20%231.json')
+    })
+
+    test('uses publicUrl instead of the bucket URL', ({ assert }) => {
+        const storage = new S3StorageService({ ...config, endpoint: 'https://s3.example.org', publicUrl: 'https://cdn.example.org/assets/' })
+        assert.equal(storage.getPublicUrl(key), 'https://cdn.example.org/assets/tilesets/42/my%20tile%20%231.json')
     })
 })
 

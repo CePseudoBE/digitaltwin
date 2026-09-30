@@ -31,17 +31,23 @@ export interface S3StorageConfig {
     bucket: string
     /** Address the bucket in the path (`<endpoint>/<bucket>/<key>`) rather than the host; MinIO needs it. Default: false */
     pathStyle?: boolean
+    /** Base URL for public links instead of the bucket URL, e.g. a CDN or custom domain */
+    publicUrl?: string
 }
 
 export class S3StorageService extends StorageService {
     #s3: S3Client
     readonly #bucket: string
     readonly #endpoint: string
+    readonly #pathStyle: boolean
+    readonly #publicUrl?: string
 
     constructor(config: S3StorageConfig) {
         super()
         this.#bucket = config.bucket
         this.#endpoint = config.endpoint
+        this.#pathStyle = config.pathStyle ?? false
+        this.#publicUrl = config.publicUrl
         this.#s3 = new S3Client({
             endpoint: config.endpoint,
             region: config.region ?? 'us-east-1',
@@ -49,7 +55,7 @@ export class S3StorageService extends StorageService {
                 accessKeyId: config.accessKey,
                 secretAccessKey: config.secretKey
             },
-            forcePathStyle: config.pathStyle ?? false,
+            forcePathStyle: this.#pathStyle,
             // Several S3-compatible services reject the checksum headers the SDK sends by default
             requestChecksumCalculation: 'WHEN_REQUIRED',
             responseChecksumValidation: 'WHEN_REQUIRED'
@@ -179,13 +185,18 @@ export class S3StorageService extends StorageService {
     }
 
     /**
-     * Returns the public URL for a stored file: https://{bucket}.{endpoint host}/{key}
+     * Returns the public URL for a stored file: `<publicUrl>/<key>` when configured, otherwise
+     * `<endpoint>/<bucket>/<key>` in path style or `<scheme>://<bucket>.<endpoint host>/<key>`.
+     * Each path segment is URL-encoded, so keys with spaces or `#` stay loadable.
      * @param relativePath - The storage path/key of the file
      * @returns The public URL to access the file directly
      */
     getPublicUrl(relativePath: string): string {
-        const endpointHost = this.#endpoint.replace(/^https?:\/\//, '')
-        return `https://${this.#bucket}.${endpointHost}/${relativePath}`
+        const key = relativePath.split('/').map(encodeURIComponent).join('/')
+        if (this.#publicUrl) return `${this.#publicUrl.replace(/\/+$/, '')}/${key}`
+        if (this.#pathStyle) return `${this.#endpoint.replace(/\/+$/, '')}/${this.#bucket}/${key}`
+        const { protocol, host } = new URL(this.#endpoint)
+        return `${protocol}//${this.#bucket}.${host}/${key}`
     }
 
     /**

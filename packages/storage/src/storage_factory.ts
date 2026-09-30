@@ -33,7 +33,8 @@ export class StorageServiceFactory {
                     endpoint: env.S3_ENDPOINT,
                     bucket: env.S3_BUCKET,
                     region: env.S3_REGION,
-                    pathStyle: parseBoolean(env.S3_FORCE_PATH_STYLE, 'S3_FORCE_PATH_STYLE')
+                    pathStyle: parseBoolean(env.S3_FORCE_PATH_STYLE, 'S3_FORCE_PATH_STYLE'),
+                    publicUrl: env.S3_PUBLIC_URL
                 })
                 // Configure CORS for browser access (non-blocking)
                 safeAsync(
