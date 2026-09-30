@@ -27,7 +27,7 @@ import { exposeEndpoints } from './endpoints.js'
 import { registerErrorHandler, registerRequestLogging } from './error_handler.js'
 import { registerOpenApi, type OpenApiOptions } from './openapi.js'
 import { scheduleComponents } from './scheduler.js'
-import { LogLevel, engineEventBus } from '@cepseudo/shared'
+import { LogLevel, Logger, engineEventBus } from '@cepseudo/shared'
 import type { QueueConfig } from './queue_manager.js'
 import { QueueManager, withoutVersionCheck } from './queue_manager.js'
 import { UploadProcessor, UploadReconciler } from '@cepseudo/assets'
@@ -41,6 +41,12 @@ import {
     withTimeout,
     type HealthCheckFn
 } from './health.js'
+import { importOptional } from './optional_import.js'
+
+/** What the engine calls in @cepseudo/ngsi-ld, typed here because the package is optional. */
+interface NgsiLdPackage {
+    registerNgsiLd(options: Record<string, unknown>): Promise<{ close(): Promise<void> }>
+}
 
 /**
  * Result of component validation
@@ -622,30 +628,26 @@ export class DigitalTwinEngine {
     }
 
     /**
-     * Attempts to load optional plugin packages that extend the engine.
-     * Failures are silently ignored — the engine works without them.
+     * Registers the optional plugin packages that are installed.
+     * A package that is not installed is skipped; one that is installed but fails to load
+     * or register makes start() fail, since a silently missing API is worse than a failed boot.
      * @private
      */
     async #loadOptionalPackages(): Promise<void> {
-        try {
-            // Using a computed specifier prevents TypeScript from requiring the module at compile time.
-            // The engine works correctly whether or not this optional package is installed.
-            const ngsiLdPkg = '@cepseudo/ngsi-ld'
-             
-            const ngsiLd = await import(ngsiLdPkg) as any
-            const { Logger } = await import('@cepseudo/shared')
-            this.#ngsiLd = await ngsiLd.registerNgsiLd({
-                fastify: this.#server,
-                db: this.#database,
-                redis: this.getRedisConfig(),
-                components: this.getAllComponents(),
-                logger: new Logger('ngsi-ld'),
-                authMiddleware: this.#authMiddleware,
-                ...this.#options.ngsiLd,
-            })
-        } catch {
-            // Package not installed — skip silently
+        const ngsiLd = await importOptional<NgsiLdPackage>('@cepseudo/ngsi-ld')
+        if (!ngsiLd) {
+            new Logger('DigitalTwin', this.#options.logging?.level).info('NGSI-LD package not installed, skipping')
+            return
         }
+        this.#ngsiLd = await ngsiLd.registerNgsiLd({
+            fastify: this.#server,
+            db: this.#database,
+            redis: this.getRedisConfig(),
+            components: this.getAllComponents(),
+            logger: new Logger('ngsi-ld'),
+            authMiddleware: this.#authMiddleware,
+            ...this.#options.ngsiLd
+        })
     }
 
     /**

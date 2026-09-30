@@ -27,22 +27,23 @@ This package depends on `@cepseudo/shared`, `@cepseudo/database`, and `@cepseudo
 
 ## How the Optional Plugin Pattern Works
 
-The engine never imports `@cepseudo/ngsi-ld` statically. Instead, it uses a dynamic import with a try/catch at startup:
+The engine never imports `@cepseudo/ngsi-ld` statically. Instead, it tries a dynamic import at startup:
 
 ```typescript
 // Inside @cepseudo/engine — dynamic discovery
 async function loadOptionalPackages() {
-    try {
-        const { registerNgsiLd } = await import('@cepseudo/ngsi-ld')
-        // Registers the routes as an encapsulated Fastify plugin; the handle is closed in engine.stop()
-        ngsiLd = await registerNgsiLd({ fastify, db, redis, components, logger, authMiddleware })
-        logger.info('NGSI-LD plugin loaded')
-    } catch {
-        // Package not installed — skip silently, framework works without it
+    // undefined only when the package is not installed
+    const ngsiLd = await importOptional<NgsiLdPackage>('@cepseudo/ngsi-ld')
+    if (!ngsiLd) {
         logger.info('NGSI-LD package not installed, skipping')
+        return
     }
+    // Registers the routes as an encapsulated Fastify plugin; the handle is closed in engine.stop()
+    handle = await ngsiLd.registerNgsiLd({ fastify, db, redis, components, logger, authMiddleware })
 }
 ```
+
+Only a missing package is skipped. If the package is installed but fails to load or register (a missing dependency, an invalid `NGSI_LD_*` variable, Redis unreachable), `engine.start()` fails with that error.
 
 The integration point is the **EventBus** from `@cepseudo/shared`. When a Collector or Harvester completes, the engine emits a `component:event` on the event bus. If the NGSI-LD plugin is loaded, it listens for these events, converts data to NGSI-LD entities, updates the entity cache, and evaluates subscriptions. If the plugin is not loaded, the events are simply ignored.
 

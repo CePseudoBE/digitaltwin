@@ -84,17 +84,16 @@ LAYER 3: engine          → shared, database, storage, auth, components, assets
 The NGSI-LD package is a plugin. The engine and other packages must NEVER hard-import it. Instead:
 
 ```typescript
-// In the engine — dynamic discovery
+// In the engine — dynamic discovery (packages/engine/src/optional_import.ts)
 async function loadOptionalPackages() {
-    try {
-        const ngsiLd = await import('@cepseudo/ngsi-ld')
-        // Register NGSI-LD endpoints, subscription matcher, entity cache
-        return ngsiLd
-    } catch {
-        // Package not installed — skip silently, framework works without it
+    // undefined only when the package itself is not installed
+    const ngsiLd = await importOptional<NgsiLdPackage>('@cepseudo/ngsi-ld')
+    if (!ngsiLd) {
         logger.info('NGSI-LD package not installed, skipping')
-        return null
+        return
     }
+    // Any other failure (broken install, invalid NGSI_LD_* variable, Redis down) makes start() fail
+    handle = await ngsiLd.registerNgsiLd({ fastify, db, redis, components, logger, authMiddleware })
 }
 ```
 
@@ -108,7 +107,7 @@ Collector writes data → EventBus emits "data:written"
 
 **Rules for keeping ngsi-ld optional:**
 - No package in layers 0-2 (except ngsi-ld itself) may `import` from `@cepseudo/ngsi-ld`
-- The engine uses `dynamic import()` with try/catch, never a static import
+- The engine uses `importOptional()` (a dynamic `import()`), never a static import. Only a missing package is skipped; never swallow load or registration errors
 - EventBus event names/payloads are defined in `@cepseudo/shared`, not in ngsi-ld
 - If ngsi-ld needs a new event type, the event type goes in shared, the listener goes in ngsi-ld
 - The database migrations for ngsi-ld tables (subscriptions) run only when the package is present
