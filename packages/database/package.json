@@ -1,7 +1,7 @@
 {
   "name": "@cepseudo/database",
   "version": "1.0.1",
-  "description": "Database abstraction layer for Digital Twin framework (Kysely/Knex, PostgreSQL/SQLite)",
+  "description": "Database abstraction layer for Digital Twin framework (Kysely, PostgreSQL/SQLite)",
   "license": "MIT",
   "author": "Axel Hoffmann",
   "type": "module",
@@ -33,13 +33,9 @@
     "@cepseudo/shared": "workspace:*"
   },
   "peerDependencies": {
-    "knex": ">=3.0.0",
     "kysely": ">=0.29.0"
   },
   "peerDependenciesMeta": {
-    "knex": {
-      "optional": true
-    },
     "kysely": {
       "optional": true
     }
@@ -61,7 +57,6 @@
   "keywords": [
     "digitaltwin",
     "database",
-    "knex",
     "kysely",
     "postgresql",
     "sqlite"

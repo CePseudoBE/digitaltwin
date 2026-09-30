@@ -17,16 +17,16 @@ This package depends on the full stack of `@cepseudo/*` packages (shared, databa
 
 ```typescript
 import { DigitalTwinEngine } from '@cepseudo/engine'
-import { KnexDatabaseAdapter } from '@cepseudo/database'
+import { KyselyDatabaseAdapter } from '@cepseudo/database'
 import { StorageServiceFactory } from '@cepseudo/storage'
 import { MyCollector } from './collectors/my_collector.js'
 
-const database = new KnexDatabaseAdapter({
-    client: 'pg',
-    connection: process.env.DATABASE_URL
-})
-
 const storage = StorageServiceFactory.create()
+
+const database = await KyselyDatabaseAdapter.forPostgreSQL(
+    { host: 'localhost', user: 'admin', password: 'secret', database: 'digitaltwin' },
+    url => storage.retrieve(url)
+)
 
 const engine = new DigitalTwinEngine({
     storage,

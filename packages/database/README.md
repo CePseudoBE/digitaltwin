@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Database abstraction layer for the Digital Twin Framework. Provides a unified `DatabaseAdapter` interface with two concrete implementations (Knex and Kysely) supporting PostgreSQL and SQLite.
+Database abstraction layer for the Digital Twin Framework. Provides a `DatabaseAdapter` interface implemented with [Kysely](https://kysely.dev/) for PostgreSQL and SQLite.
 
 ## Installation
 
@@ -12,29 +12,12 @@ Database abstraction layer for the Digital Twin Framework. Provides a unified `D
 pnpm add @cepseudo/database
 ```
 
-You must also install **one** query builder and its database driver:
+You must also install Kysely and the driver of your database:
 
 ```bash
-# Option A: Kysely (recommended for new projects)
 pnpm add kysely better-sqlite3        # SQLite
 pnpm add kysely pg                    # PostgreSQL
-
-# Option B: Knex (legacy, stable)
-pnpm add knex better-sqlite3          # SQLite
-pnpm add knex pg                      # PostgreSQL
 ```
-
-## Adapters
-
-| | **KyselyDatabaseAdapter** | **KnexDatabaseAdapter** |
-|---|---|---|
-| Query builder | [Kysely](https://kysely.dev/) >= 0.27.0 | [Knex](https://knexjs.org/) >= 3.0.0 |
-| PostgreSQL | Yes (`pg`) | Yes (`pg`) |
-| SQLite | Yes (`better-sqlite3`) | Yes (`better-sqlite3` or `sqlite3`) |
-| Factory methods | `async` (returns `Promise`) | Synchronous |
-| Status | Recommended | Legacy, stable |
-
-Both adapters implement the same abstract `DatabaseAdapter` class. Switching between them requires no changes to component code.
 
 ## Usage
 
@@ -51,20 +34,22 @@ const database = await KyselyDatabaseAdapter.forPostgreSQL(
         password: 'secret',
         database: 'digitaltwin',
         maxConnections: 15,
+        ssl: true,
     },
     dataResolver
 )
 ```
 
-### Knex with SQLite (development)
+With `ssl: true` the server certificate is verified. Trust a private CA with `NODE_EXTRA_CA_CERTS=/path/to/ca.pem`; only for a server you cannot fix, turn verification off with `rejectUnauthorized: false` or `DATABASE_SSL_REJECT_UNAUTHORIZED=false`.
+
+### Kysely with SQLite (development)
 
 ```typescript
-import { KnexDatabaseAdapter } from '@cepseudo/database'
+import { KyselyDatabaseAdapter } from '@cepseudo/database'
 
-const database = KnexDatabaseAdapter.forSQLite(
+const database = await KyselyDatabaseAdapter.forSQLite(
     {
         filename: './data/digitaltwin.db',
-        client: 'better-sqlite3',
         enableForeignKeys: true,
     },
     dataResolver
@@ -102,14 +87,11 @@ class WeatherCollector {
 
 ## Peer Dependencies
 
-This package requires **at least one** of the following query builders. Both are marked as optional peer dependencies -- install only the one you use.
-
 | Peer dependency | Version | Required when |
 |---|---|---|
-| `knex` | >= 3.0.0 | Using `KnexDatabaseAdapter` |
-| `kysely` | >= 0.27.0 | Using `KyselyDatabaseAdapter` |
-
-Each adapter also requires a database driver (`pg` for PostgreSQL, `better-sqlite3` or `sqlite3` for SQLite).
+| `kysely` | >= 0.29.0 | Always |
+| `pg` | -- | PostgreSQL |
+| `better-sqlite3` | -- | SQLite |
 
 ## License
 

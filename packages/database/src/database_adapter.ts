@@ -29,10 +29,10 @@ export type { MetadataRow } from '@cepseudo/shared'
  *
  * @example
  * ```typescript
- * // Using KnexDatabaseAdapter (concrete implementation)
- * const database = KnexDatabaseAdapter.forSQLite({
+ * // Using KyselyDatabaseAdapter (concrete implementation)
+ * const database = await KyselyDatabaseAdapter.forSQLite({
  *   filename: './data/digitaltwin.db'
- * }, storage)
+ * }, url => storage.retrieve(url))
  *
  * // Save collector data
  * await database.save({

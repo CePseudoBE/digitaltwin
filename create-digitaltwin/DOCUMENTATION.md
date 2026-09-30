@@ -222,13 +222,9 @@ my-digitaltwin-app/
 Generated for development and simple deployments:
 
 ```typescript
-const database = new KnexDatabaseAdapter({
-  client: 'better-sqlite3',
-  connection: {
-    filename: './data/my-app.db'
-  },
-  useNullAsDefault: true
-}, storage)
+const database = await KyselyDatabaseAdapter.forSQLite({
+  filename: env.DB_PATH || './data/my-app.db'
+}, url => storage.retrieve(url))
 ```
 
 **Environment Variables:**
@@ -241,16 +237,13 @@ DB_PATH=./data/my-app.db
 Generated for production deployments:
 
 ```typescript
-const database = new KnexDatabaseAdapter({
-  client: 'pg',
-  connection: {
-    host: env.DB_HOST,
-    port: env.DB_PORT || 5432,
-    user: env.DB_USER,
-    password: env.DB_PASSWORD,
-    database: env.DB_NAME
-  }
-}, storage)
+const database = await KyselyDatabaseAdapter.forPostgreSQL({
+  host: env.DB_HOST,
+  port: env.DB_PORT || 5432,
+  user: env.DB_USER,
+  password: env.DB_PASSWORD,
+  database: env.DB_NAME
+}, url => storage.retrieve(url))
 ```
 
 **Environment Variables:**

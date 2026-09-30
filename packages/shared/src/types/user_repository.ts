@@ -4,13 +4,13 @@ import type { AuthenticatedUser, UserRecord } from './auth.js'
  * Repository interface for user persistence operations.
  *
  * Abstracts database access for user management, allowing
- * different implementations (Knex, in-memory for testing, etc.)
+ * different implementations (Kysely, in-memory for testing, etc.)
  * without coupling the auth layer to a specific database adapter.
  *
  * @example
  * ```typescript
- * // Production: KnexUserRepository from @cepseudo/database
- * const repo = new KnexUserRepository(knex)
+ * // Production: from the database adapter of @cepseudo/database
+ * const repo = database.getUserRepository()
  *
  * // Testing: in-memory implementation
  * const repo: UserRepository = {

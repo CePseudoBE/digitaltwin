@@ -1,4 +1,6 @@
 import { Kysely, SqliteDialect, PostgresDialect, sql } from 'kysely'
+import type { ColumnDefinitionBuilder, CreateTableBuilder } from 'kysely'
+import { parseBoolean } from '@cepseudo/shared'
 import type { DataRecord, DataResolver, MetadataRow, UserRepository } from '@cepseudo/shared'
 import { DatabaseAdapter } from '../database_adapter.js'
 import { mapToDataRecord } from '../map_to_data_record.js'
@@ -11,8 +13,24 @@ export interface KyselyPostgreSQLConfig {
     password: string
     database: string
     ssl?: boolean
+    /** Verify the server certificate when `ssl` is on (default: true; also DATABASE_SSL_REJECT_UNAUTHORIZED=false) */
+    rejectUnauthorized?: boolean
     /** Max pool size (default: 15) */
     maxConnections?: number
+}
+
+/**
+ * TLS options for the pg pool. The certificate is verified unless explicitly turned off;
+ * a private CA is trusted through NODE_EXTRA_CA_CERTS rather than by disabling verification.
+ */
+export function postgresSsl(
+    config: Pick<KyselyPostgreSQLConfig, 'ssl' | 'rejectUnauthorized'>,
+    env: Partial<Record<string, string>> = process.env
+): false | { rejectUnauthorized: boolean } {
+    if (!config.ssl) return false
+    const rejectUnauthorized =
+        config.rejectUnauthorized ?? parseBoolean(env.DATABASE_SSL_REJECT_UNAUTHORIZED, 'DATABASE_SSL_REJECT_UNAUTHORIZED') ?? true
+    return { rejectUnauthorized }
 }
 
 export interface KyselySQLiteConfig {
@@ -47,7 +65,7 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
     /**
      * Create a KyselyDatabaseAdapter for PostgreSQL.
      *
-     * Uses the same config shape as KnexDatabaseAdapter.forPostgreSQL().
+     * With `ssl: true` the server certificate is verified (see `postgresSsl`).
      * Requires `pg` to be installed as a peer dependency.
      *
      * @example
@@ -73,7 +91,7 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
             user: config.user,
             password: config.password,
             database: config.database,
-            ssl: config.ssl ? { rejectUnauthorized: false } : false,
+            ssl: postgresSsl(config),
             max: config.maxConnections ?? 15
         })
 
@@ -85,7 +103,6 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
     /**
      * Create a KyselyDatabaseAdapter for SQLite.
      *
-     * Uses the same config shape as KnexDatabaseAdapter.forSQLite().
      * Requires `better-sqlite3` to be installed as a peer dependency.
      *
      * @example
@@ -344,30 +361,43 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
         await this.#db.schema.createIndex(`${name}_idx_updated_at`).on(name).column('updated_at').execute()
     }
 
-    #addDynamicColumn(builder: any, columnName: string, sqlType: string): any {
+    #addDynamicColumn(builder: CreateTableBuilder<string>, columnName: string, sqlType: string): CreateTableBuilder<string> {
+        return builder.addColumn(columnName, sql.raw(this.#columnType(sqlType)), col => this.#columnModifiers(col, sqlType, false))
+    }
+
+    /** Maps a declaration such as 'varchar(20) not null' to the column type of the current dialect. */
+    #columnType(sqlType: string): string {
+        const lower = sqlType.toLowerCase()
+        if (lower.includes('text')) return 'text'
+        if (lower.includes('integer')) return 'integer'
+        if (lower.includes('boolean')) return 'boolean'
+        if (lower.includes('timestamp') || lower.includes('datetime')) return this.#timestampType()
+        if (lower.includes('real') || lower.includes('decimal') || lower.includes('float')) return 'real'
+        const match = lower.match(/varchar\((\d+)\)/)
+        return match ? `varchar(${match[1]})` : 'varchar(255)'
+    }
+
+    /**
+     * Applies NOT NULL and an explicit DEFAULT from the declaration. A NOT NULL column added to an
+     * existing table also needs a default for the rows already there, so one is derived from its type.
+     */
+    #columnModifiers(col: ColumnDefinitionBuilder, sqlType: string, fillsExistingRows: boolean): ColumnDefinitionBuilder {
         const lower = sqlType.toLowerCase()
         const notNull = lower.includes('not null')
+        if (notNull) col = col.notNull()
+        if (lower.includes('default true')) return col.defaultTo(true)
+        if (lower.includes('default false')) return col.defaultTo(false)
+        if (lower.includes('default current_timestamp')) return col.defaultTo(sql`CURRENT_TIMESTAMP`)
+        if (!notNull || !fillsExistingRows) return col
 
-        let dataType: string
-        if (lower.includes('text')) dataType = 'text'
-        else if (lower.includes('integer')) dataType = 'integer'
-        else if (lower.includes('boolean')) dataType = 'boolean'
-        else if (lower.includes('timestamp') || lower.includes('datetime')) dataType = this.#timestampType()
-        else if (lower.includes('real') || lower.includes('decimal') || lower.includes('float')) dataType = 'real'
-        else if (lower.includes('varchar')) {
-            const match = lower.match(/varchar\((\d+)\)/)
-            dataType = match ? `varchar(${match[1]})` : 'varchar(255)'
-        } else {
-            dataType = 'varchar(255)'
+        const type = this.#columnType(sqlType)
+        if (type === 'integer' || type === 'real') return col.defaultTo(0)
+        if (type === 'boolean') return col.defaultTo(false)
+        if (type === this.#timestampType()) {
+            // SQLite refuses a non-constant default in ALTER TABLE ADD COLUMN
+            return col.defaultTo(this.#dialect === 'postgres' ? sql`CURRENT_TIMESTAMP` : new Date().toISOString())
         }
-
-        return builder.addColumn(columnName, dataType, (col: any) => {
-            if (notNull) col = col.notNull()
-            if (lower.includes('default true')) col = col.defaultTo(true)
-            else if (lower.includes('default false')) col = col.defaultTo(false)
-            else if (lower.includes('default current_timestamp')) col = col.defaultTo(sql`CURRENT_TIMESTAMP`)
-            return col
-        })
+        return col.defaultTo('')
     }
 
     async migrateTableSchema(name: string): Promise<string[]> {
@@ -504,50 +534,6 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
     }
 
     // ========== Batch operations ==========
-
-    async saveBatch(metadataList: MetadataRow[]): Promise<DataRecord[]> {
-        if (metadataList.length === 0) return []
-
-        for (const meta of metadataList) {
-            this.#validateTableName(meta.name)
-        }
-
-        const groupedByTable = new Map<string, MetadataRow[]>()
-        for (const meta of metadataList) {
-            const group = groupedByTable.get(meta.name)
-            if (group) group.push(meta)
-            else groupedByTable.set(meta.name, [meta])
-        }
-
-        return this.#db.transaction().execute(async (trx) => {
-            const results: DataRecord[] = []
-
-            for (const [tableName, metas] of groupedByTable) {
-                const insertData = metas.map(meta => {
-                    const data: Record<string, unknown> = {
-                        name: meta.name,
-                        type: meta.type,
-                        url: meta.url,
-                        date: meta.date.toISOString()
-                    }
-                    if (meta.id !== undefined) data.id = meta.id
-                    if ('description' in meta) data.description = meta.description
-                    if ('source' in meta) data.source = meta.source
-                    if ('owner_id' in meta) data.owner_id = meta.owner_id
-                    if ('filename' in meta) data.filename = meta.filename
-                    return data
-                })
-
-                await trx.insertInto(tableName).values(insertData.map(d => this.#sanitizeValues(d))).execute()
-
-                for (const meta of metas) {
-                    results.push(mapToDataRecord(meta, this.#dataResolver))
-                }
-            }
-
-            return results
-        })
-    }
 
     async deleteBatch(deleteRequests: Array<{ id: string; name: string }>): Promise<void> {
         if (deleteRequests.length === 0) return
@@ -749,31 +735,9 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
 
         for (const [colName, colDef] of Object.entries(columns)) {
             if (existingCols.has(colName)) continue
-
-            const lower = colDef.toLowerCase()
-            const isNotNull = lower.includes('not null')
-
-            let dataType: string
-            if (lower.includes('text')) dataType = 'text'
-            else if (lower.includes('integer')) dataType = 'integer'
-            else if (lower.includes('boolean')) dataType = 'boolean'
-            else if (lower.includes('timestamp') || lower.includes('datetime')) dataType = this.#timestampType()
-            else if (lower.includes('real') || lower.includes('decimal') || lower.includes('float')) dataType = 'real'
-            else {
-                const varchMatch = lower.match(/varchar\((\d+)\)/)
-                dataType = varchMatch ? `varchar(${varchMatch[1]})` : 'text'
-            }
-
-            // For NOT NULL on existing tables we must supply a default — SQLite
-            // requires it because existing rows can't retroactively have a value.
-            const implicitDefault = (dataType === 'integer' || dataType === 'boolean') ? 0 : ''
-
             await this.#db.schema
                 .alterTable(tableName)
-                .addColumn(colName, dataType as any, col => {
-                    if (isNotNull) col = col.notNull().defaultTo(implicitDefault)
-                    return col
-                })
+                .addColumn(colName, sql.raw(this.#columnType(colDef)), col => this.#columnModifiers(col, colDef, true))
                 .execute()
         }
     }
