@@ -48,7 +48,7 @@ test.group('Headers Transmission through the HTTP layer', group => {
     // Simulate the request object as the engine builds it
     const mockRequest = {
       headers: {
-        'host': 'apisix:9080',
+        'host': 'gateway:9080',
         'x-real-ip': '172.18.0.2',
         'x-forwarded-for': '172.18.0.2',
         'x-user-id': '6e06a527-a89d-4390-95cd-10ae63cfc939',
@@ -76,7 +76,7 @@ test.group('Headers Transmission through the HTTP layer', group => {
     const assetsManager = new HeaderTestAssetsManager()
     assetsManager.setDependencies(db, storage)
 
-    // Request without APISIX headers (direct access, bypassing gateway)
+    // Request without gateway headers (direct access, bypassing the gateway)
     const mockRequest = {
       headers: {
         'host': 'localhost:3000',
@@ -122,7 +122,7 @@ test.group('Headers Transmission through the HTTP layer', group => {
     const assetsManager = new HeaderTestAssetsManager()
     assetsManager.setDependencies(db, storage)
 
-    // Test with proper APISIX headers
+    // Test with proper gateway headers
     const requestWithAuth = {
       headers: {
         'x-user-id': '12345-67890',
@@ -173,7 +173,7 @@ test.group('Ultimate-Express Integration Simulation', (group) => {
   test('simulate complete flow from HTTP request to AssetsManager', async ({ assert }) => {
     // This simulates what the engine does
     const incomingHttpHeaders = {
-      'host': 'apisix:9080',
+      'host': 'gateway:9080',
       'x-real-ip': '172.18.0.2',
       'x-forwarded-for': '172.18.0.2',
       'x-forwarded-proto': 'http',
@@ -200,7 +200,7 @@ test.group('Ultimate-Express Integration Simulation', (group) => {
     // This is what happens inside the handler
     const result = await assetsManager.testHeaderAccess(requestObject)
 
-    // Verify all APISIX headers are available
+    // Verify all gateway headers are available
     assert.equal(result.userId, '6e06a527-a89d-4390-95cd-10ae63cfc939')
     assert.equal(result.userRoles, 'default-roles-master,offline_access')
     assert.isDefined(result.allHeaders['x-real-ip'])

@@ -9,10 +9,10 @@ Digital Twin Core is a minimalist TypeScript framework used to collect and proce
 - **Handlers** – expose GET endpoints that directly return the result of the method defined in the decorator.
 - **Assets Manager** – upload, store and manage file assets with metadata, providing RESTful endpoints for CRUD operations.
 - **Custom Table Manager** – manage structured data in custom database tables with automatic CRUD endpoints and custom business logic endpoints.
-- **Storage adapters** – currently local filesystem and OVH Object Storage via S3 API.
+- **Storage adapters** – local filesystem and any S3-compatible object storage.
 - **Database adapter** – implemented with [Knex](https://knexjs.org/) to index metadata.
 - **Engine** – orchestrates components, schedules jobs with BullMQ and exposes endpoints via Express.
-- **Authentication** – pluggable authentication system supporting API gateway headers, JWT tokens, or no-auth mode.
+- **Authentication** – OIDC Bearer tokens from any identity provider, trusted gateway headers, or no-auth mode for development.
 
 ## Installation
 
@@ -56,7 +56,7 @@ import { Env } from './src/.env/.env.js';
 
 // Validate environment variables and bootstrap services
 const env = Env.validate({
-  STORAGE_CONFIG: Env.schema.enum(['local', 'ovh'])
+  STORAGE_CONFIG: Env.schema.enum(['local', 's3'])
 });
 
 const storage = StorageServiceFactory.create();
@@ -486,7 +486,7 @@ The engine serves the generated document at `GET /api/openapi.json` and `GET /ap
 
 ### HTTP Compression
 
-HTTP compression is **disabled by default** because API gateways (Apache APISIX, Kong, Nginx, etc.) typically handle compression at the gateway level.
+HTTP compression is **disabled by default** because API gateways and reverse proxies (Kong, Nginx, Traefik, etc.) typically handle compression at the gateway level.
 
 For standalone deployments without a gateway, enable compression via environment variable:
 

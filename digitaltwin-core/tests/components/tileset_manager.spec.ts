@@ -293,7 +293,7 @@ test.group('TilesetManager', (group) => {
         assert.equal(statusEndpoint?.method, 'get')
     })
 
-    test('getEndpoints should not include files endpoint (files served directly from OVH)', ({ assert }) => {
+    test('getEndpoints should not include files endpoint (files served directly from object storage)', ({ assert }) => {
         const manager = new TestTilesetManager()
         const db = new MockDatabaseAdapter()
         const storage = new LocalStorageService('.test-tileset-no-files')

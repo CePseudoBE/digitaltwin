@@ -5,7 +5,7 @@
  * including data collection, processing, asset management, and real-time synchronization.
  *
  * @version 1.0.0
- * @author FARI Team
+ * @author Axel Hoffmann
  *
  * @example
  * ```typescript
