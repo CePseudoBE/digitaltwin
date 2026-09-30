@@ -282,6 +282,7 @@ test.group('Engine auth configuration', group => {
     group.each.teardown(() => {
         process.env.NODE_ENV = 'test'
         delete process.env.AUTH_MODE
+        delete process.env.AUTH_ADMIN_ROLE
     })
 
     test('production without AUTH_MODE refuses to start', async ({ assert }) => {
@@ -289,6 +290,17 @@ test.group('Engine auth configuration', group => {
         delete process.env.AUTH_MODE
 
         await assert.rejects(() => createEngine().start(), /AUTH_MODE is required in production/)
+    })
+
+    test('a custom provider starts in production without AUTH_MODE and keeps AUTH_ADMIN_ROLE', async ({ assert }) => {
+        process.env.NODE_ENV = 'production'
+        process.env.AUTH_ADMIN_ROLE = 'operator'
+        const auth: AuthProvider = { authenticate: async () => ({ subject: 'ops', roles: ['operator'] }) }
+
+        await withEngine({ auth }, async engine => {
+            const result = await engine.getAuthMiddleware()?.authenticate({ headers: {} })
+            assert.isTrue(result?.success === true && result.isAdmin)
+        })
     })
 
     test('a custom provider instance is used and readied instead of the env-selected one', async ({ assert }) => {

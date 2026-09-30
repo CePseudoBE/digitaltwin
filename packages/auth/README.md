@@ -154,7 +154,7 @@ class ApiKeyProvider implements AuthProvider {
 new DigitalTwinEngine({ auth: new ApiKeyProvider(), ... })
 ```
 
-Return `null` for a request without valid credentials. Admin is still decided by `AUTH_ADMIN_ROLE`, read by the same parser as `AUTH_MODE`: in production `AUTH_MODE` must therefore still be set, to any valid mode.
+Return `null` for a request without valid credentials. Admin is still decided by `AUTH_ADMIN_ROLE`.
 
 The built-in providers (`OidcAuthProvider`, `TrustedHeaderAuthProvider`, `NoAuthProvider`) can be passed the same way to configure them in code rather than through the environment.
 

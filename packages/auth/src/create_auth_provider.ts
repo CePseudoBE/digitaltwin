@@ -61,7 +61,7 @@ export function readAuthEnv(env: AuthEnv = process.env): AuthSettings {
     return {
         mode,
         defaulted: !raw,
-        adminRole: env.AUTH_ADMIN_ROLE || env.DIGITALTWIN_ADMIN_ROLE_NAME || 'admin',
+        adminRole: adminRoleFromEnv(env),
         anonymousSubject: env.DIGITALTWIN_ANONYMOUS_USER_ID || 'anonymous',
         trustedHeaders:
             mode === 'trusted-headers'
@@ -70,9 +70,12 @@ export function readAuthEnv(env: AuthEnv = process.env): AuthSettings {
     }
 }
 
-/** Role that grants access to every resource, read from `AUTH_ADMIN_ROLE` (default: 'admin'). */
+/**
+ * Role that grants access to every resource, read from `AUTH_ADMIN_ROLE` (default: 'admin').
+ * It does not validate `AUTH_MODE`, so a custom provider passed as `EngineOptions.auth` needs none.
+ */
 export function adminRoleFromEnv(env: AuthEnv = process.env): string {
-    return readAuthEnv(env).adminRole
+    return env.AUTH_ADMIN_ROLE || env.DIGITALTWIN_ADMIN_ROLE_NAME || 'admin'
 }
 
 /**
