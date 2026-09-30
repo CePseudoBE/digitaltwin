@@ -1,6 +1,7 @@
 // src/engine/queue_manager.ts
 import type { QueueOptions, ConnectionOptions } from 'bullmq'
 import { Queue } from 'bullmq'
+import { Logger } from '@cepseudo/shared'
 import { withTimeout } from './health.js'
 
 /**
@@ -106,6 +107,12 @@ export class QueueManager {
         this.harvesterQueue = this.#createHarvesterQueue(baseConnection, config.queueOptions?.harvesters)
         this.priorityQueue = this.#createPriorityQueue(baseConnection, config.queueOptions?.priority)
         this.uploadQueue = this.#createUploadQueue(baseConnection, config.queueOptions?.uploads)
+
+        // Without a listener BullMQ dumps every Redis error through console.error, bypassing the logger
+        const logger = new Logger('DigitalTwin')
+        for (const queue of [this.collectorQueue, this.harvesterQueue, this.priorityQueue, this.uploadQueue]) {
+            queue.on('error', error => logger.warn(`Queue ${queue.name} error: ${error.message}`))
+        }
     }
 
     /**

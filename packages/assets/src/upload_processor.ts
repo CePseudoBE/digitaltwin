@@ -75,6 +75,7 @@ export class UploadProcessor {
 
         this.worker.on('completed', job => console.log(`[UploadProcessor] Job ${job.id} completed`))
         this.worker.on('failed', (job, err) => console.error(`[UploadProcessor] Job ${job?.id} failed:`, err.message))
+        this.worker.on('error', err => console.warn(`[UploadProcessor] Worker error: ${err.message}`))
     }
 
     async stop(force = false): Promise<void> {
