@@ -102,7 +102,7 @@ await storage.delete(key)
 // Delete in batch (S3 adapter uses optimized bulk delete)
 await storage.deleteBatch(['path/a.json', 'path/b.json'])
 
-// Delete all files under a prefix
+// Delete all files under a prefix; throws a StorageError when S3 reports objects it could not delete
 const count = await storage.deleteByPrefix('tilesets/42')
 
 // Get public URL (each path segment is URL-encoded)

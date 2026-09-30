@@ -1,11 +1,12 @@
 /**
  * Tests for S3StorageService: integration against a local MinIO container
- * (path style, as MinIO requires), plus request-free checks of the public URL.
+ * (path style, as MinIO requires), plus request-free checks of the public URL
+ * and of DeleteObjects error handling.
  */
 import { test } from '@japa/runner'
 import { GenericContainer, Wait } from 'testcontainers'
 import type { StartedTestContainer } from 'testcontainers'
-import { S3Client } from '@aws-sdk/client-s3'
+import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3'
 import { S3StorageService } from '../src/adapters/s3_storage_service.js'
 
 const MINIO_USER = 'minioadmin'
@@ -251,6 +252,25 @@ test.group('S3StorageService - getPublicUrl() (no network)', () => {
     test('uses publicUrl instead of the bucket URL', ({ assert }) => {
         const storage = new S3StorageService({ ...config, endpoint: 'https://s3.example.org', publicUrl: 'https://cdn.example.org/assets/' })
         assert.equal(storage.getPublicUrl(key), 'https://cdn.example.org/assets/tilesets/42/my%20tile%20%231.json')
+    })
+})
+
+test.group('S3StorageService - DeleteObjects errors (no network)', group => {
+    const originalSend = S3Client.prototype.send
+
+    group.each.teardown(() => {
+        S3Client.prototype.send = originalSend
+    })
+
+    test('deleteByPrefix() throws when S3 reports keys it could not delete', async ({ assert }) => {
+        const stubbedSend = async (command: unknown) =>
+            command instanceof ListObjectsV2Command
+                ? { Contents: [{ Key: 'tilesets/1/a.json' }, { Key: 'tilesets/1/b.json' }] }
+                : { Errors: [{ Key: 'tilesets/1/b.json', Code: 'AccessDenied', Message: 'Access Denied' }] }
+        S3Client.prototype.send = stubbedSend as unknown as typeof originalSend
+        const storage = new S3StorageService({ accessKey: 'x', secretKey: 'x', endpoint: 'http://127.0.0.1:1', bucket: 'b' })
+
+        await assert.rejects(() => storage.deleteByPrefix('tilesets/1'), /Failed to delete 1 of 2 objects \(tilesets\/1\/b\.json: AccessDenied Access Denied\)/)
     })
 })
 

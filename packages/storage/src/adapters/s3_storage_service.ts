@@ -16,7 +16,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { StorageService } from '../storage_service.js'
 import type { PresignedUploadResult, ObjectExistsResult } from '../storage_service.js'
-import { safeAsync, Logger } from '@cepseudo/shared'
+import { safeAsync, Logger, StorageError } from '@cepseudo/shared'
 import type { Readable } from 'stream'
 
 const logger = new Logger('S3Storage')
@@ -165,20 +165,7 @@ export class S3StorageService extends StorageService {
             const concurrentBatches = batches.slice(i, i + MAX_CONCURRENT)
             await Promise.all(
                 concurrentBatches.map((batch, index) =>
-                    safeAsync(
-                        () =>
-                            this.#s3.send(
-                                new DeleteObjectsCommand({
-                                    Bucket: this.#bucket,
-                                    Delete: {
-                                        Objects: batch.map(key => ({ Key: key })),
-                                        Quiet: true // Don't return info about each deleted object
-                                    }
-                                })
-                            ),
-                        `delete batch ${i + index + 1}/${batches.length}`,
-                        logger
-                    )
+                    safeAsync(() => this.#deleteObjects(batch), `delete batch ${i + index + 1}/${batches.length}`, logger)
                 )
             )
         }
@@ -230,15 +217,7 @@ export class S3StorageService extends StorageService {
             const keys = objects.map(obj => obj.Key).filter((key): key is string => !!key)
 
             if (keys.length > 0) {
-                await this.#s3.send(
-                    new DeleteObjectsCommand({
-                        Bucket: this.#bucket,
-                        Delete: {
-                            Objects: keys.map(key => ({ Key: key })),
-                            Quiet: true
-                        }
-                    })
-                )
+                await this.#deleteObjects(keys)
                 totalDeleted += keys.length
             }
 
@@ -246,6 +225,27 @@ export class S3StorageService extends StorageService {
         } while (continuationToken)
 
         return totalDeleted
+    }
+
+    /**
+     * Deletes up to 1000 keys in one request.
+     * @throws {StorageError} When S3 reports keys it could not delete
+     */
+    async #deleteObjects(keys: string[]): Promise<void> {
+        const { Errors } = await this.#s3.send(
+            new DeleteObjectsCommand({
+                Bucket: this.#bucket,
+                Delete: { Objects: keys.map(key => ({ Key: key })), Quiet: true }
+            })
+        )
+        // Quiet mode still lists the failed keys: an HTTP 200 alone does not mean they are gone
+        if (Errors && Errors.length > 0) {
+            const [first] = Errors
+            throw new StorageError(
+                `Failed to delete ${Errors.length} of ${keys.length} objects (${first.Key}: ${first.Code} ${first.Message})`,
+                { keys: Errors.map(error => error.Key) }
+            )
+        }
     }
 
     /**
