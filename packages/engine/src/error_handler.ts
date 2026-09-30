@@ -88,7 +88,6 @@ export function registerErrorHandler(fastify: FastifyInstance): void {
             requestId: request.id,
             method: request.method,
             path: request.url,
-            userId: request.headers['x-user-id'],
             stack: error instanceof Error ? error.stack : undefined
         }
         if (status >= 500) logger.error(line, fields)
