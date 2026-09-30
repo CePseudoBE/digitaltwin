@@ -6,7 +6,7 @@ export type DatabaseType = 'sqlite' | 'postgresql'
 /**
  * Supported storage service types
  */
-export type StorageType = 'local' | 'ovh'
+export type StorageType = 'local' | 's3'
 
 /**
  * User answers collected from CLI prompts for project configuration
@@ -92,8 +92,8 @@ export interface DatabaseConfig {
 export interface StorageConfig {
   /** Local filesystem storage path */
   local: string
-  /** OVH Object Storage (S3-compatible) configuration */
-  ovh: {
+  /** S3-compatible object storage configuration */
+  s3: {
     accessKey: string
     secretKey: string
     endpoint: string

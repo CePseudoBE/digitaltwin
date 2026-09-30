@@ -36,7 +36,7 @@ function validateDatabase(db: string): db is DatabaseType {
  * Validates storage option
  */
 function validateStorage(storage: string): storage is StorageType {
-  return storage === 'local' || storage === 'ovh'
+  return storage === 'local' || storage === 's3'
 }
 
 /**
@@ -66,7 +66,7 @@ export async function createDigitalTwinApp(): Promise<void> {
     .argument('[project-name]', 'name of the project')
     .option('-y, --yes', 'Skip prompts and use defaults')
     .option('--database <type>', 'Database type: sqlite, postgresql', 'sqlite')
-    .option('--storage <type>', 'Storage type: local, ovh', 'local')
+    .option('--storage <type>', 'Storage type: local, s3', 'local')
     .option('--storage-path <path>', 'Local storage directory path', './uploads')
     .option('--redis', 'Enable Redis for queue management')
     .option('--docker', 'Include Docker configuration files')
@@ -101,7 +101,7 @@ export async function createDigitalTwinApp(): Promise<void> {
           }
 
           if (!validateStorage(storage)) {
-            console.error(chalk.red(`Error: Invalid storage type '${storage}'. Use 'local' or 'ovh'`))
+            console.error(chalk.red(`Error: Invalid storage type '${storage}'. Use 'local' or 's3'`))
             process.exit(1)
           }
 

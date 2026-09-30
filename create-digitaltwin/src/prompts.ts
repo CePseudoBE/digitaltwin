@@ -45,7 +45,7 @@ export async function getProjectPrompts(initialProjectName?: string): Promise<Pr
       message: 'Choose your storage service:',
       choices: [
         { title: 'Local Storage (File system)', value: 'local' },
-        { title: 'OVH Object Storage (S3-compatible)', value: 'ovh' }
+        { title: 'S3-compatible object storage (AWS S3, MinIO, Scaleway, ...)', value: 's3' }
       ],
       initial: 0
     },

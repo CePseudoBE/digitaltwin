@@ -134,8 +134,8 @@ async function generatePackageJson(projectPath: string, answers: ProjectAnswers)
         dependencies.ioredis = '^5.6.1'
     }
 
-    // Add AWS SDK if using OVH storage
-    if (storage === 'ovh') {
+    // Add AWS SDK if using S3 storage
+    if (storage === 's3') {
         dependencies['@aws-sdk/client-s3'] = '^3.842.0'
     }
 
@@ -192,7 +192,7 @@ function generateIndexFile(answers: ProjectAnswers): string {
 
     const dotenvImport = `import 'dotenv/config'`
 
-    const storageClass = storage === 'local' ? 'LocalStorageService' : 'OvhS3StorageService'
+    const storageClass = storage === 'local' ? 'LocalStorageService' : 'S3StorageService'
     const exampleImports = includeExamples
         ? "import { JSONPlaceholderCollector } from './components/index.js'"
         : ''
@@ -214,12 +214,14 @@ function generateIndexFile(answers: ProjectAnswers): string {
     // Local storage configuration
     STORAGE_PATH: Env.schema.string({ optional: true }),`
         : `
-    // OVH Object Storage configuration
-    OVH_ACCESS_KEY: Env.schema.string(),
-    OVH_SECRET_KEY: Env.schema.string(),
-    OVH_ENDPOINT: Env.schema.string({ format: 'url' }),
-    OVH_REGION: Env.schema.string({ optional: true }),
-    OVH_BUCKET: Env.schema.string(),`
+    // S3-compatible object storage configuration
+    S3_ENDPOINT: Env.schema.string({ format: 'url' }),
+    S3_REGION: Env.schema.string({ optional: true }),
+    S3_BUCKET: Env.schema.string(),
+    S3_ACCESS_KEY_ID: Env.schema.string(),
+    S3_SECRET_ACCESS_KEY: Env.schema.string(),
+    S3_FORCE_PATH_STYLE: Env.schema.boolean({ optional: true }),
+    S3_PUBLIC_URL: Env.schema.string({ optional: true }),`
 
     const redisConfigSection = useRedis ? `
     // Redis configuration  
@@ -229,11 +231,13 @@ function generateIndexFile(answers: ProjectAnswers): string {
     const storageInit = storage === 'local'
         ? `env.STORAGE_PATH || '${localStoragePath || './uploads'}'`
         : `{
-    accessKey: env.OVH_ACCESS_KEY,
-    secretKey: env.OVH_SECRET_KEY,
-    endpoint: env.OVH_ENDPOINT,
-    region: env.OVH_REGION || 'gra',
-    bucket: env.OVH_BUCKET
+    accessKey: env.S3_ACCESS_KEY_ID,
+    secretKey: env.S3_SECRET_ACCESS_KEY,
+    endpoint: env.S3_ENDPOINT,
+    region: env.S3_REGION,
+    bucket: env.S3_BUCKET,
+    pathStyle: env.S3_FORCE_PATH_STYLE,
+    publicUrl: env.S3_PUBLIC_URL
   }`
 
     const dbConfig = database === 'postgresql'
@@ -254,7 +258,7 @@ function generateIndexFile(answers: ProjectAnswers): string {
 
     const storageDisplay = storage === 'local'
         ? `Local filesystem (\${env.STORAGE_PATH || '${localStoragePath || './uploads'}'})`
-        : 'OVH Object Storage'
+        : 'S3 object storage'
 
     const queueDisplay = useRedis ? 'Redis enabled' : 'In-memory mode'
     const dbDisplay = database === 'postgresql' ? 'PostgreSQL' : 'SQLite'
@@ -296,7 +300,7 @@ async function main(): Promise<void> {
   // Start the engine
   await engine.start()
   const port = engine.getPort() || env.PORT || 3000
-  console.log(\`[DigitalTwin] Server running on port \${port} | DB: ${dbDisplay} | Storage: ${storage === 'local' ? 'Local' : 'OVH S3'}\`)
+  console.log(\`[DigitalTwin] Server running on port \${port} | DB: ${dbDisplay} | Storage: ${storage === 'local' ? 'Local' : 'S3'}\`)
 }
 
 main().catch((error: Error) => {
@@ -401,11 +405,13 @@ DB_PATH=./data/${projectName}.db
         content += `STORAGE_PATH=${localStoragePath || './uploads'}
 `
     } else {
-        content += `OVH_ACCESS_KEY=
-OVH_SECRET_KEY=
-OVH_ENDPOINT=https://s3.gra.io.cloud.ovh.net
-OVH_REGION=gra
-OVH_BUCKET=${projectName}
+        content += `S3_ENDPOINT=https://s3.example.com
+S3_REGION=us-east-1
+S3_BUCKET=${projectName}
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+# S3_FORCE_PATH_STYLE=true
+# S3_PUBLIC_URL=
 `
     }
 
@@ -464,12 +470,16 @@ DB_PATH=./data/${projectName}.db
 STORAGE_PATH=${localStoragePath || './uploads'}
 `
     } else {
-        envContent += `# OVH Object Storage (S3-compatible)
-OVH_ACCESS_KEY=your_ovh_access_key_here
-OVH_SECRET_KEY=your_ovh_secret_key_here
-OVH_ENDPOINT=https://s3.gra.io.cloud.ovh.net
-OVH_REGION=gra
-OVH_BUCKET=${projectName}-storage
+        envContent += `# S3-compatible object storage (AWS S3, MinIO, Scaleway, ...)
+S3_ENDPOINT=https://s3.example.com
+S3_REGION=us-east-1
+S3_BUCKET=${projectName}-storage
+S3_ACCESS_KEY_ID=your_access_key_here
+S3_SECRET_ACCESS_KEY=your_secret_key_here
+# Bucket in the path instead of the host (MinIO)
+# S3_FORCE_PATH_STYLE=true
+# Base URL for public links (CDN or custom domain)
+# S3_PUBLIC_URL=https://cdn.example.com
 `
     }
 
@@ -637,14 +647,14 @@ async function generateReadme(projectPath: string, answers: ProjectAnswers): Pro
     const dbLabel = database === 'postgresql' ? 'PostgreSQL with production-ready configuration' : 'SQLite for easy development'
     const storageLabel = storage === 'local'
         ? `Local file system storage (${localStoragePath || './uploads'})`
-        : 'OVH Object Storage integration'
+        : 'S3-compatible object storage'
     const queueLabel = useRedis ? 'Redis-powered background jobs' : 'In-memory job processing'
     const exampleFeature = includeExamples ? '- **Example Collector** - JSONPlaceholder API collector included as template' : ''
 
     const dbConfig = database === 'postgresql' ? 'PostgreSQL' : 'SQLite'
     const storageConfig = storage === 'local'
         ? `Local File System (${localStoragePath || './uploads'})`
-        : 'OVH Object Storage'
+        : 'S3-compatible object storage'
     const queueConfig = useRedis ? 'Redis (BullMQ)' : 'In-memory'
     const dockerConfig = includeDocker ? 'Included' : 'Not included'
 

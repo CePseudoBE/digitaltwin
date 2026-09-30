@@ -603,7 +603,7 @@ const engine = new DigitalTwinEngine({
 
 ### HTTP Compression
 
-HTTP compression is **disabled by default** because API gateways (Apache APISIX, Kong, Nginx, etc.) typically handle compression at the gateway level.
+HTTP compression is **disabled by default** because API gateways and reverse proxies (Kong, Nginx, Traefik, etc.) typically handle compression at the gateway level.
 
 For standalone deployments without a gateway, enable compression via environment variable:
 
@@ -664,15 +664,15 @@ const storage = StorageServiceFactory.create() // Uses LOCAL_STORAGE_PATH .env v
 const storage = new LocalStorageService('/path/to/storage')
 ```
 
-#### OVH Object Storage (S3-compatible)
+#### S3-compatible object storage
 
 ```typescript
-const storage = new OVHStorageService({
-  endpoint: 'https://s3.rbx.io.cloud.ovh.net',
-  region: 'rbx',
+const storage = new S3StorageService({
+  endpoint: 'https://s3.example.com',
+  region: 'us-east-1',
   bucket: 'my-bucket',
-  accessKeyId: process.env.OVH_ACCESS_KEY,
-  secretAccessKey: process.env.OVH_SECRET_KEY
+  accessKey: process.env.S3_ACCESS_KEY_ID,
+  secretKey: process.env.S3_SECRET_ACCESS_KEY
 })
 ```
 
@@ -1289,7 +1289,7 @@ await engine.start()
 import { Env } from 'digitaltwin-core/.env'
 
 const env = Env.validate({
-  STORAGE_CONFIG: Env.schema.enum(['local', 'ovh']),
+  STORAGE_CONFIG: Env.schema.enum(['local', 's3']),
   DATABASE_URL: Env.schema.string(),
   REDIS_URL: Env.schema.string().optional(),
   LOG_LEVEL: Env.schema.enum(['DEBUG', 'INFO', 'WARN', 'ERROR']).default('INFO')

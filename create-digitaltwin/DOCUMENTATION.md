@@ -32,7 +32,7 @@
 - **Multiple Installation Methods** - Support for `npx`, `npm init`, and `yarn create`
 - **Interactive Configuration** - User-friendly prompts for all project settings
 - **Database Flexibility** - SQLite for development, PostgreSQL for production
-- **Storage Options** - Local filesystem or OVH Object Storage (S3-compatible)
+- **Storage Options** - Local filesystem or S3-compatible object storage
 - **Docker Ready** - Optional Docker and docker-compose configuration
 - **Example Components** - Working examples with JSONPlaceholder API
 - **Development Tools** - Built-in CLI commands for testing and development
@@ -107,9 +107,9 @@ The CLI generates different project templates based on your choices:
 | Configuration | Database | Storage | Queue | Use Case |
 |---------------|----------|---------|-------|----------|
 | **Development** | SQLite | Local Files | In-memory | Quick prototyping |
-| **Production** | PostgreSQL | OVH Storage | Redis | Scalable deployment |
+| **Production** | PostgreSQL | S3 storage | Redis | Scalable deployment |
 | **Hybrid** | PostgreSQL | Local Files | Redis | Cost-effective production |
-| **Cloud-First** | PostgreSQL | OVH Storage | In-memory | Simple cloud deployment |
+| **Cloud-First** | PostgreSQL | S3 storage | In-memory | Simple cloud deployment |
 
 ### Template Features
 
@@ -156,7 +156,7 @@ Choose your database:
 ```
 Choose your storage service:
 ❯ Local Storage (File system)  
-  OVH Object Storage (S3-compatible)
+  S3-compatible object storage (AWS S3, MinIO, Scaleway, ...)
 ```
 
 **Local Storage:**
@@ -165,11 +165,10 @@ Choose your storage service:
 - Perfect for development
 - Customizable directory path
 
-**OVH Object Storage:**
-- Cloud-native storage
-- S3-compatible API
+**S3-compatible object storage:**
+- Any provider with an S3 API (AWS S3, MinIO, Scaleway, ...)
 - Scalable and reliable
-- Global CDN distribution
+- Optional CDN or custom domain for public links (`S3_PUBLIC_URL`)
 
 #### 4. Redis Queue Management
 ```
@@ -284,27 +283,31 @@ STORAGE_PATH=./uploads
 - Perfect for development
 - Direct file system access
 
-### OVH Object Storage
+### S3-compatible object storage
 
-S3-compatible cloud storage:
+Any storage with an S3 API (AWS S3, MinIO, Scaleway, ...):
 
 ```typescript
-const storage = new OvhS3StorageService({
-  accessKey: env.OVH_ACCESS_KEY,
-  secretKey: env.OVH_SECRET_KEY,
-  endpoint: env.OVH_ENDPOINT,
-  region: env.OVH_REGION,
-  bucket: env.OVH_BUCKET
+const storage = new S3StorageService({
+  accessKey: env.S3_ACCESS_KEY_ID,
+  secretKey: env.S3_SECRET_ACCESS_KEY,
+  endpoint: env.S3_ENDPOINT,
+  region: env.S3_REGION,
+  bucket: env.S3_BUCKET,
+  pathStyle: env.S3_FORCE_PATH_STYLE,
+  publicUrl: env.S3_PUBLIC_URL
 })
 ```
 
 **Configuration:**
 ```env
-OVH_ACCESS_KEY=your_access_key
-OVH_SECRET_KEY=your_secret_key
-OVH_ENDPOINT=https://s3.gra.io.cloud.ovh.net
-OVH_REGION=gra
-OVH_BUCKET=my-app-storage
+S3_ENDPOINT=https://s3.example.com
+S3_REGION=us-east-1
+S3_BUCKET=my-app-storage
+S3_ACCESS_KEY_ID=your_access_key
+S3_SECRET_ACCESS_KEY=your_secret_key
+# S3_FORCE_PATH_STYLE=true              # MinIO
+# S3_PUBLIC_URL=https://cdn.example.com # CDN or custom domain
 ```
 
 **Benefits:**
@@ -554,7 +557,7 @@ const dbConfig = database === 'postgresql'
 // Storage-specific imports
 const storageClass = storage === 'local' 
   ? 'LocalStorageService' 
-  : 'OvhS3StorageService'
+  : 'S3StorageService'
 
 // Feature-based file generation
 if (answers.includeDocker) {
