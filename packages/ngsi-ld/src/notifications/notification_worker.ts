@@ -98,7 +98,7 @@ export function startNotificationWorker(
             logger.warn(`Notification job ${job.id} failed permanently: ${err.message}`)
         }
     })
-    // BullMQ re-emits Redis failures as 'error'; without a listener they become unhandled rejections
+    // Without a listener BullMQ dumps every Redis error through console.error, bypassing the logger
     worker.on('error', err => logger.warn(`NGSI-LD notification worker error: ${err.message}`))
 
     return worker

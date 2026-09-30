@@ -16,7 +16,7 @@ test.group('notification worker - Redis errors', group => {
         }
     })
 
-    test('an error event is logged instead of escaping as an unhandled error', async ({ assert }) => {
+    test('an error event goes through the plugin logger', async ({ assert }) => {
         const warnings: string[] = []
         const logger = new Logger('ngsi-ld')
         logger.warn = (message: string) => {
