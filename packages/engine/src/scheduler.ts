@@ -102,11 +102,12 @@ class ComponentScheduler {
     async schedule(): Promise<Worker[]> {
         this.#setupEventListeners()
 
-        if (this.multiQueue) {
-            return this.#scheduleMultiQueue()
-        } else {
-            return this.#scheduleSingleQueue()
+        const workers = this.multiQueue ? await this.#scheduleMultiQueue() : await this.#scheduleSingleQueue()
+        // Without a listener BullMQ dumps every Redis error through console.error, bypassing the logger
+        for (const worker of workers) {
+            worker.on('error', error => this.logger.warn(`Worker ${worker.name} error: ${error.message}`))
         }
+        return workers
     }
 
     /**
