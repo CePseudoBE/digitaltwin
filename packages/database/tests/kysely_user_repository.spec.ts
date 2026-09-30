@@ -165,6 +165,17 @@ function registerUserRepositoryTests(label: string, factory: KyselyFactory) {
             assert.equal((await repo.findOrCreateUser({ subject: 'alice', roles: ['admin'] })).id, aliceId)
         })
 
+        test('findOrCreateUser() maps concurrent first logins of one subject to a single user', async ({ assert }) => {
+            const repo = new KyselyUserRepository(db, dialect)
+            await repo.initializeTables()
+            const authUser: AuthenticatedUser = { subject: `concurrent-${Date.now()}`, roles: ['user', 'editor'] }
+
+            const results = await Promise.all([repo.findOrCreateUser(authUser), repo.findOrCreateUser(authUser), repo.findOrCreateUser(authUser)])
+
+            assert.lengthOf(new Set(results.map(user => user.id)), 1)
+            assert.sameMembers(results[0].roles, ['user', 'editor'])
+        })
+
         test('timestamps are set on creation', async ({ assert }) => {
             const repo = new KyselyUserRepository(db, dialect)
             await repo.initializeTables()

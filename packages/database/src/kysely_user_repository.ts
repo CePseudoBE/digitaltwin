@@ -78,15 +78,16 @@ export class KyselyUserRepository implements UserRepository {
 
     async findOrCreateUser(authUser: AuthenticatedUser): Promise<UserRecord> {
         const now = new Date().toISOString()
-        const existing = await this.#db
+        // Insert-or-ignore then select: two first requests of the same caller cannot both insert
+        await this.#db
+            .insertInto('users')
+            .values({ subject: authUser.subject, created_at: now, updated_at: now })
+            .onConflict(oc => oc.column('subject').doNothing())
+            .execute()
+        const { id } = await this.#db
             .selectFrom('users')
             .select('id')
             .where('subject', '=', authUser.subject)
-            .executeTakeFirst()
-        const { id } = existing ?? await this.#db
-            .insertInto('users')
-            .values({ subject: authUser.subject, created_at: now, updated_at: now })
-            .returning('id')
             .executeTakeFirstOrThrow()
 
         await this.#syncUserRoles(id as number, authUser.roles)
@@ -151,6 +152,7 @@ export class KyselyUserRepository implements UserRepository {
                 await trx
                     .insertInto('user_roles')
                     .values(roleIds.map(roleId => ({ user_id: userId, role_id: roleId })))
+                    .onConflict(oc => oc.columns(['user_id', 'role_id']).doNothing())
                     .execute()
             }
 
