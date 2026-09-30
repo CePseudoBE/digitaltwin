@@ -61,17 +61,9 @@ function makeInput(overrides: Partial<SubscriptionCreate> = {}): SubscriptionCre
     }
 }
 
-const allowAll: NgsiLdAuthenticator = {
-    async authenticate() {
-        return { success: true, user: { id: 1, keycloak_id: 'tester', roles: [], created_at: new Date(), updated_at: new Date() }, isAdmin: false }
-    }
-}
+const allowAll: NgsiLdAuthenticator = { identify: async () => ({ subject: 'tester', roles: [] }) }
 
-const denyAll: NgsiLdAuthenticator = {
-    async authenticate() {
-        return { success: false, response: { status: 401, content: JSON.stringify({ error: 'Authentication required' }) } }
-    }
-}
+const denyAll: NgsiLdAuthenticator = { identify: async () => undefined }
 
 const SUBS = '/ngsi-ld/v1/subscriptions'
 const UNKNOWN_ID = '00000000-0000-0000-0000-000000000000'

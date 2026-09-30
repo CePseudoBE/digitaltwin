@@ -54,6 +54,13 @@ Collector writes data --> EventBus emits "component:event"
 
 No package in layers 0--2 (except ngsi-ld itself) may import from this package. Event names and payload types are defined in `@cepseudo/shared`, not here.
 
+## Authentication
+
+The engine passes its own `AuthMiddleware` to the plugin, so NGSI-LD routes accept the same credentials as every other component.
+
+- Writes (`POST`, `PATCH`, `DELETE`) always require an authenticated caller. Without an auth middleware they answer 401.
+- Reads (`GET`) are public unless `publicRead: false` is set in the engine's `ngsiLd` options or `NGSI_LD_PUBLIC_READ=false` is set in the environment. The option wins over the variable.
+
 ## Core Concepts
 
 ### Entities
