@@ -169,14 +169,9 @@ OVH S3      → Raw files (3D assets, collected data, tilesets)
 
 ### Authentication & Authorization
 
-**Being replaced (roadmap milestone 1).** Target: the framework is an OIDC resource server. Clients send `Authorization: Bearer <JWT>`; the framework validates it against the issuer's JWKS (`OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_ROLES_CLAIM`). A generic, opt-in trusted-headers mode replaces the APISIX parser for deployments behind a gateway. `AUTH_MODE` is required in production. Until milestone 1 lands, the current behaviour is:
+The framework is an OIDC resource server and never logs users in. Clients send `Authorization: Bearer <JWT>`; the framework validates it against the issuer's JWKS (`AUTH_MODE=oidc`, `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_ROLES_CLAIM`). The other modes are `trusted-headers` (opt-in, behind a gateway that sets the identity headers and a shared secret) and `none` (development). `AUTH_MODE` is required in production.
 
-Auth is handled externally by an API Gateway (Apache APISIX) which validates tokens and forwards user info via headers:
-
-- `x-user-id`: User identifier
-- `x-user-roles`: Comma-separated roles
-
-The framework parses these via `ApisixAuthParser`, manages user records in the database, and enforces resource ownership.
+Every mode is an `AuthProvider` with an async `authenticate(req)`. `createAuthProvider()` is the only code that reads the auth environment variables; a custom provider is passed as `EngineOptions.auth`. Users are stored by `subject` (the OIDC `sub`), and admin is the role named by `AUTH_ADMIN_ROLE`. The user-facing guide is `packages/auth/README.md`.
 
 **Important**: A shared `AuthMiddleware` class handles authentication for all components. Do NOT duplicate auth logic — always use `AuthMiddleware.authenticate(req)`.
 
@@ -186,7 +181,7 @@ The framework parses these via `ApisixAuthParser`, manages user records in the d
 
 ### Presigned URL Upload Flow
 
-Large files (3D assets) must NOT transit through the backend or APISIX. The flow:
+Large files (3D assets) must NOT transit through the backend or the gateway. The flow:
 
 1. Client → `POST /assets/upload-request` (JWT + fileName, size, contentType)
 2. Backend verifies JWT, creates DB entry (`status: pending`), generates presigned PUT URL
