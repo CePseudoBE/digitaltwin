@@ -96,6 +96,7 @@ export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<Ngsi
     logger.info(`NGSI-LD plugin initialized: ${allSubs.length} subscriptions loaded`)
 
     const notificationQueue = new Queue<NotificationJobData>('ngsi-ld-notifications', { connection: bullmqConnection })
+    notificationQueue.on('error', err => logger.warn(`NGSI-LD notification queue error: ${err.message}`))
 
     // Encapsulated so the NGSI-LD error format applies to these routes only
     await fastify.register(async instance => {
@@ -107,6 +108,8 @@ export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<Ngsi
     })
 
     const worker = startNotificationWorker(bullmqConnection, subscriptionStore, subscriptionCache, logger, { allowPrivateWebhooks })
+    // BullMQ connections closed while still initializing reject after their listeners are gone
+    await Promise.all([notificationQueue.waitUntilReady(), worker.waitUntilReady()])
 
     const onComponentEvent = async (event: ComponentEvent): Promise<void> => {
         if (event.type !== 'collector:completed' && event.type !== 'harvester:completed') {
