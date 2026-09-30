@@ -323,6 +323,31 @@ function registerAdapterTests(label: string, factory: AdapterFactory) {
             assert.include(table!.columns.map(c => c.name), 'temperature')
         })
 
+        test('ensureColumns gives NOT NULL columns added to a table with rows a default of their type', async ({ assert }) => {
+            const table = `${label}_ensure_not_null`
+            await db.createTableWithColumns(table, { sensor_id: 'text not null' })
+            await db.getKysely().insertInto(table).values({ sensor_id: 's1' }).execute()
+
+            await db.ensureColumns(table, {
+                label: 'text not null',
+                code: 'varchar(20) not null',
+                count: 'integer not null',
+                score: 'real not null',
+                flag: 'boolean not null',
+                enabled: 'boolean default true not null',
+                seen_at: 'timestamp not null'
+            })
+
+            const row = await db.getKysely().selectFrom(table).selectAll().executeTakeFirstOrThrow()
+            assert.equal(row.label, '')
+            assert.equal(row.code, '')
+            assert.equal(Number(row.count), 0)
+            assert.equal(Number(row.score), 0)
+            assert.isFalse(Boolean(row.flag))
+            assert.isTrue(Boolean(row.enabled))
+            assert.isNotNull(row.seen_at)
+        })
+
         test('ensureColumns is a no-op when all columns exist', async ({ assert }) => {
             await db.createTableWithColumns(`${label}_ensure_noop`, { sensor_id: 'text not null' })
             await assert.doesNotReject(() => db.ensureColumns(`${label}_ensure_noop`, { sensor_id: 'text not null' }))

@@ -1,4 +1,5 @@
 import { Kysely, SqliteDialect, PostgresDialect, sql } from 'kysely'
+import type { ColumnDefinitionBuilder, CreateTableBuilder } from 'kysely'
 import { parseBoolean } from '@cepseudo/shared'
 import type { DataRecord, DataResolver, MetadataRow, UserRepository } from '@cepseudo/shared'
 import { DatabaseAdapter } from '../database_adapter.js'
@@ -360,30 +361,43 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
         await this.#db.schema.createIndex(`${name}_idx_updated_at`).on(name).column('updated_at').execute()
     }
 
-    #addDynamicColumn(builder: any, columnName: string, sqlType: string): any {
+    #addDynamicColumn(builder: CreateTableBuilder<string>, columnName: string, sqlType: string): CreateTableBuilder<string> {
+        return builder.addColumn(columnName, sql.raw(this.#columnType(sqlType)), col => this.#columnModifiers(col, sqlType, false))
+    }
+
+    /** Maps a declaration such as 'varchar(20) not null' to the column type of the current dialect. */
+    #columnType(sqlType: string): string {
+        const lower = sqlType.toLowerCase()
+        if (lower.includes('text')) return 'text'
+        if (lower.includes('integer')) return 'integer'
+        if (lower.includes('boolean')) return 'boolean'
+        if (lower.includes('timestamp') || lower.includes('datetime')) return this.#timestampType()
+        if (lower.includes('real') || lower.includes('decimal') || lower.includes('float')) return 'real'
+        const match = lower.match(/varchar\((\d+)\)/)
+        return match ? `varchar(${match[1]})` : 'varchar(255)'
+    }
+
+    /**
+     * Applies NOT NULL and an explicit DEFAULT from the declaration. A NOT NULL column added to an
+     * existing table also needs a default for the rows already there, so one is derived from its type.
+     */
+    #columnModifiers(col: ColumnDefinitionBuilder, sqlType: string, fillsExistingRows: boolean): ColumnDefinitionBuilder {
         const lower = sqlType.toLowerCase()
         const notNull = lower.includes('not null')
+        if (notNull) col = col.notNull()
+        if (lower.includes('default true')) return col.defaultTo(true)
+        if (lower.includes('default false')) return col.defaultTo(false)
+        if (lower.includes('default current_timestamp')) return col.defaultTo(sql`CURRENT_TIMESTAMP`)
+        if (!notNull || !fillsExistingRows) return col
 
-        let dataType: string
-        if (lower.includes('text')) dataType = 'text'
-        else if (lower.includes('integer')) dataType = 'integer'
-        else if (lower.includes('boolean')) dataType = 'boolean'
-        else if (lower.includes('timestamp') || lower.includes('datetime')) dataType = this.#timestampType()
-        else if (lower.includes('real') || lower.includes('decimal') || lower.includes('float')) dataType = 'real'
-        else if (lower.includes('varchar')) {
-            const match = lower.match(/varchar\((\d+)\)/)
-            dataType = match ? `varchar(${match[1]})` : 'varchar(255)'
-        } else {
-            dataType = 'varchar(255)'
+        const type = this.#columnType(sqlType)
+        if (type === 'integer' || type === 'real') return col.defaultTo(0)
+        if (type === 'boolean') return col.defaultTo(false)
+        if (type === this.#timestampType()) {
+            // SQLite refuses a non-constant default in ALTER TABLE ADD COLUMN
+            return col.defaultTo(this.#dialect === 'postgres' ? sql`CURRENT_TIMESTAMP` : new Date().toISOString())
         }
-
-        return builder.addColumn(columnName, dataType, (col: any) => {
-            if (notNull) col = col.notNull()
-            if (lower.includes('default true')) col = col.defaultTo(true)
-            else if (lower.includes('default false')) col = col.defaultTo(false)
-            else if (lower.includes('default current_timestamp')) col = col.defaultTo(sql`CURRENT_TIMESTAMP`)
-            return col
-        })
+        return col.defaultTo('')
     }
 
     async migrateTableSchema(name: string): Promise<string[]> {
@@ -721,31 +735,9 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
 
         for (const [colName, colDef] of Object.entries(columns)) {
             if (existingCols.has(colName)) continue
-
-            const lower = colDef.toLowerCase()
-            const isNotNull = lower.includes('not null')
-
-            let dataType: string
-            if (lower.includes('text')) dataType = 'text'
-            else if (lower.includes('integer')) dataType = 'integer'
-            else if (lower.includes('boolean')) dataType = 'boolean'
-            else if (lower.includes('timestamp') || lower.includes('datetime')) dataType = this.#timestampType()
-            else if (lower.includes('real') || lower.includes('decimal') || lower.includes('float')) dataType = 'real'
-            else {
-                const varchMatch = lower.match(/varchar\((\d+)\)/)
-                dataType = varchMatch ? `varchar(${varchMatch[1]})` : 'text'
-            }
-
-            // For NOT NULL on existing tables we must supply a default — SQLite
-            // requires it because existing rows can't retroactively have a value.
-            const implicitDefault = (dataType === 'integer' || dataType === 'boolean') ? 0 : ''
-
             await this.#db.schema
                 .alterTable(tableName)
-                .addColumn(colName, dataType as any, col => {
-                    if (isNotNull) col = col.notNull().defaultTo(implicitDefault)
-                    return col
-                })
+                .addColumn(colName, sql.raw(this.#columnType(colDef)), col => this.#columnModifiers(col, colDef, true))
                 .execute()
         }
     }
