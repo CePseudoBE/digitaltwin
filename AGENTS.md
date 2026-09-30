@@ -50,7 +50,7 @@ The public policy in CONTRIBUTING.md ("AI-Assisted Contributions") applies to wo
 ```
 packages/
 ├── shared/          → Types, errors, utils, validation, env (LAYER 0)
-├── database/        → DatabaseAdapter + KyselyDatabaseAdapter (LAYER 1; Knex adapter is legacy, removed in milestone 3)
+├── database/        → DatabaseAdapter + KyselyDatabaseAdapter (LAYER 1)
 ├── storage/         → StorageService + S3/Local adapters (LAYER 1)
 ├── auth/            → AuthProvider, UserService, AuthMiddleware (LAYER 1)
 ├── components/      → Collector, Harvester, Handler, CustomTableManager (LAYER 2)
@@ -371,7 +371,7 @@ CREATE TABLE ngsi_ld_subscriptions (
 ```
 ultimate-express          HTTP server
 bullmq + ioredis          Queue management + Redis
-knex                      Database query builder (PostgreSQL, SQLite)
+kysely                    Database query builder (PostgreSQL, SQLite)
 @aws-sdk/client-s3        S3-compatible object storage
 @aws-sdk/s3-request-presigner  Presigned URL generation
 @fastify/multipart        Multipart uploads (small files; presigned URLs are the large-file path)
@@ -437,7 +437,7 @@ Packages are published to npm **only via the main branch pipeline**. Never publi
 - **No `any`** — use proper types. `TypedRequest` for HTTP requests, generics where needed.
 - **No `export *`** — explicit named exports in every `index.ts`.
 - **No auth duplication** — use `AuthMiddleware` from `@cepseudo/auth`.
-- **No direct Knex access outside database package** — always go through `DatabaseAdapter` or `UserRepository`.
+- **No direct Kysely access outside database package** — always go through `DatabaseAdapter` or `UserRepository`.
 - Concise variable names in implementation, descriptive names for public APIs.
 - Prefer `import type` for cross-package type-only imports.
 - Error handling: use the custom error hierarchy from `@cepseudo/shared/errors`.

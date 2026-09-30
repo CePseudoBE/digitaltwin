@@ -3,8 +3,7 @@ import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/sh
 /**
  * Service for managing users in the Digital Twin framework.
  *
- * Delegates all database operations to a UserRepository implementation,
- * removing the previous direct Knex dependency.
+ * Delegates all database operations to a UserRepository implementation.
  *
  */
 export class UserService {

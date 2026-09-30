@@ -12,7 +12,7 @@ A component-based TypeScript framework for building Digital Twin applications wi
 | Package | Description | Layer |
 |---------|-------------|-------|
 | [@cepseudo/shared](./packages/shared) | Types, errors, utilities, validation, environment helpers | 0 |
-| [@cepseudo/database](./packages/database) | Database abstraction (Knex/Kysely, PostgreSQL/SQLite) | 1 |
+| [@cepseudo/database](./packages/database) | Database abstraction (Kysely, PostgreSQL/SQLite) | 1 |
 | [@cepseudo/storage](./packages/storage) | Storage abstraction (local filesystem, S3-compatible object storage) | 1 |
 | [@cepseudo/auth](./packages/auth) | Authentication providers and middleware | 1 |
 | [@cepseudo/components](./packages/components) | Component base classes (Collector, Harvester, Handler, CustomTableManager) | 2 |
@@ -28,7 +28,7 @@ A component-based TypeScript framework for building Digital Twin applications wi
 LAYER 3  engine          → orchestrates everything
 LAYER 2  components      → base classes users extend
          assets          → file/tileset/map management
-LAYER 1  database        → DB adapters (Knex, Kysely)
+LAYER 1  database        → DB adapter (Kysely)
          storage         → file storage (local, S3)
          auth            → authentication & middleware
 LAYER 0  shared          → types, errors, utils (no internal deps)
@@ -73,7 +73,7 @@ pnpm run dev
 │                                                                 │
 │  ┌────────────────────────┐    ┌────────────────────────────┐  │
 │  │    DatabaseAdapter     │    │      StorageService        │  │
-│  │  (Kysely/Knex: PG/SQLite)│  │    (Local / S3)            │  │
+│  │   (Kysely: PG/SQLite)  │    │    (Local / S3)            │  │
 │  └────────────────────────┘    └────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```

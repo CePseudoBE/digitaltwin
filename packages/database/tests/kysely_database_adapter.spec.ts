@@ -161,20 +161,6 @@ function registerAdapterTests(label: string, factory: AdapterFactory) {
         })
         group.teardown(async () => { await cleanup() })
 
-        test('saveBatch inserts multiple records', async ({ assert }) => {
-            await db.createTable(`${label}_batch_save`)
-            const records = await db.saveBatch([
-                { name: `${label}_batch_save`, type: 'text/plain', url: '/b1.txt', date: new Date() },
-                { name: `${label}_batch_save`, type: 'text/plain', url: '/b2.txt', date: new Date() },
-                { name: `${label}_batch_save`, type: 'text/plain', url: '/b3.txt', date: new Date() },
-            ])
-            assert.lengthOf(records, 3)
-        })
-
-        test('saveBatch returns empty array for empty input', async ({ assert }) => {
-            assert.lengthOf(await db.saveBatch([]), 0)
-        })
-
         test('deleteBatch removes multiple records', async ({ assert }) => {
             await db.createTable(`${label}_batch_del`)
             const s1 = await db.save({ name: `${label}_batch_del`, type: 'text/plain', url: '/d1.txt', date: new Date() })

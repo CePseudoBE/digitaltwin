@@ -220,10 +220,10 @@ export interface EngineOptions {
  * ```TypeScript
  * import { DigitalTwinEngine } from './digital_twin_engine.js'
  * import { StorageServiceFactory } from '../storage/storage_factory.js'
- * import { KnexDatabaseAdapter } from '../database/adapters/knex_database_adapter.js'
+ * import { KyselyDatabaseAdapter } from '@cepseudo/database'
  *
  * const storage = StorageServiceFactory.create()
- * const database = new KnexDatabaseAdapter({ client: 'sqlite3', connection: ':memory:' }, storage)
+ * const database = await KyselyDatabaseAdapter.forSQLite({ filename: ':memory:' }, url => storage.retrieve(url))
  *
  * const engine = new DigitalTwinEngine({
  *   storage,

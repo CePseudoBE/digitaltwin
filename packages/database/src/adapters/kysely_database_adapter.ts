@@ -47,7 +47,6 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
     /**
      * Create a KyselyDatabaseAdapter for PostgreSQL.
      *
-     * Uses the same config shape as KnexDatabaseAdapter.forPostgreSQL().
      * Requires `pg` to be installed as a peer dependency.
      *
      * @example
@@ -85,7 +84,6 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
     /**
      * Create a KyselyDatabaseAdapter for SQLite.
      *
-     * Uses the same config shape as KnexDatabaseAdapter.forSQLite().
      * Requires `better-sqlite3` to be installed as a peer dependency.
      *
      * @example
@@ -504,50 +502,6 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
     }
 
     // ========== Batch operations ==========
-
-    async saveBatch(metadataList: MetadataRow[]): Promise<DataRecord[]> {
-        if (metadataList.length === 0) return []
-
-        for (const meta of metadataList) {
-            this.#validateTableName(meta.name)
-        }
-
-        const groupedByTable = new Map<string, MetadataRow[]>()
-        for (const meta of metadataList) {
-            const group = groupedByTable.get(meta.name)
-            if (group) group.push(meta)
-            else groupedByTable.set(meta.name, [meta])
-        }
-
-        return this.#db.transaction().execute(async (trx) => {
-            const results: DataRecord[] = []
-
-            for (const [tableName, metas] of groupedByTable) {
-                const insertData = metas.map(meta => {
-                    const data: Record<string, unknown> = {
-                        name: meta.name,
-                        type: meta.type,
-                        url: meta.url,
-                        date: meta.date.toISOString()
-                    }
-                    if (meta.id !== undefined) data.id = meta.id
-                    if ('description' in meta) data.description = meta.description
-                    if ('source' in meta) data.source = meta.source
-                    if ('owner_id' in meta) data.owner_id = meta.owner_id
-                    if ('filename' in meta) data.filename = meta.filename
-                    return data
-                })
-
-                await trx.insertInto(tableName).values(insertData.map(d => this.#sanitizeValues(d))).execute()
-
-                for (const meta of metas) {
-                    results.push(mapToDataRecord(meta, this.#dataResolver))
-                }
-            }
-
-            return results
-        })
-    }
 
     async deleteBatch(deleteRequests: Array<{ id: string; name: string }>): Promise<void> {
         if (deleteRequests.length === 0) return

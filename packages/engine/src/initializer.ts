@@ -29,7 +29,7 @@ import type { AuthMiddleware } from '@cepseudo/auth'
  * @example
  * ```typescript
  * const components = [weatherCollector, trafficHarvester];
- * const database = new KnexDatabaseAdapter(config);
+ * const database = await KyselyDatabaseAdapter.forPostgreSQL(config, dataResolver);
  * const storage = new LocalStorageService();
  *
  * await initializeComponents(components, database, storage, true);
@@ -67,7 +67,7 @@ export async function initializeComponents(
  * @example
  * ```typescript
  * const managers = [tilesetManager, pointCloudManager];
- * const database = new KnexDatabaseAdapter(config);
+ * const database = await KyselyDatabaseAdapter.forPostgreSQL(config, dataResolver);
  * const storage = new S3StorageService(credentials);
  *
  * await initializeAssetsManagers(managers, database, storage, true);

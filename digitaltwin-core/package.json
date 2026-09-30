@@ -68,7 +68,6 @@
   },
   "peerDependencies": {
     "better-sqlite3": "^12.2.0",
-    "knex": "^3.0.0",
     "mysql2": "*",
     "pg": "*",
     "sqlite3": "^5.1.7"

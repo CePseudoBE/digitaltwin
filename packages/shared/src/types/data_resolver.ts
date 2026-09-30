@@ -14,7 +14,7 @@
  * const resolver: DataResolver = (url) => storage.retrieve(url)
  *
  * // Use in database adapter
- * const adapter = new KnexDatabaseAdapter(config, resolver)
+ * const adapter = await KyselyDatabaseAdapter.forPostgreSQL(config, resolver)
  * ```
  */
 export type DataResolver = (url: string) => Promise<Buffer>
