@@ -14,16 +14,8 @@ import { property } from '../src/helpers/property.js'
 import { buildUrn } from '../src/helpers/urn.js'
 import { NGSI_LD_CORE_CONTEXT } from '../src/types/context.js'
 
-const allowAll: NgsiLdAuthenticator = {
-    async authenticate() {
-        return { success: true, user: { id: 1, keycloak_id: 'tester', roles: [], created_at: new Date(), updated_at: new Date() }, isAdmin: false }
-    }
-}
-const denyAll: NgsiLdAuthenticator = {
-    async authenticate() {
-        return { success: false, response: { status: 401, content: JSON.stringify({ error: 'Authentication required' }) } }
-    }
-}
+const allowAll: NgsiLdAuthenticator = { identify: async () => ({ subject: 'tester', roles: [] }) }
+const denyAll: NgsiLdAuthenticator = { identify: async () => undefined }
 
 async function buildApp(cache: EntityCache, auth: NgsiLdAuthenticator): Promise<FastifyInstance> {
     const app = Fastify({ logger: false })
