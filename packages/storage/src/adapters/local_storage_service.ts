@@ -106,7 +106,7 @@ export class LocalStorageService extends StorageService {
     /**
      * Returns a local file path for the stored file.
      * Note: For local storage, this returns a relative file path, not an HTTP URL.
-     * In production, use a cloud storage service (OVH, S3) for public URLs.
+     * In production, use S3-compatible object storage for public URLs.
      * @param relativePath - The storage path of the file
      * @returns The file path (relative to baseDir)
      * @throws Error if path traversal is detected

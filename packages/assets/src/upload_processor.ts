@@ -52,7 +52,7 @@ export type UploadStatus = 'pending' | 'uploaded' | 'processing' | 'completed' |
  *
  * Flow:
  * 1. Read ZIP from temp file
- * 2. Extract and upload all files to storage (OVH S3)
+ * 2. Extract and upload all files to storage (S3-compatible)
  * 3. Update database with tileset_url and base_path
  * 4. Clean up temp file
  */

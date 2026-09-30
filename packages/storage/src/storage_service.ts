@@ -151,7 +151,7 @@ export abstract class StorageService {
     /**
      * Returns the public URL for a stored file.
      *
-     * For cloud storage (S3, OVH, Azure), this returns the direct HTTP URL.
+     * For object storage (S3-compatible), this returns the direct HTTP URL.
      * For local storage, this may return a relative path or throw an error.
      *
      * @abstract
@@ -161,7 +161,7 @@ export abstract class StorageService {
      * @example
      * ```typescript
      * const url = storage.getPublicUrl('tilesets/123/tileset.json')
-     * // Returns: 'https://bucket.s3.region.cloud.ovh.net/tilesets/123/tileset.json'
+     * // Returns: 'https://bucket.s3.eu-west-1.amazonaws.com/tilesets/123/tileset.json'
      * ```
      */
     abstract getPublicUrl(relativePath: string): string

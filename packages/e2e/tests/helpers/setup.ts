@@ -7,7 +7,7 @@
 import { GenericContainer, Wait } from 'testcontainers'
 import type { StartedTestContainer } from 'testcontainers'
 import { KyselyDatabaseAdapter } from '@cepseudo/database'
-import { OvhS3StorageService } from '@cepseudo/storage'
+import { S3StorageService } from '@cepseudo/storage'
 import { AuthMiddleware, createAuthProvider, UserService } from '@cepseudo/auth'
 import type { DatabaseAdapter } from '@cepseudo/database'
 import type { StorageService } from '@cepseudo/storage'
@@ -18,7 +18,7 @@ const MINIO_BUCKET = 'test-bucket'
 
 export interface E2EInfrastructure {
     db: DatabaseAdapter
-    storage: OvhS3StorageService
+    storage: S3StorageService
     authMiddleware: AuthMiddleware
     cleanup: () => Promise<void>
 }
@@ -63,8 +63,8 @@ async function createBucket(endpoint: string): Promise<void> {
     await s3.destroy()
 }
 
-function makeStorage(endpoint: string): OvhS3StorageService {
-    return new OvhS3StorageService({
+function makeStorage(endpoint: string): S3StorageService {
+    return new S3StorageService({
         accessKey: process.env.TEST_MINIO_ACCESS_KEY || MINIO_USER,
         secretKey: process.env.TEST_MINIO_SECRET_KEY || MINIO_PASSWORD,
         endpoint,

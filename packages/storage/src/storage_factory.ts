@@ -2,8 +2,8 @@
  * Factory class for creating the appropriate StorageService
  * implementation based on environment configuration.
  */
-import { Env, safeAsync, Logger } from '@cepseudo/shared'
-import { OvhS3StorageService } from './adapters/ovh_storage_service.js'
+import { Env, safeAsync, Logger, parseBoolean } from '@cepseudo/shared'
+import { S3StorageService } from './adapters/s3_storage_service.js'
 import { LocalStorageService } from './adapters/local_storage_service.js'
 import type { StorageService } from './storage_service.js'
 
@@ -15,7 +15,7 @@ export class StorageServiceFactory {
      * based on the STORAGE_CONFIG environment variable.
      *
      * - 'local': returns a LocalStorageService
-     * - 'ovh': returns an OvhS3StorageService
+     * - 's3': returns an S3StorageService configured from the S3_* variables
      *
      * @throws Error if STORAGE_CONFIG is not supported
      */
@@ -26,21 +26,23 @@ export class StorageServiceFactory {
             case 'local':
                 return new LocalStorageService(env.LOCAL_STORAGE_DIR || 'data')
 
-            case 'ovh': {
-                const ovhStorage = new OvhS3StorageService({
-                    accessKey: env.OVH_ACCESS_KEY,
-                    secretKey: env.OVH_SECRET_KEY,
-                    endpoint: env.OVH_ENDPOINT,
-                    bucket: env.OVH_BUCKET,
-                    region: env.OVH_REGION ?? 'gra'
+            case 's3': {
+                const s3Storage = new S3StorageService({
+                    accessKey: env.S3_ACCESS_KEY_ID,
+                    secretKey: env.S3_SECRET_ACCESS_KEY,
+                    endpoint: env.S3_ENDPOINT,
+                    bucket: env.S3_BUCKET,
+                    region: env.S3_REGION,
+                    pathStyle: parseBoolean(env.S3_FORCE_PATH_STYLE, 'S3_FORCE_PATH_STYLE'),
+                    publicUrl: env.S3_PUBLIC_URL
                 })
                 // Configure CORS for browser access (non-blocking)
                 safeAsync(
-                    () => ovhStorage.configureCors(['*'], ['GET', 'HEAD', 'PUT'], ['*', 'Authorization']),
-                    'configure OVH CORS',
+                    () => s3Storage.configureCors(['*'], ['GET', 'HEAD', 'PUT'], ['*', 'Authorization']),
+                    'configure S3 CORS',
                     logger
                 )
-                return ovhStorage
+                return s3Storage
             }
 
             default:

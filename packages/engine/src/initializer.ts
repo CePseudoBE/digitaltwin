@@ -68,7 +68,7 @@ export async function initializeComponents(
  * ```typescript
  * const managers = [tilesetManager, pointCloudManager];
  * const database = new KnexDatabaseAdapter(config);
- * const storage = new OvhS3StorageService(credentials);
+ * const storage = new S3StorageService(credentials);
  *
  * await initializeAssetsManagers(managers, database, storage, true);
  * // Asset managers are now ready to handle file operations

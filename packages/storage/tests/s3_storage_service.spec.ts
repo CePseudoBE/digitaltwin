@@ -1,16 +1,13 @@
 /**
- * Integration tests for OvhS3StorageService using a local MinIO container.
- *
- * MinIO is S3-compatible — the same AWS SDK code runs against it as against
- * OVH Object Storage. The only difference is pathStyle: true for localhost
- * (MinIO) vs pathStyle: false for OVH (virtual-hosted style).
- *
- * These tests never touch the real OVH bucket.
+ * Tests for S3StorageService: integration against a local MinIO container
+ * (path style, as MinIO requires), plus request-free checks of the public URL
+ * and of DeleteObjects error handling.
  */
 import { test } from '@japa/runner'
 import { GenericContainer, Wait } from 'testcontainers'
 import type { StartedTestContainer } from 'testcontainers'
-import { OvhS3StorageService } from '../src/adapters/ovh_storage_service.js'
+import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3'
+import { S3StorageService } from '../src/adapters/s3_storage_service.js'
 
 const MINIO_USER = 'minioadmin'
 const MINIO_PASSWORD = 'minioadmin'
@@ -35,7 +32,7 @@ async function startMinio(): Promise<{ container: StartedTestContainer; endpoint
 
 async function createBucket(endpoint: string): Promise<void> {
     // Use the AWS SDK directly to create the bucket before tests
-    const { S3Client, CreateBucketCommand } = await import('@aws-sdk/client-s3')
+    const { CreateBucketCommand, PutBucketPolicyCommand } = await import('@aws-sdk/client-s3')
     const s3 = new S3Client({
         endpoint,
         region: 'us-east-1',
@@ -45,11 +42,17 @@ async function createBucket(endpoint: string): Promise<void> {
         responseChecksumValidation: 'WHEN_REQUIRED',
     })
     await s3.send(new CreateBucketCommand({ Bucket: BUCKET }))
+    // MinIO ignores object ACLs: a bucket policy is what lets the public URL test read anonymously
+    const policy = {
+        Version: '2012-10-17',
+        Statement: [{ Effect: 'Allow', Principal: { AWS: ['*'] }, Action: ['s3:GetObject'], Resource: [`arn:aws:s3:::${BUCKET}/*`] }]
+    }
+    await s3.send(new PutBucketPolicyCommand({ Bucket: BUCKET, Policy: JSON.stringify(policy) }))
     await s3.destroy()
 }
 
-function makeStorage(endpoint: string): OvhS3StorageService {
-    return new OvhS3StorageService({
+function makeStorage(endpoint: string): S3StorageService {
+    return new S3StorageService({
         accessKey: MINIO_USER,
         secretKey: MINIO_PASSWORD,
         endpoint,
@@ -59,10 +62,10 @@ function makeStorage(endpoint: string): OvhS3StorageService {
     })
 }
 
-test.group('OvhS3StorageService (MinIO integration)', group => {
+test.group('S3StorageService (MinIO integration)', group => {
     let container: StartedTestContainer
     let endpoint: string
-    let storage: OvhS3StorageService
+    let storage: S3StorageService
 
     group.setup(async () => {
         const result = await startMinio()
@@ -173,6 +176,15 @@ test.group('OvhS3StorageService (MinIO integration)', group => {
 
     // ── generatePresignedUploadUrl ───────────────────────────────────────────
 
+    test('getPublicUrl() serves the object anonymously, keys with spaces and # included', async ({ assert }) => {
+        const key = 'tilesets/42/my tile #1.json'
+        await storage.saveWithPath(Buffer.from('{"asset":{}}'), key)
+
+        const response = await fetch(storage.getPublicUrl(key))
+        assert.equal(response.status, 200)
+        assert.equal(await response.text(), '{"asset":{}}')
+    })
+
     test('supportsPresignedUrls() returns true', ({ assert }) => {
         assert.isTrue(storage.supportsPresignedUrls())
     })
@@ -223,9 +235,48 @@ test.group('OvhS3StorageService (MinIO integration)', group => {
     })
 })
 
-test.group('OvhS3StorageService - deleteByPrefix() guard (no network)', () => {
+test.group('S3StorageService - getPublicUrl() (no network)', () => {
+    const config = { accessKey: 'x', secretKey: 'x', bucket: 'city' }
+    const key = 'tilesets/42/my tile #1.json'
+
+    test('puts the bucket in the host by default and encodes each path segment', ({ assert }) => {
+        const storage = new S3StorageService({ ...config, endpoint: 'https://s3.example.org' })
+        assert.equal(storage.getPublicUrl(key), 'https://city.s3.example.org/tilesets/42/my%20tile%20%231.json')
+    })
+
+    test('puts the bucket in the path with pathStyle', ({ assert }) => {
+        const storage = new S3StorageService({ ...config, endpoint: 'http://localhost:9000/', pathStyle: true })
+        assert.equal(storage.getPublicUrl(key), 'http://localhost:9000/city/tilesets/42/my%20tile%20%231.json')
+    })
+
+    test('uses publicUrl instead of the bucket URL', ({ assert }) => {
+        const storage = new S3StorageService({ ...config, endpoint: 'https://s3.example.org', publicUrl: 'https://cdn.example.org/assets/' })
+        assert.equal(storage.getPublicUrl(key), 'https://cdn.example.org/assets/tilesets/42/my%20tile%20%231.json')
+    })
+})
+
+test.group('S3StorageService - DeleteObjects errors (no network)', group => {
+    const originalSend = S3Client.prototype.send
+
+    group.each.teardown(() => {
+        S3Client.prototype.send = originalSend
+    })
+
+    test('deleteByPrefix() throws when S3 reports keys it could not delete', async ({ assert }) => {
+        const stubbedSend = async (command: unknown) =>
+            command instanceof ListObjectsV2Command
+                ? { Contents: [{ Key: 'tilesets/1/a.json' }, { Key: 'tilesets/1/b.json' }] }
+                : { Errors: [{ Key: 'tilesets/1/b.json', Code: 'AccessDenied', Message: 'Access Denied' }] }
+        S3Client.prototype.send = stubbedSend as unknown as typeof originalSend
+        const storage = new S3StorageService({ accessKey: 'x', secretKey: 'x', endpoint: 'http://127.0.0.1:1', bucket: 'b' })
+
+        await assert.rejects(() => storage.deleteByPrefix('tilesets/1'), /Failed to delete 1 of 2 objects \(tilesets\/1\/b\.json: AccessDenied Access Denied\)/)
+    })
+})
+
+test.group('S3StorageService - deleteByPrefix() guard (no network)', () => {
     test('refuses prefixes that would match the whole bucket before calling S3', async ({ assert }) => {
-        const storage = new OvhS3StorageService({
+        const storage = new S3StorageService({
             accessKey: 'x', secretKey: 'x', endpoint: 'http://127.0.0.1:1', region: 'us-east-1', bucket: 'b', pathStyle: true,
         })
         for (const prefix of ['', ' ', '/', '.', './']) {

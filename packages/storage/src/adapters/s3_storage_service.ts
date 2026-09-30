@@ -1,6 +1,6 @@
 /**
- * OVH Object Storage implementation of StorageService
- * via S3-compatible API using @aws-sdk/client-s3
+ * StorageService for any S3-compatible object storage (AWS S3, MinIO, Scaleway, ...)
+ * through @aws-sdk/client-s3
  */
 import {
     S3Client,
@@ -16,45 +16,54 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { StorageService } from '../storage_service.js'
 import type { PresignedUploadResult, ObjectExistsResult } from '../storage_service.js'
-import { safeAsync, Logger } from '@cepseudo/shared'
+import { safeAsync, Logger, StorageError } from '@cepseudo/shared'
 import type { Readable } from 'stream'
 
-const logger = new Logger('OvhS3Storage')
+const logger = new Logger('S3Storage')
 
-export interface OvhS3Config {
+export interface S3StorageConfig {
     accessKey: string
     secretKey: string
-    endpoint: string // e.g. 'https://s3.gra.io.cloud.ovh.net'
-    region?: string // e.g. 'gra'
+    /** e.g. 'https://s3.eu-west-1.amazonaws.com', 'http://localhost:9000' */
+    endpoint: string
+    /** Default: 'us-east-1' */
+    region?: string
     bucket: string
-    pathStyle?: boolean // true for MinIO/localhost, false for OVH (default)
+    /** Address the bucket in the path (`<endpoint>/<bucket>/<key>`) rather than the host; MinIO needs it. Default: false */
+    pathStyle?: boolean
+    /** Base URL for public links instead of the bucket URL, e.g. a CDN or custom domain */
+    publicUrl?: string
 }
 
-export class OvhS3StorageService extends StorageService {
+export class S3StorageService extends StorageService {
     #s3: S3Client
     readonly #bucket: string
     readonly #endpoint: string
+    readonly #pathStyle: boolean
+    readonly #publicUrl?: string
 
-    constructor(config: OvhS3Config) {
+    constructor(config: S3StorageConfig) {
         super()
         this.#bucket = config.bucket
         this.#endpoint = config.endpoint
+        this.#pathStyle = config.pathStyle ?? false
+        this.#publicUrl = config.publicUrl
         this.#s3 = new S3Client({
             endpoint: config.endpoint,
-            region: config.region ?? 'gra',
+            region: config.region ?? 'us-east-1',
             credentials: {
                 accessKeyId: config.accessKey,
                 secretAccessKey: config.secretKey
             },
-            forcePathStyle: config.pathStyle ?? false,
-            // Match Python boto3 config for OVH compatibility
+            forcePathStyle: this.#pathStyle,
+            // Several S3-compatible services reject the checksum headers the SDK sends by default
             requestChecksumCalculation: 'WHEN_REQUIRED',
             responseChecksumValidation: 'WHEN_REQUIRED'
         })
     }
 
     /**
-     * Uploads a file to the OVH S3-compatible object storage.
+     * Uploads a file to the bucket.
      * @param buffer - File contents to upload
      * @param collectorName - Folder/prefix to store under
      * @param extension - Optional file extension (e.g. 'json')
@@ -114,7 +123,7 @@ export class OvhS3StorageService extends StorageService {
     }
 
     /**
-     * Uploads a file to OVH S3 at a specific path (preserves filename).
+     * Uploads a file at a specific path (preserves filename).
      * Unlike save(), this method does not auto-generate a timestamp filename.
      * Files are uploaded with public-read ACL for direct access (e.g., Cesium tilesets).
      * @param buffer - File contents to upload
@@ -156,36 +165,25 @@ export class OvhS3StorageService extends StorageService {
             const concurrentBatches = batches.slice(i, i + MAX_CONCURRENT)
             await Promise.all(
                 concurrentBatches.map((batch, index) =>
-                    safeAsync(
-                        () =>
-                            this.#s3.send(
-                                new DeleteObjectsCommand({
-                                    Bucket: this.#bucket,
-                                    Delete: {
-                                        Objects: batch.map(key => ({ Key: key })),
-                                        Quiet: true // Don't return info about each deleted object
-                                    }
-                                })
-                            ),
-                        `delete batch ${i + index + 1}/${batches.length}`,
-                        logger
-                    )
+                    safeAsync(() => this.#deleteObjects(batch), `delete batch ${i + index + 1}/${batches.length}`, logger)
                 )
             )
         }
     }
 
     /**
-     * Returns the public URL for a stored file.
-     * Constructs the OVH S3 public URL format: https://{bucket}.{endpoint_host}/{key}
+     * Returns the public URL for a stored file: `<publicUrl>/<key>` when configured, otherwise
+     * `<endpoint>/<bucket>/<key>` in path style or `<scheme>://<bucket>.<endpoint host>/<key>`.
+     * Each path segment is URL-encoded, so keys with spaces or `#` stay loadable.
      * @param relativePath - The storage path/key of the file
      * @returns The public URL to access the file directly
      */
     getPublicUrl(relativePath: string): string {
-        // Extract host from endpoint (e.g., 'https://s3.gra.io.cloud.ovh.net' -> 's3.gra.io.cloud.ovh.net')
-        const endpointHost = this.#endpoint.replace(/^https?:\/\//, '')
-        // OVH S3 URL format: https://{bucket}.{endpoint_host}/{key}
-        return `https://${this.#bucket}.${endpointHost}/${relativePath}`
+        const key = relativePath.split('/').map(encodeURIComponent).join('/')
+        if (this.#publicUrl) return `${this.#publicUrl.replace(/\/+$/, '')}/${key}`
+        if (this.#pathStyle) return `${this.#endpoint.replace(/\/+$/, '')}/${this.#bucket}/${key}`
+        const { protocol, host } = new URL(this.#endpoint)
+        return `${protocol}//${this.#bucket}.${host}/${key}`
     }
 
     /**
@@ -219,15 +217,7 @@ export class OvhS3StorageService extends StorageService {
             const keys = objects.map(obj => obj.Key).filter((key): key is string => !!key)
 
             if (keys.length > 0) {
-                await this.#s3.send(
-                    new DeleteObjectsCommand({
-                        Bucket: this.#bucket,
-                        Delete: {
-                            Objects: keys.map(key => ({ Key: key })),
-                            Quiet: true
-                        }
-                    })
-                )
+                await this.#deleteObjects(keys)
                 totalDeleted += keys.length
             }
 
@@ -235,6 +225,27 @@ export class OvhS3StorageService extends StorageService {
         } while (continuationToken)
 
         return totalDeleted
+    }
+
+    /**
+     * Deletes up to 1000 keys in one request.
+     * @throws {StorageError} When S3 reports keys it could not delete
+     */
+    async #deleteObjects(keys: string[]): Promise<void> {
+        const { Errors } = await this.#s3.send(
+            new DeleteObjectsCommand({
+                Bucket: this.#bucket,
+                Delete: { Objects: keys.map(key => ({ Key: key })), Quiet: true }
+            })
+        )
+        // Quiet mode still lists the failed keys: an HTTP 200 alone does not mean they are gone
+        if (Errors && Errors.length > 0) {
+            const [first] = Errors
+            throw new StorageError(
+                `Failed to delete ${Errors.length} of ${keys.length} objects (${first.Key}: ${first.Code} ${first.Message})`,
+                { keys: Errors.map(error => error.Key) }
+            )
+        }
     }
 
     /**
@@ -321,10 +332,10 @@ export class OvhS3StorageService extends StorageService {
                     }
                 })
             )
-            console.log('[OvhS3StorageService] CORS configured successfully')
+            console.log('[S3StorageService] CORS configured successfully')
             return true
         } catch (error) {
-            console.error('[OvhS3StorageService] Error configuring CORS:', error)
+            console.error('[S3StorageService] Error configuring CORS:', error)
             return false
         }
     }

@@ -1,7 +1,7 @@
 {
   "name": "@cepseudo/storage",
   "version": "1.0.1",
-  "description": "Storage service abstraction for Digital Twin framework (local filesystem, OVH S3)",
+  "description": "Storage service abstraction for Digital Twin framework (local filesystem, S3-compatible object storage)",
   "license": "MIT",
   "author": "Axel Hoffmann",
   "type": "module",
@@ -60,7 +60,6 @@
     "digitaltwin",
     "storage",
     "s3",
-    "ovh",
     "presigned-url"
   ],
   "bugs": {
