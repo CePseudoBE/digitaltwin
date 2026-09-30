@@ -16,9 +16,9 @@ const MINIO_USER = 'minioadmin'
 const MINIO_PASSWORD = 'minioadmin'
 const BUCKET = 'test-bucket'
 
-// Image pinned on quay.io: the Docker Hub `minio/minio` repository is gone.
+// Community fork: upstream MinIO is archived and its images are no longer public.
 async function startMinio(): Promise<{ container: StartedTestContainer; endpoint: string }> {
-    const container = await new GenericContainer('quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z.hotfix.7aa24e772')
+    const container = await new GenericContainer('pgsty/minio:RELEASE.2026-08-04T00-00-00Z')
         .withEnvironment({
             MINIO_ROOT_USER: MINIO_USER,
             MINIO_ROOT_PASSWORD: MINIO_PASSWORD,
