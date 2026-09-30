@@ -33,6 +33,12 @@ async function withEngine(options: Partial<EngineOptions>, run: (engine: Digital
 }
 
 test.group('Engine HTTP server', () => {
+    test('starts without @cepseudo/ngsi-ld installed and serves no NGSI-LD routes', async ({ assert }) => {
+        await withEngine({}, async engine => {
+            assert.equal((await engine.inject('/ngsi-ld/v1/entities')).statusCode, 404)
+        })
+    })
+
     test('health and queue routes answer through inject() without a fixed port', async ({ assert }) => {
         await withEngine({}, async engine => {
             const live = await engine.inject('/api/health/live')
