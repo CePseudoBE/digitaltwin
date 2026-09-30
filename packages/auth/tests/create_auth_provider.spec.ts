@@ -26,11 +26,17 @@ test.group('readAuthEnv', () => {
         assert.throws(() => readAuthEnv({ AUTH_MODE: 'jwt' }), /Unknown AUTH_MODE "jwt"\. Valid modes: oidc, trusted-headers, gateway, none/)
     })
 
+    test('the admin role is read without validating AUTH_MODE', ({ assert }) => {
+        assert.equal(adminRoleFromEnv({ NODE_ENV: 'production', AUTH_ADMIN_ROLE: 'operator' }), 'operator')
+        assert.equal(adminRoleFromEnv({ AUTH_MODE: 'jwt' }), 'admin')
+    })
+
     test('admin role and anonymous subject have defaults and env overrides', ({ assert }) => {
         assert.equal(adminRoleFromEnv({}), 'admin')
         assert.equal(adminRoleFromEnv({ AUTH_ADMIN_ROLE: 'operator' }), 'operator')
         assert.equal(adminRoleFromEnv({ DIGITALTWIN_ADMIN_ROLE_NAME: 'root' }), 'root')
         assert.equal(adminRoleFromEnv({ AUTH_ADMIN_ROLE: 'operator', DIGITALTWIN_ADMIN_ROLE_NAME: 'root' }), 'operator')
+        assert.equal(readAuthEnv({ AUTH_ADMIN_ROLE: 'operator' }).adminRole, 'operator')
         assert.equal(readAuthEnv({}).anonymousSubject, 'anonymous')
         assert.equal(readAuthEnv({ DIGITALTWIN_ANONYMOUS_USER_ID: 'dev' }).anonymousSubject, 'dev')
     })
