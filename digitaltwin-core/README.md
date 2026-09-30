@@ -498,33 +498,7 @@ When enabled, the server uses gzip compression for JSON responses larger than 1K
 
 ## Authentication
 
-The framework supports multiple authentication modes:
-
-- **Gateway** (default): Uses headers from API gateways (Apache APISIX, KrakenD)
-- **JWT**: Direct JWT token validation
-- **None**: Disabled for development/testing
-
-### Gateway Mode (Default)
-
-No configuration needed. The framework reads `x-user-id` and `x-user-roles` headers set by your API gateway.
-
-### JWT Mode
-
-```bash
-export AUTH_MODE=jwt
-export JWT_SECRET=your-secret-key
-# Or for RSA: JWT_PUBLIC_KEY or JWT_PUBLIC_KEY_FILE
-```
-
-### Disable Authentication
-
-```bash
-export AUTH_MODE=none
-# Or
-export AUTH_MODE=none
-```
-
-For detailed configuration options, see [src/auth/README.md](src/auth/README.md).
+Authentication lives in `@cepseudo/auth`; see its [guide](https://github.com/CePseudoBE/digitaltwin/blob/main/packages/auth/README.md). The `gateway` default and the `jwt` mode of earlier versions are gone: set `AUTH_MODE` to `oidc`, `trusted-headers` or `none`.
 
 ## Project Scaffolding
 

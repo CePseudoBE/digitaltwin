@@ -111,11 +111,23 @@ pnpm lint
 - **Scheduled Data Collection**: Cron-based collectors with automatic retry
 - **Data Processing Pipelines**: Harvesters with dependency chains and event triggers
 - **Asset Management**: File uploads with metadata, presigned URL uploads for large files
-- **Authentication**: Pluggable auth (API Gateway headers, JWT, or disabled)
+- **Authentication**: OIDC resource server (Keycloak, Auth0, Microsoft Entra ID, ...), trusted gateway headers, or disabled for development
 - **Queue Management**: BullMQ with Redis for reliable background processing
 - **Health Checks**: Kubernetes-ready liveness and readiness probes
 - **OpenAPI Generation**: Auto-generate API specs from components
 - **Graceful Shutdown**: Proper cleanup on SIGTERM/SIGINT
+
+## Authentication
+
+The framework validates `Authorization: Bearer` tokens issued by any OIDC provider; it never logs users in itself.
+
+```env
+AUTH_MODE=oidc
+OIDC_ISSUER=https://id.example.org/realms/city
+OIDC_AUDIENCE=digitaltwin
+```
+
+`AUTH_MODE` is required in production. Use `trusted-headers` behind a gateway that passes the identity in headers, and `none` for local development. The [authentication guide](./packages/auth/README.md) covers Keycloak, Auth0 and Microsoft Entra ID, who is admin, and running behind a gateway safely.
 
 ## Environment Variables
 
