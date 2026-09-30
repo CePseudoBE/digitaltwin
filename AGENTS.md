@@ -51,7 +51,7 @@ The public policy in CONTRIBUTING.md ("AI-Assisted Contributions") applies to wo
 packages/
 ├── shared/          → Types, errors, utils, validation, env (LAYER 0)
 ├── database/        → DatabaseAdapter + KyselyDatabaseAdapter (LAYER 1; Knex adapter is legacy, removed in milestone 3)
-├── storage/         → StorageService + OVH/Local adapters (LAYER 1)
+├── storage/         → StorageService + S3/Local adapters (LAYER 1)
 ├── auth/            → AuthProvider, UserService, AuthMiddleware (LAYER 1)
 ├── components/      → Collector, Harvester, Handler, CustomTableManager (LAYER 2)
 ├── assets/          → AssetsManager, TilesetManager, MapManager, presigned URLs (LAYER 2)
@@ -148,7 +148,7 @@ The framework is component-based. Components are user-defined classes that plug 
 - **Collectors**: Scheduled components that fetch data from external APIs/sources, optionally transform it, and store it in the database. Can run at any frequency (hourly, every second, etc.).
 - **Harvesters**: Read data from the database (typically data written by Collectors), transform/aggregate it into new datasets, and write the results back to the database.
 - **Handlers**: Expose HTTP endpoints for real-time request/response operations. Do NOT write to the database.
-- **Assets Managers**: Handle file uploads with metadata, CRUD operations, and user ownership. Files are stored on OVH Object Storage (S3-compatible), metadata in PostgreSQL.
+- **Assets Managers**: Handle file uploads with metadata, CRUD operations, and user ownership. Files are stored on S3-compatible object storage, metadata in PostgreSQL.
 
 All components implement `getConfiguration()` and active components (Collector, Harvester) implement `setDependencies(database, storage)`.
 
@@ -164,7 +164,7 @@ All components implement `getConfiguration()` and active components (Collector, 
 ```
 PostgreSQL  → Metadata, user ownership, subscriptions, historical data
 Redis       → BullMQ queues, subscription cache, entity last-state cache
-OVH S3      → Raw files (3D assets, collected data, tilesets)
+S3          → Raw files (3D assets, collected data, tilesets)
 ```
 
 ### Authentication & Authorization
@@ -185,7 +185,7 @@ Large files (3D assets) must NOT transit through the backend or the gateway. The
 
 1. Client → `POST /assets/upload-request` (JWT + fileName, size, contentType)
 2. Backend verifies JWT, creates DB entry (`status: pending`), generates presigned PUT URL
-3. Client uploads directly to OVH S3 (multipart for files > 100MB)
+3. Client uploads directly to S3 (multipart for files > 100MB)
 4. Client → `POST /assets/confirm/{fileId}`
 5. Backend does HEAD request on S3 to verify → `status: completed`
 
@@ -194,7 +194,7 @@ Large files (3D assets) must NOT transit through the backend or the gateway. The
 - `pending` + presigned URL expired + no file → `expired`
 - Multipart not finalized > 2h → `AbortMultipartUpload` + `failed`
 
-**CORS configuration required on OVH bucket:**
+**CORS configuration required on the bucket:**
 ```json
 {
   "CORSRules": [{
@@ -372,7 +372,7 @@ CREATE TABLE ngsi_ld_subscriptions (
 ultimate-express          HTTP server
 bullmq + ioredis          Queue management + Redis
 knex                      Database query builder (PostgreSQL, SQLite)
-@aws-sdk/client-s3        OVH Object Storage (S3-compatible)
+@aws-sdk/client-s3        S3-compatible object storage
 @aws-sdk/s3-request-presigner  Presigned URL generation
 @fastify/multipart        Multipart uploads (small files; presigned URLs are the large-file path)
 jose                      OIDC Bearer token validation (JWKS discovery)
