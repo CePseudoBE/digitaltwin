@@ -37,7 +37,7 @@ export interface NgsiLdPluginOptions {
     logger: Logger
     /** Engine auth middleware. Without it every write endpoint answers 401. */
     authMiddleware?: NgsiLdAuthenticator
-    /** Serve GET endpoints without authentication (default true). */
+    /** Serve GET endpoints without authentication (default true); also NGSI_LD_PUBLIC_READ=false. */
     publicRead?: boolean
     /** Accept webhooks on loopback and private networks. Development only; also NGSI_LD_ALLOW_PRIVATE_WEBHOOKS=true. */
     allowPrivateWebhooks?: boolean
@@ -62,7 +62,7 @@ export interface NgsiLdHandle {
  */
 export async function registerNgsiLd(options: NgsiLdPluginOptions): Promise<NgsiLdHandle> {
     const { fastify, db, redis: redisConfig, components, logger, authMiddleware } = options
-    const publicRead = options.publicRead ?? true
+    const publicRead = options.publicRead ?? parseBoolean(process.env.NGSI_LD_PUBLIC_READ, 'NGSI_LD_PUBLIC_READ') ?? true
     const allowPrivateWebhooks =
         options.allowPrivateWebhooks ?? parseBoolean(process.env.NGSI_LD_ALLOW_PRIVATE_WEBHOOKS, 'NGSI_LD_ALLOW_PRIVATE_WEBHOOKS') ?? false
     const guards = createRouteGuards(authMiddleware, publicRead)
