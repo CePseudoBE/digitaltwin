@@ -33,7 +33,7 @@ const ASYNC_UPLOAD_THRESHOLD = 50 * 1024 * 1024
 
 /**
  * Metadata stored in database for a tileset.
- * Simplified: Cesium accesses files directly from OVH.
+ * Simplified: Cesium accesses files directly from object storage.
  */
 export interface TilesetMetadataRow {
     id?: number
@@ -56,16 +56,16 @@ export interface TilesetMetadataRow {
 /**
  * Specialized Assets Manager for handling 3D Tiles tilesets.
  *
- * This manager extracts uploaded ZIP files and stores each file in cloud storage (OVH S3),
+ * This manager extracts uploaded ZIP files and stores each file in object storage (S3-compatible),
  * allowing Cesium and other 3D viewers to load tilesets directly via public URLs.
  *
  * ## How it works
  *
  * 1. User uploads a ZIP containing a 3D Tiles tileset
- * 2. ZIP is extracted and all files are stored in OVH with public-read ACL
+ * 2. ZIP is extracted and all files are stored in object storage with public-read ACL
  * 3. Database stores only the tileset.json URL and base path
- * 4. Cesium loads tileset.json directly from OVH
- * 5. Cesium fetches tiles using relative paths in tileset.json (directly from OVH)
+ * 4. Cesium loads tileset.json directly from object storage
+ * 5. Cesium fetches tiles using relative paths in tileset.json (directly from object storage)
  *
  * ## Endpoints
  *

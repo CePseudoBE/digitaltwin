@@ -11,19 +11,19 @@ Abstract storage layer for the Digital Twin framework. Provides a unified API fo
 pnpm add @cepseudo/storage
 ```
 
-For S3-compatible storage (OVH, AWS, MinIO), install the AWS SDK peer dependencies:
+For S3-compatible storage (AWS S3, MinIO, Scaleway, ...), install the AWS SDK peer dependencies:
 
 ```bash
 pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
 ```
 
-These are **optional** -- only required when using `OvhS3StorageService`. The local filesystem adapter has no additional dependencies.
+These are **optional** -- only required when using `S3StorageService`. The local filesystem adapter has no additional dependencies.
 
 ## Adapters
 
-| Feature | `LocalStorageService` | `OvhS3StorageService` |
+| Feature | `LocalStorageService` | `S3StorageService` |
 |---|---|---|
-| Backend | Local filesystem | S3-compatible (OVH, AWS, MinIO) |
+| Backend | Local filesystem | S3-compatible (AWS S3, MinIO, Scaleway, ...) |
 | Presigned URLs | No | Yes |
 | Batch delete | Sequential | S3 `DeleteObjects` (up to 1000/request) |
 | Public URLs | File path (requires static serving) | Direct HTTPS URL |
@@ -41,7 +41,7 @@ These are **optional** -- only required when using `OvhS3StorageService`. The lo
 import { StorageServiceFactory } from '@cepseudo/storage'
 
 // STORAGE_CONFIG=local  --> LocalStorageService
-// STORAGE_CONFIG=ovh    --> OvhS3StorageService (requires OVH_* env vars)
+// STORAGE_CONFIG=s3     --> S3StorageService (requires S3_* env vars)
 const storage = StorageServiceFactory.create()
 ```
 
@@ -52,32 +52,33 @@ const storage = StorageServiceFactory.create()
 | `STORAGE_CONFIG` | -- | Set to `local` |
 | `LOCAL_STORAGE_DIR` | `data` | Base directory for file storage |
 
-**Environment variables for `ovh`:**
+**Environment variables for `s3`:**
 
 | Variable | Default | Description |
 |---|---|---|
-| `STORAGE_CONFIG` | -- | Set to `ovh` |
-| `OVH_ACCESS_KEY` | -- | S3 access key |
-| `OVH_SECRET_KEY` | -- | S3 secret key |
-| `OVH_ENDPOINT` | -- | S3 endpoint (e.g. `https://s3.gra.io.cloud.ovh.net`) |
-| `OVH_BUCKET` | -- | Bucket name |
-| `OVH_REGION` | `gra` | S3 region |
+| `STORAGE_CONFIG` | -- | Set to `s3` |
+| `S3_ENDPOINT` | -- | S3 endpoint (e.g. `https://s3.eu-west-1.amazonaws.com`, `http://localhost:9000`) |
+| `S3_BUCKET` | -- | Bucket name |
+| `S3_ACCESS_KEY_ID` | -- | Access key |
+| `S3_SECRET_ACCESS_KEY` | -- | Secret key |
+| `S3_REGION` | `us-east-1` | Region |
+| `S3_FORCE_PATH_STYLE` | `false` | Address the bucket in the path (`<endpoint>/<bucket>/<key>`) instead of the host; MinIO needs `true` |
 
 ### Direct adapter instantiation
 
 ```typescript
-import { LocalStorageService, OvhS3StorageService } from '@cepseudo/storage'
+import { LocalStorageService, S3StorageService } from '@cepseudo/storage'
 
 // Local filesystem
 const local = new LocalStorageService('./data')
 
-// OVH S3-compatible storage
-const s3 = new OvhS3StorageService({
+// S3-compatible storage
+const s3 = new S3StorageService({
     accessKey: 'your-access-key',
     secretKey: 'your-secret-key',
-    endpoint: 'https://s3.gra.io.cloud.ovh.net',
+    endpoint: 'https://s3.eu-west-1.amazonaws.com',
     bucket: 'my-bucket',
-    region: 'gra'
+    region: 'eu-west-1'
 })
 ```
 
@@ -105,7 +106,7 @@ const count = await storage.deleteByPrefix('tilesets/42')
 
 // Get public URL
 const url = storage.getPublicUrl('tilesets/42/tileset.json')
-// --> 'https://my-bucket.s3.gra.io.cloud.ovh.net/tilesets/42/tileset.json'
+// --> 'https://my-bucket.s3.eu-west-1.amazonaws.com/tilesets/42/tileset.json'
 ```
 
 ### Presigned URL upload flow
@@ -175,12 +176,13 @@ interface ObjectExistsResult {
     contentType?: string     // MIME type
 }
 
-interface OvhS3Config {
+interface S3StorageConfig {
     accessKey: string
     secretKey: string
-    endpoint: string   // e.g. 'https://s3.gra.io.cloud.ovh.net'
-    region?: string    // e.g. 'gra' (default)
+    endpoint: string     // e.g. 'https://s3.eu-west-1.amazonaws.com'
+    region?: string      // default 'us-east-1'
     bucket: string
+    pathStyle?: boolean  // bucket in the path instead of the host (MinIO), default false
 }
 ```
 
@@ -188,10 +190,10 @@ interface OvhS3Config {
 
 | Package | Required for | Required? |
 |---|---|---|
-| `@aws-sdk/client-s3` >= 3.0.0 | `OvhS3StorageService` | Optional |
+| `@aws-sdk/client-s3` >= 3.0.0 | `S3StorageService` | Optional |
 | `@aws-sdk/s3-request-presigner` >= 3.0.0 | Presigned URL generation | Optional |
 
-The AWS SDK packages are only loaded by `OvhS3StorageService`. If you only use `LocalStorageService`, they are not needed.
+The AWS SDK packages are only loaded by `S3StorageService`. If you only use `LocalStorageService`, they are not needed.
 
 ## License
 

@@ -36,7 +36,7 @@ export { type AsyncUploadable, isAsyncUploadable } from './components/async_uplo
 // Storage Services
 export { StorageService } from './storage/storage_service.js'
 export { LocalStorageService } from './storage/adapters/local_storage_service.js'
-export { OvhS3StorageService } from './storage/adapters/ovh_storage_service.js'
+export { S3StorageService } from './storage/adapters/s3_storage_service.js'
 export { StorageServiceFactory } from './storage/storage_factory.js'
 
 // Database Services

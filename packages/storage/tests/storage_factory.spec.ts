@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 import { StorageServiceFactory } from '../src/storage_factory.js'
 import { LocalStorageService } from '../src/adapters/local_storage_service.js'
-import { OvhS3StorageService } from '../src/adapters/ovh_storage_service.js'
+import { S3StorageService } from '../src/adapters/s3_storage_service.js'
 import { Env } from '@cepseudo/shared'
 import fs from 'fs/promises'
 
@@ -28,18 +28,19 @@ test.group('StorageServiceFactory', (group) => {
         assert.deepEqual(retrieved, data)
     })
 
-    test('"ovh" creates OvhS3StorageService', ({ assert }) => {
-        mockEnv({
-            STORAGE_CONFIG: 'ovh',
-            OVH_ACCESS_KEY: 'test-key',
-            OVH_SECRET_KEY: 'test-secret',
-            OVH_ENDPOINT: 'https://s3.gra.io.cloud.ovh.net',
-            OVH_BUCKET: 'test-bucket',
-            OVH_REGION: 'gra'
-        })
+    // Nothing listens on port 1: the start-up CORS call fails fast, without reaching the network
+    const s3Env = {
+        STORAGE_CONFIG: 's3',
+        S3_ACCESS_KEY_ID: 'test-key',
+        S3_SECRET_ACCESS_KEY: 'test-secret',
+        S3_ENDPOINT: 'http://127.0.0.1:1',
+        S3_BUCKET: 'test-bucket'
+    }
 
-        const storage = StorageServiceFactory.create()
-        assert.instanceOf(storage, OvhS3StorageService)
+    test('"s3" creates an S3StorageService', ({ assert }) => {
+        mockEnv(s3Env)
+
+        assert.instanceOf(StorageServiceFactory.create(), S3StorageService)
     })
 
     test('unknown config throws error', ({ assert }) => {

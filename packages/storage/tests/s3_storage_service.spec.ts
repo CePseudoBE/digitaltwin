@@ -1,16 +1,11 @@
 /**
- * Integration tests for OvhS3StorageService using a local MinIO container.
- *
- * MinIO is S3-compatible — the same AWS SDK code runs against it as against
- * OVH Object Storage. The only difference is pathStyle: true for localhost
- * (MinIO) vs pathStyle: false for OVH (virtual-hosted style).
- *
- * These tests never touch the real OVH bucket.
+ * Integration tests for S3StorageService against a local MinIO container
+ * (path style, as MinIO requires).
  */
 import { test } from '@japa/runner'
 import { GenericContainer, Wait } from 'testcontainers'
 import type { StartedTestContainer } from 'testcontainers'
-import { OvhS3StorageService } from '../src/adapters/ovh_storage_service.js'
+import { S3StorageService } from '../src/adapters/s3_storage_service.js'
 
 const MINIO_USER = 'minioadmin'
 const MINIO_PASSWORD = 'minioadmin'
@@ -48,8 +43,8 @@ async function createBucket(endpoint: string): Promise<void> {
     await s3.destroy()
 }
 
-function makeStorage(endpoint: string): OvhS3StorageService {
-    return new OvhS3StorageService({
+function makeStorage(endpoint: string): S3StorageService {
+    return new S3StorageService({
         accessKey: MINIO_USER,
         secretKey: MINIO_PASSWORD,
         endpoint,
@@ -59,10 +54,10 @@ function makeStorage(endpoint: string): OvhS3StorageService {
     })
 }
 
-test.group('OvhS3StorageService (MinIO integration)', group => {
+test.group('S3StorageService (MinIO integration)', group => {
     let container: StartedTestContainer
     let endpoint: string
-    let storage: OvhS3StorageService
+    let storage: S3StorageService
 
     group.setup(async () => {
         const result = await startMinio()
@@ -223,9 +218,9 @@ test.group('OvhS3StorageService (MinIO integration)', group => {
     })
 })
 
-test.group('OvhS3StorageService - deleteByPrefix() guard (no network)', () => {
+test.group('S3StorageService - deleteByPrefix() guard (no network)', () => {
     test('refuses prefixes that would match the whole bucket before calling S3', async ({ assert }) => {
-        const storage = new OvhS3StorageService({
+        const storage = new S3StorageService({
             accessKey: 'x', secretKey: 'x', endpoint: 'http://127.0.0.1:1', region: 'us-east-1', bucket: 'b', pathStyle: true,
         })
         for (const prefix of ['', ' ', '/', '.', './']) {
