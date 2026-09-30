@@ -25,7 +25,7 @@ export const sqliteAdapterFactory: AdapterFactory = async () => {
     sqliteDb.exec(`
         CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            keycloak_id VARCHAR(255) NOT NULL UNIQUE,
+            subject VARCHAR(255) NOT NULL UNIQUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )

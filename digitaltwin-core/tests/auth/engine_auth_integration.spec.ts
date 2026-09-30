@@ -186,7 +186,7 @@ test.group('Authentication Flow End-to-End', group => {
     // Step 2: User service would find/create user (mocked here)
     const mockUserRecord = {
       id: 123,
-      keycloak_id: authUser!.subject,
+      subject: authUser!.subject,
       roles: authUser!.roles,
       created_at: new Date(),
       updated_at: new Date()

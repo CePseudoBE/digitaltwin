@@ -324,7 +324,7 @@ node dt make:map-manager CityMaps
 ```sql
 CREATE TABLE users (
                        id INTEGER PRIMARY KEY,
-                       keycloak_id VARCHAR(255) UNIQUE NOT NULL,
+                       subject VARCHAR(255) UNIQUE NOT NULL,
                        created_at TIMESTAMP,
                        updated_at TIMESTAMP
 );

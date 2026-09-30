@@ -14,15 +14,15 @@ function createMockUserRepository(): UserRepository {
         async findOrCreateUser(authUser: AuthenticatedUser) {
             const existing = users.get(authUser.subject)
             if (existing) return existing
-            const record: UserRecord = { id: nextId++, keycloak_id: authUser.subject, roles: authUser.roles, created_at: new Date(), updated_at: new Date() }
+            const record: UserRecord = { id: nextId++, subject: authUser.subject, roles: authUser.roles, created_at: new Date(), updated_at: new Date() }
             users.set(authUser.subject, record)
             return record
         },
         async getUserById(id: number) {
             return [...users.values()].find(u => u.id === id)
         },
-        async getUserByKeycloakId(keycloakId: string) {
-            return users.get(keycloakId)
+        async getUserBySubject(subject: string) {
+            return users.get(subject)
         },
     }
 }

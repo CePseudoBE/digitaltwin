@@ -32,8 +32,8 @@ export class UserService {
         return await this.#userRepository.getUserById(id)
     }
 
-    /** Gets a user by their Keycloak ID with roles */
-    async getUserByKeycloakId(keycloakId: string): Promise<UserRecord | undefined> {
-        return await this.#userRepository.getUserByKeycloakId(keycloakId)
+    /** Gets a user by their identity provider subject, with roles */
+    async getUserBySubject(subject: string): Promise<UserRecord | undefined> {
+        return await this.#userRepository.getUserBySubject(subject)
     }
 }

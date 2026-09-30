@@ -21,7 +21,7 @@ function createMockUserRepository(): UserRepository {
             }
             const record: UserRecord = {
                 id: nextId++,
-                keycloak_id: authUser.subject,
+                subject: authUser.subject,
                 roles: authUser.roles,
                 created_at: new Date(),
                 updated_at: new Date()
@@ -32,8 +32,8 @@ function createMockUserRepository(): UserRepository {
         async getUserById(id: number) {
             return [...users.values()].find(u => u.id === id)
         },
-        async getUserByKeycloakId(keycloakId: string) {
-            return users.get(keycloakId)
+        async getUserBySubject(subject: string) {
+            return users.get(subject)
         }
     }
 }
@@ -57,7 +57,7 @@ test.group('AuthMiddleware', (group) => {
 
         assert.isTrue(result.success)
         if (result.success) {
-            assert.equal(result.user.keycloak_id, 'dev')
+            assert.equal(result.user.subject, 'dev')
             assert.deepEqual(result.user.roles, ['anonymous'])
             assert.isFalse(result.isAdmin)
         }
@@ -73,7 +73,7 @@ test.group('AuthMiddleware', (group) => {
         assert.isTrue(result.success)
         if (result.success) {
             assert.isDefined(result.user.id)
-            assert.equal(result.user.keycloak_id, 'uuid-123')
+            assert.equal(result.user.subject, 'uuid-123')
             assert.includeMembers(result.user.roles, ['user', 'admin'])
         }
     })
@@ -111,7 +111,7 @@ test.group('AuthMiddleware', (group) => {
 
         const result = await middleware.authenticate({ headers: {} })
 
-        assert.isTrue(result.success && result.user.keycloak_id === 'late')
+        assert.isTrue(result.success && result.user.subject === 'late')
     })
 
     test('UserService error propagates', async ({ assert }) => {
@@ -119,7 +119,7 @@ test.group('AuthMiddleware', (group) => {
             async initializeTables() {},
             async findOrCreateUser() { throw new Error('DB connection failed') },
             async getUserById() { return undefined },
-            async getUserByKeycloakId() { return undefined }
+            async getUserBySubject() { return undefined }
         }
         const middleware = gatewayMiddleware(failingRepo)
 
@@ -134,7 +134,7 @@ test.group('AuthMiddleware', (group) => {
 
         assert.isTrue(result.success)
         if (result.success) {
-            assert.equal(result.user.keycloak_id, 'uuid-456')
+            assert.equal(result.user.subject, 'uuid-456')
             assert.deepEqual(result.user.roles, [])
         }
     })
@@ -159,7 +159,7 @@ test.group('AuthMiddleware.identify', () => {
             async initializeTables() {},
             async findOrCreateUser() { throw new Error('must not be called') },
             async getUserById() { return undefined },
-            async getUserByKeycloakId() { return undefined }
+            async getUserBySubject() { return undefined }
         }
         const middleware = gatewayMiddleware(failingRepo)
 

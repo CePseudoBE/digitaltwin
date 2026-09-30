@@ -18,7 +18,7 @@ function createInMemoryUserRepository(): UserRepository {
             }
             const record: UserRecord = {
                 id: nextId++,
-                keycloak_id: authUser.subject,
+                subject: authUser.subject,
                 roles: authUser.roles,
                 created_at: new Date(),
                 updated_at: new Date()
@@ -29,8 +29,8 @@ function createInMemoryUserRepository(): UserRepository {
         async getUserById(id: number) {
             return [...users.values()].find(u => u.id === id)
         },
-        async getUserByKeycloakId(keycloakId: string) {
-            return users.get(keycloakId)
+        async getUserBySubject(subject: string) {
+            return users.get(subject)
         }
     }
 }
@@ -59,7 +59,7 @@ test.group('UserService', (group) => {
 
         const result = await userService.findOrCreateUser(authUser)
 
-        assert.equal(result.keycloak_id, '12345-abcde')
+        assert.equal(result.subject, '12345-abcde')
         assert.isDefined(result.id)
         assert.isNumber(result.id)
     })
@@ -71,7 +71,7 @@ test.group('UserService', (group) => {
         const firstResult = await userService.findOrCreateUser(authUser)
         const secondResult = await userService.findOrCreateUser(authUser)
 
-        assert.equal(secondResult.keycloak_id, '12345-abcde')
+        assert.equal(secondResult.subject, '12345-abcde')
         assert.equal(secondResult.id, firstResult.id)
     })
 
@@ -81,7 +81,7 @@ test.group('UserService', (group) => {
 
         const result = await userService.findOrCreateUser(authUser)
 
-        assert.equal(result.keycloak_id, '12345-abcde')
+        assert.equal(result.subject, '12345-abcde')
         assert.isArray(result.roles)
         assert.includeMembers(result.roles, ['user', 'admin'])
     })
@@ -95,7 +95,7 @@ test.group('UserService', (group) => {
 
         assert.isDefined(result)
         assert.equal(result!.id, created.id)
-        assert.equal(result!.keycloak_id, '12345-abcde')
+        assert.equal(result!.subject, '12345-abcde')
     })
 
     test('getUserById() returns undefined when not found', async ({ assert }) => {
@@ -106,13 +106,13 @@ test.group('UserService', (group) => {
         assert.isUndefined(result)
     })
 
-    test('getUserByKeycloakId() finds user by keycloak ID', async ({ assert }) => {
+    test('getUserBySubject() finds user by subject', async ({ assert }) => {
         const userService = new UserService(createInMemoryUserRepository())
         await userService.findOrCreateUser({ subject: '12345-abcde', roles: ['user'] })
 
-        const result = await userService.getUserByKeycloakId('12345-abcde')
+        const result = await userService.getUserBySubject('12345-abcde')
 
         assert.isDefined(result)
-        assert.equal(result!.keycloak_id, '12345-abcde')
+        assert.equal(result!.subject, '12345-abcde')
     })
 })
