@@ -179,10 +179,10 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
             async initializeTables() {},
             async findOrCreateUser(authUser) {
                 const now = new Date()
-                return { id: 1, keycloak_id: authUser.subject, roles: authUser.roles, created_at: now, updated_at: now }
+                return { id: 1, subject: authUser.subject, roles: authUser.roles, created_at: now, updated_at: now }
             },
             async getUserById(id: number) { return undefined },
-            async getUserByKeycloakId(keycloakId: string) { return undefined }
+            async getUserBySubject(subject: string) { return undefined }
         }
     }
 

@@ -1,4 +1,4 @@
-import type { Kysely} from 'kysely';
+import type { ColumnDefinitionBuilder, Kysely } from 'kysely'
 import { sql } from 'kysely'
 import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/shared'
 
@@ -6,7 +6,7 @@ import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/sh
  * Kysely-based implementation of UserRepository.
  *
  * Manages a normalized user schema with three tables:
- * - `users`: Core user records linked to Keycloak IDs
+ * - `users`: Core user records keyed by the identity provider subject
  * - `roles`: Master list of available roles
  * - `user_roles`: Many-to-many relationship between users and roles
  */
@@ -22,11 +22,12 @@ export class KyselyUserRepository implements UserRepository {
     async initializeTables(): Promise<void> {
         const tables = await this.#db.introspection.getTables()
         const tableNames = new Set(tables.map(t => t.name))
+        const usersTable = tables.find(t => t.name === 'users')
         const idType: 'serial' | 'integer' = this.#dialect === 'postgres' ? 'serial' : 'integer'
         const tsType: 'timestamptz' | 'timestamp' = this.#dialect === 'postgres' ? 'timestamptz' : 'timestamp'
         const idModifier = this.#dialect === 'postgres'
-            ? (col: any) => col.primaryKey()
-            : (col: any) => col.primaryKey().autoIncrement()
+            ? (col: ColumnDefinitionBuilder) => col.primaryKey()
+            : (col: ColumnDefinitionBuilder) => col.primaryKey().autoIncrement()
 
         // 1. Create roles table
         if (!tableNames.has('roles')) {
@@ -40,18 +41,20 @@ export class KyselyUserRepository implements UserRepository {
             await this.#db.schema.createIndex('roles_idx_name').on('roles').column('name').execute()
         }
 
-        // 2. Create users table
-        if (!tableNames.has('users')) {
+        // 2. Create users table, or migrate a 1.x one
+        if (!usersTable) {
             await this.#db.schema
                 .createTable('users')
                 .addColumn('id', idType, idModifier)
-                .addColumn('keycloak_id', 'varchar(255)', col => col.notNull().unique())
+                .addColumn('subject', 'varchar(255)', col => col.notNull().unique())
                 .addColumn('created_at', tsType, col => col.defaultTo(sql`CURRENT_TIMESTAMP`))
                 .addColumn('updated_at', tsType, col => col.defaultTo(sql`CURRENT_TIMESTAMP`))
                 .execute()
 
-            await this.#db.schema.createIndex('users_idx_keycloak_id').on('users').column('keycloak_id').execute()
+            await this.#db.schema.createIndex('users_idx_subject').on('users').column('subject').execute()
             await this.#db.schema.createIndex('users_idx_created_at').on('users').column('created_at').execute()
+        } else if (usersTable.columns.some(c => c.name === 'keycloak_id')) {
+            await this.#renameKeycloakIdToSubject()
         }
 
         // 3. Create user_roles junction table
@@ -74,59 +77,47 @@ export class KyselyUserRepository implements UserRepository {
     }
 
     async findOrCreateUser(authUser: AuthenticatedUser): Promise<UserRecord> {
-        // 1. Find or create user
-        let userRow = await this.#db
+        const now = new Date().toISOString()
+        const existing = await this.#db
             .selectFrom('users')
-            .selectAll()
-            .where('keycloak_id', '=', authUser.subject)
+            .select('id')
+            .where('subject', '=', authUser.subject)
             .executeTakeFirst()
+        const { id } = existing ?? await this.#db
+            .insertInto('users')
+            .values({ subject: authUser.subject, created_at: now, updated_at: now })
+            .returning('id')
+            .executeTakeFirstOrThrow()
 
-        if (!userRow) {
-            const now = new Date()
-            const nowStr = now.toISOString()
-            const insertResult = await this.#db
-                .insertInto('users')
-                .values({ keycloak_id: authUser.subject, created_at: nowStr, updated_at: nowStr })
-                .returning('id')
-                .executeTakeFirstOrThrow()
+        await this.#syncUserRoles(id as number, authUser.roles)
 
-            userRow = {
-                id: (insertResult as any).id,
-                keycloak_id: authUser.subject,
-                created_at: nowStr,
-                updated_at: nowStr
-            }
-        }
-
-        const userId = userRow.id as number
-        if (!userId) throw new Error('User record does not have an ID after creation/retrieval')
-
-        // 2. Synchronize roles
-        await this.#syncUserRoles(userId, authUser.roles)
-
-        // 3. Return user with current roles
-        return (await this.#getUserWithRoles(userId)) || {
-            id: userId,
-            keycloak_id: authUser.subject,
-            roles: authUser.roles,
-            created_at: new Date(userRow.created_at as string),
-            updated_at: new Date(userRow.updated_at as string)
-        }
+        const user = await this.#getUserWithRoles(id as number)
+        if (!user) throw new Error(`User ${authUser.subject} was deleted while its roles were synchronized`)
+        return user
     }
 
     async getUserById(id: number): Promise<UserRecord | undefined> {
         return this.#getUserWithRoles(id)
     }
 
-    async getUserByKeycloakId(keycloakId: string): Promise<UserRecord | undefined> {
+    async getUserBySubject(subject: string): Promise<UserRecord | undefined> {
         const userRow = await this.#db
             .selectFrom('users')
             .select('id')
-            .where('keycloak_id', '=', keycloakId)
+            .where('subject', '=', subject)
             .executeTakeFirst()
 
         if (!userRow) return undefined
         return this.#getUserWithRoles(userRow.id as number)
+    }
+
+    // 1.x named the identity column after Keycloak; the rename keeps every row and its id
+    async #renameKeycloakIdToSubject(): Promise<void> {
+        await this.#db.transaction().execute(async trx => {
+            await trx.schema.alterTable('users').renameColumn('keycloak_id', 'subject').execute()
+            await trx.schema.dropIndex('users_idx_keycloak_id').ifExists().execute()
+            await trx.schema.createIndex('users_idx_subject').on('users').column('subject').execute()
+        })
     }
 
     async #syncUserRoles(userId: number, newRoles: string[]): Promise<void> {
@@ -175,7 +166,7 @@ export class KyselyUserRepository implements UserRepository {
             .leftJoin('roles', 'user_roles.role_id', 'roles.id')
             .select([
                 'users.id',
-                'users.keycloak_id',
+                'users.subject',
                 'users.created_at',
                 'users.updated_at',
                 'roles.name as role_name'
@@ -192,7 +183,7 @@ export class KyselyUserRepository implements UserRepository {
 
         return {
             id: userRow.id as number,
-            keycloak_id: userRow.keycloak_id as string,
+            subject: userRow.subject as string,
             roles,
             created_at: new Date(userRow.created_at as string),
             updated_at: new Date(userRow.updated_at as string)

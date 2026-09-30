@@ -17,7 +17,7 @@ import type { AuthenticatedUser, UserRecord } from './auth.js'
  *   initializeTables: async () => {},
  *   findOrCreateUser: async (user) => ({ ...user, id: 1, created_at: new Date(), updated_at: new Date() }),
  *   getUserById: async () => undefined,
- *   getUserByKeycloakId: async () => undefined
+ *   getUserBySubject: async () => undefined
  * }
  * ```
  */
@@ -31,6 +31,6 @@ export interface UserRepository {
     /** Get a user by their database ID */
     getUserById(id: number): Promise<UserRecord | undefined>
 
-    /** Get a user by their Keycloak ID with roles */
-    getUserByKeycloakId(keycloakId: string): Promise<UserRecord | undefined>
+    /** Get a user by their identity provider subject, with roles */
+    getUserBySubject(subject: string): Promise<UserRecord | undefined>
 }

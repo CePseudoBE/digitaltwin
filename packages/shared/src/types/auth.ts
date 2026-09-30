@@ -23,8 +23,8 @@ export interface AuthenticatedUser {
 export interface UserRecord {
     /** Primary key (auto-increment) */
     id?: number
-    /** Subject of the caller at the identity provider (unique across system) */
-    keycloak_id: string
+    /** Subject of the caller at the identity provider (`sub` in OIDC, unique across the system) */
+    subject: string
     /** User roles (populated from user_roles junction table) */
     roles: string[]
     /** First time the user was seen in the system */

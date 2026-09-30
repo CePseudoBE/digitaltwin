@@ -75,7 +75,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
 
     // ========== Mock Knex for UserService ==========
 
-    private users: Map<number, { id: number; keycloak_id: string; created_at: Date; updated_at: Date }> = new Map()
+    private users: Map<number, { id: number; subject: string; created_at: Date; updated_at: Date }> = new Map()
     private roles: Map<number, { id: number; name: string; created_at: Date }> = new Map()
     private userRoles: Array<{ user_id: number; role_id: number; created_at: Date }> = []
     private userIdCounter = 1
@@ -239,7 +239,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
                                         // LEFT JOIN returns user even without roles
                                         results.push({
                                             id: user.id,
-                                            keycloak_id: user.keycloak_id,
+                                            subject: user.subject,
                                             created_at: user.created_at,
                                             updated_at: user.updated_at,
                                             role_name: null
@@ -250,7 +250,7 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
                                             const role = self.roles.get(ur.role_id)
                                             results.push({
                                                 id: user.id,
-                                                keycloak_id: user.keycloak_id,
+                                                subject: user.subject,
                                                 created_at: user.created_at,
                                                 updated_at: user.updated_at,
                                                 role_name: role?.name || null
@@ -730,12 +730,12 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
                 // No-op for mock
             },
             async findOrCreateUser(authUser) {
-                // Find existing user by keycloak_id
+                // Find existing user by subject
                 for (const user of users.values()) {
-                    if (user.keycloak_id === authUser.subject) {
+                    if (user.subject === authUser.subject) {
                         return {
                             id: user.id,
-                            keycloak_id: user.keycloak_id,
+                            subject: user.subject,
                             roles: authUser.roles,
                             created_at: user.created_at,
                             updated_at: user.updated_at
@@ -745,18 +745,18 @@ export class MockDatabaseAdapter extends DatabaseAdapter {
                 // Create new user
                 const id = self.userIdCounter++
                 const now = new Date()
-                users.set(id, { id, keycloak_id: authUser.subject, created_at: now, updated_at: now })
-                return { id, keycloak_id: authUser.subject, roles: authUser.roles, created_at: now, updated_at: now }
+                users.set(id, { id, subject: authUser.subject, created_at: now, updated_at: now })
+                return { id, subject: authUser.subject, roles: authUser.roles, created_at: now, updated_at: now }
             },
             async getUserById(id: number) {
                 const user = users.get(id)
                 if (!user) return undefined
-                return { id: user.id, keycloak_id: user.keycloak_id, roles: [], created_at: user.created_at, updated_at: user.updated_at }
+                return { id: user.id, subject: user.subject, roles: [], created_at: user.created_at, updated_at: user.updated_at }
             },
-            async getUserByKeycloakId(keycloakId: string) {
+            async getUserBySubject(subject: string) {
                 for (const user of users.values()) {
-                    if (user.keycloak_id === keycloakId) {
-                        return { id: user.id, keycloak_id: user.keycloak_id, roles: [], created_at: user.created_at, updated_at: user.updated_at }
+                    if (user.subject === subject) {
+                        return { id: user.id, subject: user.subject, roles: [], created_at: user.created_at, updated_at: user.updated_at }
                     }
                 }
                 return undefined

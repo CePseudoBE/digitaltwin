@@ -520,7 +520,7 @@ test.group('CustomTableManager authentication helpers', (group) => {
         manager.setDependencies(db)
 
         const record = { id: 1, owner_id: 123, created_at: new Date(), updated_at: new Date() }
-        const userRecord = { id: 123, keycloak_id: 'test', roles: [] }
+        const userRecord = { id: 123, subject: 'test', roles: [] }
 
         assert.isTrue((manager as any).userOwnsRecord(record, userRecord))
     })
@@ -531,7 +531,7 @@ test.group('CustomTableManager authentication helpers', (group) => {
         manager.setDependencies(db)
 
         const record = { id: 1, owner_id: 456, created_at: new Date(), updated_at: new Date() }
-        const userRecord = { id: 123, keycloak_id: 'test', roles: [] }
+        const userRecord = { id: 123, subject: 'test', roles: [] }
 
         assert.isFalse((manager as any).userOwnsRecord(record, userRecord))
     })
@@ -542,7 +542,7 @@ test.group('CustomTableManager authentication helpers', (group) => {
         manager.setDependencies(db)
 
         const record = { id: 1, created_at: new Date(), updated_at: new Date() }
-        const userRecord = { id: 123, keycloak_id: 'test', roles: [] }
+        const userRecord = { id: 123, subject: 'test', roles: [] }
 
         assert.isFalse((manager as any).userOwnsRecord(record, userRecord))
     })

@@ -29,19 +29,19 @@ interface FakeRequestOverrides {
  */
 export async function makeAuthRequest(
     db: DatabaseAdapter,
-    keycloakId: string,
+    subject: string,
     roles: string[] = ['user'],
     overrides: FakeRequestOverrides = {}
 ): Promise<{ headers: Record<string, string>; params: Record<string, string>; body: Record<string, unknown>; query: Record<string, string>; file?: FakeRequestOverrides['file']; userRecord: UserRecord }> {
     // Ensure user exists in the database
     const userRecord = await db.getUserRepository().findOrCreateUser({
-        subject: keycloakId,
+        subject,
         roles,
     })
 
     return {
         headers: {
-            'x-user-id': keycloakId,
+            'x-user-id': subject,
             'x-user-roles': roles.join(','),
         },
         params: overrides.params || {},

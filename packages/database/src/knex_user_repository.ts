@@ -5,7 +5,7 @@ import type { AuthenticatedUser, UserRecord, UserRepository } from '@cepseudo/sh
  * Knex-based implementation of UserRepository.
  *
  * Manages a normalized user schema with three tables:
- * - `users`: Core user records linked to Keycloak IDs
+ * - `users`: Core user records; keeps the 1.x `keycloak_id` column, which KyselyUserRepository renames to `subject`
  * - `roles`: Master list of available roles
  * - `user_roles`: Many-to-many relationship between users and roles
  */
@@ -59,7 +59,7 @@ export class KnexUserRepository implements UserRepository {
 
     async findOrCreateUser(authUser: AuthenticatedUser): Promise<UserRecord> {
         // 1. Find or create user
-        let userRecord = await this.#findUserByKeycloakId(authUser.subject)
+        let userRecord = await this.#findUserBySubject(authUser.subject)
 
         if (!userRecord) {
             userRecord = await this.#createUser(authUser)
@@ -80,8 +80,8 @@ export class KnexUserRepository implements UserRepository {
         return await this.#getUserWithRoles(id)
     }
 
-    async getUserByKeycloakId(keycloakId: string): Promise<UserRecord | undefined> {
-        const userRow = (await this.#knex(this.#usersTable).where('keycloak_id', keycloakId).first()) as
+    async getUserBySubject(subject: string): Promise<UserRecord | undefined> {
+        const userRow = (await this.#knex(this.#usersTable).where('keycloak_id', subject).first()) as
             | { id: number }
             | undefined
 
@@ -90,14 +90,14 @@ export class KnexUserRepository implements UserRepository {
         return await this.#getUserWithRoles(userRow.id)
     }
 
-    async #findUserByKeycloakId(keycloakId: string): Promise<UserRecord | undefined> {
-        const row = await this.#knex(this.#usersTable).where('keycloak_id', keycloakId).first()
+    async #findUserBySubject(subject: string): Promise<UserRecord | undefined> {
+        const row = await this.#knex(this.#usersTable).where('keycloak_id', subject).first()
 
         if (!row) return undefined
 
         return {
             id: row.id,
-            keycloak_id: row.keycloak_id,
+            subject: row.keycloak_id,
             roles: [],
             created_at: new Date(row.created_at),
             updated_at: new Date(row.updated_at)
@@ -119,7 +119,7 @@ export class KnexUserRepository implements UserRepository {
 
         return {
             id,
-            keycloak_id: authUser.subject,
+            subject: authUser.subject,
             roles: [],
             created_at: now,
             updated_at: now
@@ -187,7 +187,7 @@ export class KnexUserRepository implements UserRepository {
 
         return {
             id: userRow.id,
-            keycloak_id: userRow.keycloak_id,
+            subject: userRow.keycloak_id,
             roles: roles,
             created_at: new Date(userRow.created_at),
             updated_at: new Date(userRow.updated_at)

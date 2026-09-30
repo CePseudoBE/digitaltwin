@@ -79,7 +79,7 @@ if (!result.success) {
     return result.response
 }
 
-// result.user is the full UserRecord with id, keycloak_id, roles
+// result.user is the full UserRecord with id, subject, roles
 // result.isAdmin is already decided from the configured admin role
 const { user, isAdmin } = result
 ```
