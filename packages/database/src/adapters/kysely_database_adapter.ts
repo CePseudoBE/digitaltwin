@@ -1,4 +1,5 @@
 import { Kysely, SqliteDialect, PostgresDialect, sql } from 'kysely'
+import { parseBoolean } from '@cepseudo/shared'
 import type { DataRecord, DataResolver, MetadataRow, UserRepository } from '@cepseudo/shared'
 import { DatabaseAdapter } from '../database_adapter.js'
 import { mapToDataRecord } from '../map_to_data_record.js'
@@ -11,8 +12,24 @@ export interface KyselyPostgreSQLConfig {
     password: string
     database: string
     ssl?: boolean
+    /** Verify the server certificate when `ssl` is on (default: true; also DATABASE_SSL_REJECT_UNAUTHORIZED=false) */
+    rejectUnauthorized?: boolean
     /** Max pool size (default: 15) */
     maxConnections?: number
+}
+
+/**
+ * TLS options for the pg pool. The certificate is verified unless explicitly turned off;
+ * a private CA is trusted through NODE_EXTRA_CA_CERTS rather than by disabling verification.
+ */
+export function postgresSsl(
+    config: Pick<KyselyPostgreSQLConfig, 'ssl' | 'rejectUnauthorized'>,
+    env: Partial<Record<string, string>> = process.env
+): false | { rejectUnauthorized: boolean } {
+    if (!config.ssl) return false
+    const rejectUnauthorized =
+        config.rejectUnauthorized ?? parseBoolean(env.DATABASE_SSL_REJECT_UNAUTHORIZED, 'DATABASE_SSL_REJECT_UNAUTHORIZED') ?? true
+    return { rejectUnauthorized }
 }
 
 export interface KyselySQLiteConfig {
@@ -47,6 +64,7 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
     /**
      * Create a KyselyDatabaseAdapter for PostgreSQL.
      *
+     * With `ssl: true` the server certificate is verified (see `postgresSsl`).
      * Requires `pg` to be installed as a peer dependency.
      *
      * @example
@@ -72,7 +90,7 @@ export class KyselyDatabaseAdapter extends DatabaseAdapter {
             user: config.user,
             password: config.password,
             database: config.database,
-            ssl: config.ssl ? { rejectUnauthorized: false } : false,
+            ssl: postgresSsl(config),
             max: config.maxConnections ?? 15
         })
 

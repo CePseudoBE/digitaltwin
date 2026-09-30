@@ -34,10 +34,13 @@ const database = await KyselyDatabaseAdapter.forPostgreSQL(
         password: 'secret',
         database: 'digitaltwin',
         maxConnections: 15,
+        ssl: true,
     },
     dataResolver
 )
 ```
+
+With `ssl: true` the server certificate is verified. Trust a private CA with `NODE_EXTRA_CA_CERTS=/path/to/ca.pem`; only for a server you cannot fix, turn verification off with `rejectUnauthorized: false` or `DATABASE_SSL_REJECT_UNAUTHORIZED=false`.
 
 ### Kysely with SQLite (development)
 

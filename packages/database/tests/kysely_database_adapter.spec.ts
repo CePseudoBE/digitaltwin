@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
 import { sql } from 'kysely'
-import { KyselyDatabaseAdapter } from '../src/adapters/kysely_database_adapter.js'
+import { KyselyDatabaseAdapter, postgresSsl } from '../src/adapters/kysely_database_adapter.js'
 import { sqliteAdapterFactory, postgresAdapterFactory } from './helpers/factories.js'
 import type { AdapterFactory } from './helpers/factories.js'
 
@@ -396,6 +396,21 @@ function registerAdapterTests(label: string, factory: AdapterFactory) {
         })
     }
 }
+
+test.group('postgresSsl', () => {
+    test('is off without ssl', ({ assert }) => {
+        assert.isFalse(postgresSsl({ ssl: false }, {}))
+    })
+
+    test('verifies the server certificate by default', ({ assert }) => {
+        assert.deepEqual(postgresSsl({ ssl: true }, {}), { rejectUnauthorized: true })
+    })
+
+    test('DATABASE_SSL_REJECT_UNAUTHORIZED=false turns verification off, the config option wins over it', ({ assert }) => {
+        assert.deepEqual(postgresSsl({ ssl: true }, { DATABASE_SSL_REJECT_UNAUTHORIZED: 'false' }), { rejectUnauthorized: false })
+        assert.deepEqual(postgresSsl({ ssl: true, rejectUnauthorized: true }, { DATABASE_SSL_REJECT_UNAUTHORIZED: 'false' }), { rejectUnauthorized: true })
+    })
+})
 
 registerAdapterTests('sl', sqliteAdapterFactory)
 
