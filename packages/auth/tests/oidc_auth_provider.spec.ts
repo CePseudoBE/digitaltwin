@@ -1,6 +1,7 @@
 import { test } from '@japa/runner'
 import { createServer, type Server } from 'node:http'
 import { SignJWT, exportJWK, exportSPKI, generateKeyPair, type CryptoKey, type JWK } from 'jose'
+import { createAuthProvider } from '../src/create_auth_provider.js'
 import { OidcAuthProvider } from '../src/providers/oidc_auth_provider.js'
 
 const AUDIENCE = 'digitaltwin'
@@ -130,6 +131,15 @@ test.group('OidcAuthProvider with discovery', group => {
 
         assert.deepEqual((await keycloak.authenticate(bearer(token)))?.roles, ['admin'])
         assert.deepEqual((await keycloak.authenticate(bearer(flat)))?.roles, [])
+    })
+
+    test('built from the environment with only issuer and audience, the roles claim and clock tolerance defaults apply', async ({ assert }) => {
+        const fromEnv = createAuthProvider({ AUTH_MODE: 'oidc', OIDC_ISSUER: issuer.url, OIDC_AUDIENCE: AUDIENCE })
+        const token = await sign(key, { sub: 'user-1', roles: ['editor'] }, issuer.url)
+        const justExpired = await sign(key, { sub: 'user-1' }, issuer.url, '-2s')
+
+        assert.deepEqual((await fromEnv.authenticate(bearer(token)))?.roles, ['editor'])
+        assert.equal((await fromEnv.authenticate(bearer(justExpired)))?.subject, 'user-1')
     })
 })
 

@@ -46,7 +46,7 @@ export class OidcAuthProvider implements AuthProvider {
     #keys?: Promise<Keys>
 
     constructor(options: OidcAuthProviderOptions) {
-        this.#options = { rolesClaim: 'roles', clockTolerance: 5, ...options }
+        this.#options = { ...options, rolesClaim: options.rolesClaim ?? 'roles', clockTolerance: options.clockTolerance ?? 5 }
     }
 
     /** Resolves the signing keys now instead of on the first request; rejects with a clear message when discovery fails. */
