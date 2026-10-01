@@ -10,7 +10,7 @@ export type { NotificationWorkerOptions } from './notifications/notification_wor
 export type { SubscriptionEndpointOptions } from './endpoints/subscriptions.js'
 
 // Types
-export type { NgsiLdEntity, NgsiLdProperty, NgsiLdGeoProperty, NgsiLdRelationship, GeoJsonGeometry } from './types/entity.js'
+export type { NgsiLdEntity, NgsiLdKeyValues, NgsiLdProperty, NgsiLdGeoProperty, NgsiLdRelationship, GeoJsonGeometry } from './types/entity.js'
 export type { Subscription, SubscriptionCreate, NotificationEndpoint, NotificationFormat } from './types/subscription.js'
 export type { NotificationPayload, NotificationJobData } from './types/notification.js'
 export type { JsonLdContext } from './types/context.js'

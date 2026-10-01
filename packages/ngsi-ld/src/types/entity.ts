@@ -48,3 +48,10 @@ export interface NgsiLdEntity {
     '@context'?: JsonLdContext
     [key: string]: NgsiLdProperty | NgsiLdGeoProperty | NgsiLdRelationship | string | JsonLdContext | undefined
 }
+
+/** keyValues representation of an entity: each attribute reduced to its value */
+export interface NgsiLdKeyValues {
+    id: string
+    type: string
+    [key: string]: unknown
+}
