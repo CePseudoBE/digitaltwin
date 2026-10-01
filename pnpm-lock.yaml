@@ -74,28 +74,25 @@ importers:
       '@adonisjs/ace':
         specifier: ^13.4.0
         version: 13.4.0
-      fs-extra:
-        specifier: ^11.3.0
-        version: 11.3.3
-      tempura:
-        specifier: ^0.4.1
-        version: 0.4.1
     devDependencies:
+      '@cepseudo/assets':
+        specifier: workspace:*
+        version: link:../packages/assets
+      '@cepseudo/components':
+        specifier: workspace:*
+        version: link:../packages/components
       '@cepseudo/engine':
         specifier: workspace:*
         version: link:../packages/engine
+      '@cepseudo/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
       '@japa/assert':
         specifier: ^4.1.0
         version: 4.2.0(@japa/runner@4.5.0)
       '@japa/runner':
         specifier: ^4.3.0
         version: 4.5.0
-      '@types/fs-extra':
-        specifier: ^11.0.4
-        version: 11.0.4
-      digitaltwin-core:
-        specifier: workspace:*
-        version: link:../digitaltwin-core
       fastify:
         specifier: ^5.12.5
         version: 5.12.5
@@ -3763,10 +3760,6 @@ packages:
   tar@7.5.7:
     resolution: {integrity: sha512-fov56fJiRuThVFXD6o6/Q354S7pnWMJIVlDBYijsTNx6jKSE4pvrDTs6lUnmGvNyfJwFQQwWy3owKz1ucIhveQ==}
     engines: {node: '>=18'}
-
-  tempura@0.4.1:
-    resolution: {integrity: sha512-NQ4Cs23jM6UUp3CcS5vjmyjTC6dtA5EsflBG2cyG0wZvP65AV26tJ920MGvTRYIImCY13RBpOhc7q4/pu+FG5A==}
-    engines: {node: '>=10'}
 
   terminal-size@4.0.0:
     resolution: {integrity: sha512-rcdty1xZ2/BkWa4ANjWRp4JGpda2quksXIHgn5TMjNBPZfwzJIgR68DKfSYiTL+CZWowDX/sbOo5ME/FRURvYQ==}
@@ -8321,8 +8314,6 @@ snapshots:
       minipass: 7.1.2
       minizlib: 3.1.0
       yallist: 5.0.0
-
-  tempura@0.4.1: {}
 
   terminal-size@4.0.0: {}
 

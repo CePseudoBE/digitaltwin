@@ -13,15 +13,13 @@
   "files": [
     "dist/",
     "bin/",
-    "stubs/",
     "README.md"
   ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/bin.ts",
     "clean": "rimraf dist",
-    "test": "node -r ./bin/set-test-env.cjs --import tsx bin/test.ts",
-    "prepare": "npm run build"
+    "test": "node -r ./bin/set-test-env.cjs --import tsx bin/test.ts"
   },
   "keywords": [
     "digital-twin",
@@ -44,16 +42,15 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@adonisjs/ace": "^13.4.0",
-    "fs-extra": "^11.3.0",
-    "tempura": "^0.4.1"
+    "@adonisjs/ace": "^13.4.0"
   },
   "devDependencies": {
+    "@cepseudo/assets": "workspace:*",
+    "@cepseudo/components": "workspace:*",
     "@cepseudo/engine": "workspace:*",
+    "@cepseudo/shared": "workspace:*",
     "@japa/assert": "^4.1.0",
     "@japa/runner": "^4.3.0",
-    "@types/fs-extra": "^11.0.4",
-    "digitaltwin-core": "workspace:*",
     "fastify": "^5.12.5"
   }
 }

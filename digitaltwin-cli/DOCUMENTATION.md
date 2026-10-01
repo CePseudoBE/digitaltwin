@@ -18,19 +18,15 @@ digitaltwin-cli/
 │   │       ├── make_harvester_command.ts
 │   │       └── make_assets_manager_command.ts
 │   ├── generators/         # Code generation logic
-│   │   └── stub_generator.ts         # Tempura-based generator
+│   │   ├── stub_generator.ts         # Renders a template and writes the file
+│   │   └── templates.ts              # One template function per component type
 │   ├── utils/             # Utility classes
 │   │   ├── project_detector.ts       # Project validation
 │   │   └── string_utils.ts          # Naming conventions
 │   ├── services/          # Dependency injection
 │   │   └── service_container.ts     # Service container
-│   ├── cli/              # CLI orchestration
-│   │   └── command_registry.ts      # Command registration
-│   └── stubs/            # Template files
-│       ├── collector.stub
-│       ├── handler.stub
-│       ├── harvester.stub
-│       └── assets_manager.stub
+│   └── cli/              # CLI orchestration
+│       └── command_registry.ts      # Command registration
 ```
 
 ## Design Patterns
@@ -90,48 +86,24 @@ export class ServiceContainer {
 
 ## Template System
 
-### Tempura Integration
-
-We use [Tempura](https://github.com/lukeed/tempura) for high-performance templating:
+Each component type is a function in `src/generators/templates.ts` that returns the source of the file as a template literal. Values coming from the command line go through `quote()`, so a quote in `--description` cannot break the generated code. A test generates every template and type-checks the result against the `@cepseudo/*` packages.
 
 ```typescript
-export class StubGenerator {
-  async generate(stubName: string, data: Record<string, any>): Promise<string> {
-    const template = await fs.readFile(stubPath, 'utf8')
-    const render = compile(template, { loose: true })
-    
-    const templateData = {
-      ...data,
-      // Auto-generate naming variants
-      ...(data.name ? StringUtils.generateNamingVariants(data.name) : {})
-    }
-    
-    return render(templateData)
-  }
-}
-```
+function assetsManager(data: TemplateData): string {
+  return `import { AssetsManager } from '@cepseudo/assets'
 
-### Template Syntax
-
-Templates use Handlebars-like syntax with Tempura features:
-
-```handlebars
-{{#expect name, className, endpoint, description, tags}}
-import { {{ componentType }} } from 'digitaltwin-core'
-
-{{#if description}}
-/**
- * {{ description }}
- */
-{{/if}}
-export class {{ className }} extends {{ componentType }} {
+${docBlock(data.description)}export class ${StringUtils.toPascalCase(data.name)} extends AssetsManager {
   getConfiguration() {
     return {
-      name: '{{ endpoint }}',
-      description: '{{ description }}',
-      tags: [{{#each tags as tag, index}}'{{ tag }}'{{#if index < tags.length - 1}}, {{/if}}{{/each}}]
+      name: ${quote(data.endpoint)},
+      description: ${quote(data.description ?? '')},
+      contentType: ${quote(data.contentType || 'application/octet-stream')},
+      endpoint: ${quote(data.endpoint)},
+      tags: [${list(data.tags)}]
     }
   }
+}
+`
 }
 ```
 
@@ -175,17 +147,17 @@ The CLI automatically detects Digital Twin projects created with [create-digital
 ```typescript
 export class ProjectDetector {
   async isDigitalTwinProject(cwd: string): Promise<boolean> {
-    const packageJson = await fs.readJson(path.join(cwd, 'package.json'))
+    const packageJson = JSON.parse(await fs.readFile(path.join(cwd, 'package.json'), 'utf8'))
     const dependencies = {
       ...packageJson.dependencies,
       ...packageJson.devDependencies
     }
-    return 'digitaltwin-core' in dependencies
+    return '@cepseudo/engine' in dependencies
   }
   
   async validateProject(cwd: string): Promise<void> {
     if (!await this.isDigitalTwinProject(cwd)) {
-      throw new Error('This command must be run inside a digitaltwin-core project')
+      throw new Error('This command must be run inside a Digital Twin project')
     }
   }
 }
@@ -298,9 +270,9 @@ export class MyAssetsManager extends AssetsManager {
 
 ### Custom Templates
 
-1. Add `.stub` file in `stubs/` directory
-2. Use Tempura syntax with `{{#expect}}` for required variables
-3. Reference in command's `stubName` property
+1. Add a function to `TEMPLATES` in `src/generators/templates.ts`
+2. Quote user input with `quote()` / `list()`
+3. Add it to the type-check test in `tests/templates.spec.ts`
 
 ### New Services
 
@@ -326,23 +298,17 @@ dt make:collector TestCollector --dry-run
 ### Validation
 
 The CLI validates:
-- Project structure (package.json with digitaltwin-core dependency)
+- Project structure (package.json with an @cepseudo/engine dependency)
 - Component names (valid TypeScript identifiers)
 - Required options (e.g., --source for harvesters)
 - File overwrites (--force flag)
 
 ## Performance Considerations
 
-### Template Compilation
-
-- Templates are compiled once per generation
-- Tempura provides high-performance rendering
-- Naming utilities are cached per generation
-
 ### File Operations
 
 - Async I/O operations throughout
-- Directory creation with `fs.ensureDir()`
+- Directory creation with `fs.mkdir(dir, { recursive: true })`
 - Atomic file writes
 
 ### Memory Usage

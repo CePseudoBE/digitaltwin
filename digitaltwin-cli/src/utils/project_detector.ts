@@ -1,28 +1,28 @@
-import fs from 'fs-extra'
+import { existsSync } from 'node:fs'
+import fs from 'node:fs/promises'
 import path from 'path'
 
 /**
- * Detects if current directory is a valid digitaltwin-core project
+ * Detects if current directory is a Digital Twin project
  */
 export class ProjectDetector {
   /**
-   * Check if we're in a digitaltwin-core project
+   * Check if we're in a Digital Twin project (one that depends on @cepseudo/engine)
    */
   async isDigitalTwinProject(cwd: string = process.cwd()): Promise<boolean> {
     try {
       const packageJsonPath = path.join(cwd, 'package.json')
       
-      if (!await fs.pathExists(packageJsonPath)) {
+      if (!existsSync(packageJsonPath)) {
         return false
       }
       
-      const packageJson = await fs.readJson(packageJsonPath)
+      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'))
       
-      // Check if digitaltwin-core is in dependencies
       const dependencies = packageJson.dependencies || {}
       const devDependencies = packageJson.devDependencies || {}
-      
-      return 'digitaltwin-core' in dependencies || 'digitaltwin-core' in devDependencies
+
+      return '@cepseudo/engine' in dependencies || '@cepseudo/engine' in devDependencies
     } catch {
       return false
     }
@@ -39,10 +39,10 @@ export class ProjectDetector {
   } | null> {
     try {
       const packageJsonPath = path.join(cwd, 'package.json')
-      const packageJson = await fs.readJson(packageJsonPath)
+      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'))
       
-      const srcDir = await fs.pathExists(path.join(cwd, 'src')) ? 'src' : '.'
-      const hasTypeScript = await fs.pathExists(path.join(cwd, 'tsconfig.json'))
+      const srcDir = existsSync(path.join(cwd, 'src')) ? 'src' : '.'
+      const hasTypeScript = existsSync(path.join(cwd, 'tsconfig.json'))
       
       return {
         name: packageJson.name || 'unknown',
@@ -63,8 +63,8 @@ export class ProjectDetector {
     
     if (!isProject) {
       throw new Error(
-        'This command must be run inside a digitaltwin-core project.\n' +
-        'Make sure you have digitaltwin-core in your dependencies.'
+        'This command must be run inside a Digital Twin project.\n' +
+        'Make sure you have @cepseudo/engine in your dependencies.'
       )
     }
   }

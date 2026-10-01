@@ -1,4 +1,5 @@
-import fs from 'fs-extra'
+import { existsSync } from 'node:fs'
+import fs from 'node:fs/promises'
 import path from 'path'
 import { StringUtils } from './string_utils.js'
 
@@ -116,7 +117,7 @@ export class BarrelUpdater {
     async scanComponentsDirectory(componentsDir: string): Promise<ComponentInfo[]> {
         const components: ComponentInfo[] = []
 
-        if (!await fs.pathExists(componentsDir)) {
+        if (!existsSync(componentsDir)) {
             this.log(`Components directory does not exist: ${componentsDir}`)
             return components
         }
@@ -257,7 +258,7 @@ export class BarrelUpdater {
             }
         }
 
-        await fs.ensureDir(componentsDir)
+        await fs.mkdir(componentsDir, { recursive: true })
         await fs.writeFile(barrelPath, content, 'utf8')
         this.log(`Wrote barrel file: ${barrelPath}`)
 
@@ -279,9 +280,9 @@ export class BarrelUpdater {
 
         let componentsDir: string
 
-        if (await fs.pathExists(srcComponentsDir)) {
+        if (existsSync(srcComponentsDir)) {
             componentsDir = srcComponentsDir
-        } else if (await fs.pathExists(rootComponentsDir)) {
+        } else if (existsSync(rootComponentsDir)) {
             componentsDir = rootComponentsDir
         } else {
             // Default to src/components
