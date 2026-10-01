@@ -15,8 +15,6 @@ export type {
     BatchAssetData,
     BatchUploadBody,
     BatchUploadRequest,
-    CustomTableListQuery,
-    CustomTableListRequest,
     CustomTableGetRequest,
     CustomTableCreateRequest,
     CustomTableUpdateRequest,

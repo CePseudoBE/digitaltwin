@@ -1,4 +1,4 @@
-import type { NgsiLdEntity } from './entity.js'
+import type { NgsiLdEntity, NgsiLdKeyValues } from './entity.js'
 import type { Subscription } from './subscription.js'
 
 /**
@@ -9,7 +9,7 @@ export interface NotificationPayload {
     type: 'Notification'
     subscriptionId: string
     notifiedAt: string
-    data: NgsiLdEntity[]
+    data: Array<NgsiLdEntity | NgsiLdKeyValues>
 }
 
 /**
@@ -17,7 +17,7 @@ export interface NotificationPayload {
  */
 export interface NotificationJobData {
     subscription: Subscription
-    entity: NgsiLdEntity
+    entity: NgsiLdEntity | NgsiLdKeyValues
     notificationId: string
     notifiedAt: string
 }

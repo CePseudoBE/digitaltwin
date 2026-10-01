@@ -1,5 +1,6 @@
 import { test } from '@japa/runner'
 import { randomUUID } from 'node:crypto'
+import type { Queue } from 'bullmq'
 import { enqueueNotification } from '../src/notifications/notification_sender.js'
 import type { Subscription } from '../src/types/subscription.js'
 import type { NgsiLdEntity } from '../src/types/entity.js'
@@ -34,14 +35,16 @@ function makeEntity(attrs: Record<string, number | string> = {}): NgsiLdEntity {
     return entity
 }
 
-function makeMockQueue() {
+function makeMockQueue(): Queue<NotificationJobData> & { jobs: NotificationJobData[] } {
     const jobs: NotificationJobData[] = []
-    return {
+    const mock = {
         jobs,
         async add(_name: string, data: NotificationJobData) {
             jobs.push(data)
         },
     }
+    // enqueueNotification only calls add()
+    return mock as unknown as Queue<NotificationJobData> & { jobs: NotificationJobData[] }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -51,7 +54,7 @@ test.group('enqueueNotification — attribute projection', () => {
         const queue = makeMockQueue()
         const entity = makeEntity({ pm25: 42, temperature: 20, no2: 15 })
 
-        await enqueueNotification(makeSub(), entity, queue as any)
+        await enqueueNotification(makeSub(), entity, queue)
 
         const delivered = queue.jobs[0].entity
         assert.property(delivered, 'pm25')
@@ -63,7 +66,7 @@ test.group('enqueueNotification — attribute projection', () => {
         const queue = makeMockQueue()
         const entity = makeEntity({ pm25: 42, temperature: 20 })
 
-        await enqueueNotification(makeSub({ notificationAttrs: ['pm25'] }), entity, queue as any)
+        await enqueueNotification(makeSub({ notificationAttrs: ['pm25'] }), entity, queue)
 
         const delivered = queue.jobs[0].entity
         assert.property(delivered, 'pm25')
@@ -74,7 +77,7 @@ test.group('enqueueNotification — attribute projection', () => {
         const queue = makeMockQueue()
         const entity = makeEntity({ pm25: 42 })
 
-        await enqueueNotification(makeSub({ notificationAttrs: ['pm25'] }), entity, queue as any)
+        await enqueueNotification(makeSub({ notificationAttrs: ['pm25'] }), entity, queue)
 
         const delivered = queue.jobs[0].entity
         assert.equal(delivered.id, entity.id)
@@ -86,7 +89,7 @@ test.group('enqueueNotification — attribute projection', () => {
         const entity = makeEntity({ pm25: 42 })
 
         await assert.doesNotReject(() =>
-            enqueueNotification(makeSub({ notificationAttrs: ['pm25', 'no2'] }), entity, queue as any)
+            enqueueNotification(makeSub({ notificationAttrs: ['pm25', 'no2'] }), entity, queue)
         )
 
         const delivered = queue.jobs[0].entity
@@ -95,11 +98,31 @@ test.group('enqueueNotification — attribute projection', () => {
     })
 })
 
+test.group('enqueueNotification — format', () => {
+    test('a keyValues subscription delivers each attribute as its plain value', async ({ assert }) => {
+        const queue = makeMockQueue()
+        const entity = makeEntity({ pm25: 42, status: 'ok' })
+
+        await enqueueNotification(makeSub({ notificationFormat: 'keyValues' }), entity, queue)
+
+        assert.deepEqual(queue.jobs[0].entity, { id: entity.id, type: entity.type, pm25: 42, status: 'ok' })
+    })
+
+    test('a normalized subscription delivers the attributes as NGSI-LD properties', async ({ assert }) => {
+        const queue = makeMockQueue()
+        const entity = makeEntity({ pm25: 42 })
+
+        await enqueueNotification(makeSub(), entity, queue)
+
+        assert.deepEqual(queue.jobs[0].entity, entity)
+    })
+})
+
 test.group('enqueueNotification — delivery conditions', () => {
     test('subscriptions with no endpoint are not queued for delivery', async ({ assert }) => {
         const queue = makeMockQueue()
 
-        await enqueueNotification(makeSub({ notificationEndpoint: '' }), makeEntity({ pm25: 42 }), queue as any)
+        await enqueueNotification(makeSub({ notificationEndpoint: '' }), makeEntity({ pm25: 42 }), queue)
 
         assert.lengthOf(queue.jobs, 0)
     })

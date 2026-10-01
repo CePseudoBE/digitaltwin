@@ -12,7 +12,7 @@ import {
     validateDateRangeQuery,
     validateCustomRecordCreate,
     validatePresignedUploadRequest
-} from '../../src/validation/index.js'
+} from '../../src/index.js'
 import { ValidationError } from '../../src/errors/index.js'
 
 test.group('validateData', () => {

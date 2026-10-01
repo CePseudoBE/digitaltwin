@@ -1,14 +1,14 @@
 import type { Queue } from 'bullmq'
 import type { Subscription } from '../types/subscription.js'
-import type { NgsiLdEntity } from '../types/entity.js'
-import type { NotificationJobData, NotificationPayload } from '../types/notification.js'
+import type { NgsiLdEntity, NgsiLdKeyValues } from '../types/entity.js'
+import type { NotificationJobData } from '../types/notification.js'
 import { randomUUID } from 'crypto'
 
 /**
  * Builds a keyValues projection of an NGSI-LD entity.
  */
-function toKeyValues(entity: NgsiLdEntity): Record<string, unknown> {
-    const result: Record<string, unknown> = {
+function toKeyValues(entity: NgsiLdEntity): NgsiLdKeyValues {
+    const result: NgsiLdKeyValues = {
         id: entity.id,
         type: entity.type,
     }
@@ -55,7 +55,7 @@ export async function enqueueNotification(
 
     const jobData: NotificationJobData = {
         subscription: sub,
-        entity: entityToSend,
+        entity: sub.notificationFormat === 'keyValues' ? toKeyValues(entityToSend) : entityToSend,
         notificationId,
         notifiedAt,
     }
@@ -69,13 +69,4 @@ export async function enqueueNotification(
         removeOnComplete: 100,
         removeOnFail: 50,
     })
-
-    // Build the full notification payload (for reference, stored in job data)
-    const _payload: NotificationPayload = {
-        id: `urn:ngsi-ld:Notification:${notificationId}`,
-        type: 'Notification',
-        subscriptionId: sub.id,
-        notifiedAt,
-        data: [sub.notificationFormat === 'keyValues' ? (toKeyValues(entityToSend) as NgsiLdEntity) : entityToSend],
-    }
 }
