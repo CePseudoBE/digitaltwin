@@ -1,237 +1,73 @@
 # create-digitaltwin
 
-TypeScript CLI tool to create Digital Twin applications with [digitaltwin-core](https://github.com/CePseudoBE/digital-twin-core).
+Creates a Digital Twin application on the [`@cepseudo/*` packages](https://github.com/CePseudoBE/digitaltwin).
 
-## Features
-
-- **Interactive Setup** - Guided prompts for project configuration  
-- **Database Support** - SQLite (dev) and PostgreSQL (prod) options  
-- **Storage Options** - Local filesystem or S3-compatible object storage  
-- **Queue Management** - Redis support for production workloads  
-- **Docker Ready** - Optional Docker and docker-compose configuration  
-- **Example Components** - Pre-built IoT sensor collector and data processor  
-- **TypeScript First** - Full TypeScript support with strict typing  
-- **CLI Integration** - Includes digitaltwin-cli for component generation  
-
-## Quick Start
-
-### Via npm init (Recommended)
 ```bash
-npm init digitaltwin my-digital-twin
-cd my-digital-twin
+npm init digitaltwin my-app
+cd my-app
+docker compose up -d
 npm install
 npm run dev
 ```
 
-### Via npx
-```bash
-npx create-digitaltwin my-digital-twin
-cd my-digital-twin
-npm install
-npm run dev
-```
+Requires Node.js 20.12 or later, and Docker for the local services.
 
-### Via yarn create
-```bash
-yarn create digitaltwin my-digital-twin
-cd my-digital-twin
-yarn install
-yarn dev
-```
+## Questions
 
-### Via Global Installation
-```bash
-npm install -g create-digitaltwin
-create-digitaltwin my-digital-twin
-```
+| Question | Choices | What it changes |
+|---|---|---|
+| Database | SQLite, PostgreSQL | `pg` or `better-sqlite3`, the `DB_*` variables, a `postgres` service |
+| File storage | local directory, S3-compatible | `LocalStorageService` or `S3StorageService`, the `S3_*` variables, a `minio` service and its bucket |
+| Authentication | `none`, `oidc`, `trusted-headers` | `AUTH_MODE` and its variables; `oidc` adds a mock issuer to the compose file |
+| NGSI-LD API | yes, no | the `@cepseudo/ngsi-ld` plugin, which the engine loads when it is installed |
+| docker-compose.yml | yes, no | Redis, plus the services the choices above need |
+| Example collector | yes, no | `src/components/jsonplaceholder_collector.ts` |
 
-## Usage
+Redis is always required: the engine runs its schedules on BullMQ.
 
-### Interactive Mode (Default)
+## Without prompts
 
 ```bash
-create-digitaltwin [project-name]
+npx create-digitaltwin my-app --yes --database postgresql --storage s3 --auth oidc --ngsi-ld
 ```
 
-The CLI will guide you through configuration options:
+| Flag | Values | Default |
+|---|---|---|
+| `-y, --yes` | skip the prompts | - |
+| `--database <type>` | `sqlite`, `postgresql` | `sqlite` |
+| `--storage <type>` | `local`, `s3` | `local` |
+| `--auth <mode>` | `none`, `oidc`, `trusted-headers` | `none` |
+| `--ngsi-ld` | add the NGSI-LD API | off |
+| `--no-docker` | skip `docker-compose.yml` | - |
+| `--no-examples` | skip the example collector | - |
 
-> **Note:** You can use `npm init digitaltwin` as a shorthand for `npx create-digitaltwin` thanks to npm's init command aliasing.
+The target directory must not exist or be empty.
 
-- **Project Name**: Name for your Digital Twin application
-- **Database**: SQLite (file-based) or PostgreSQL (production-ready)
-- **Storage**: Local filesystem or S3-compatible object storage (AWS S3, MinIO, Scaleway, ...)
-- **Redis**: Enable for distributed queue management
-- **Docker**: Include Docker configuration files
-- **Examples**: Include sample IoT components
-
-### Non-Interactive Mode
-
-Use the `--yes` flag to skip prompts and use defaults or CLI options:
-
-```bash
-# Create with all defaults
-npx create-digitaltwin my-app --yes
-
-# Create with PostgreSQL and Redis
-npx create-digitaltwin my-app --yes --database postgresql --redis
-
-# Create with Docker, no examples, skip install
-npx create-digitaltwin my-app --yes --docker --no-examples --skip-install
-
-# Full example with all options
-npx create-digitaltwin my-app --yes \
-  --database postgresql \
-  --storage local \
-  --storage-path ./data \
-  --redis \
-  --docker \
-  --examples
-```
-
-### CLI Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-y, --yes` | Skip prompts, use defaults | `false` |
-| `--database <type>` | Database: `sqlite` or `postgresql` | `sqlite` |
-| `--storage <type>` | Storage: `local` or `s3` | `local` |
-| `--storage-path <path>` | Local storage directory | `./uploads` |
-| `--redis` | Enable Redis for queues | `true` |
-| `--docker` | Include Docker files | `false` |
-| `--examples` | Include example components | `true` |
-| `--no-examples` | Skip example components | - |
-| `--skip-install` | Skip npm install | `false` |
-
-## Generated Project Structure
+## Generated project
 
 ```
-my-digital-twin/
+my-app/
 ├── src/
-│   ├── index.ts                 # Main application entry
-│   └── components/             # Example components (optional)
-│       ├── jsonplaceholder_collector.ts
-│       └── index.ts
-├── package.json                # Dependencies and scripts
-├── tsconfig.json              # TypeScript configuration
-├── .env                       # Environment variables template
-├── .gitignore
-├── README.md                  # Project-specific documentation
-├── dt.js                      # CLI wrapper for digitaltwin-cli
-├── Dockerfile                 # Docker configuration (optional)
-├── docker-compose.yml         # Multi-service setup (optional)
-└── dist/                      # Compiled JavaScript (after build)
+│   ├── index.ts              # Storage, database and engine set up from .env
+│   └── components/           # Example collector (optional)
+├── .env                      # Development settings, matching docker-compose.yml
+├── .env.example              # The same settings, without the generated secret
+├── docker-compose.yml        # Local services (optional)
+├── dt.js                     # node dt make:collector ... (digitaltwin-cli)
+├── package.json
+├── tsconfig.json
+└── README.md
 ```
-
-## Example Components
-
-When enabled, the generator includes working example components:
-
-### JSONPlaceholderCollector
-- Fetches real data from the JSONPlaceholder API (posts and users)
-- Runs every 15 seconds to demonstrate scheduled data collection
-- Includes error handling and performance metrics
-- Shows how to integrate with external REST APIs
-- Stores collected data with metadata in your configured storage
-
-**Generated Endpoints:**
-- `GET /api/jsonplaceholder` - Latest collected data from JSONPlaceholder
-
-## CLI Integration
-
-Each generated project includes `dt.js`, a wrapper that calls [digitaltwin-cli](https://github.com/CePseudoBE/digitaltwin-cli) for component generation:
-
-```bash
-# Generate components after project creation
-node dt make:collector WeatherCollector --description "Collects weather data"
-node dt make:handler ApiHandler --method post
-node dt make:harvester DataProcessor --source weather-collector
-node dt make:assets-manager ImageManager --content-type "image/jpeg"
-```
-
-This provides seamless component scaffolding within your Digital Twin project.
 
 ## Development
 
-### Building from Source
-
 ```bash
-git clone <repository-url>
-cd create-digitaltwin
-npm install
-npm run build
-npm link
+pnpm --filter create-digitaltwin build
+pnpm --filter create-digitaltwin test
+pnpm --filter create-digitaltwin dev my-app
 ```
 
-### Development Mode
-```bash
-npm run dev my-test-project
-```
-
-### Scripts
-
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm run dev` - Run in development mode with tsx
-- `npm test` - Run tests with Japa
-- `npm start` - Run compiled CLI
-- `npm run prepare` - Pre-publish build hook
-
-## Testing
-
-The CLI uses the [Japa](https://japa.dev/) testing framework. Tests cover:
-- Project generation with various configurations
-- Non-interactive mode with CLI options
-- Input validation
-
-```bash
-npm test
-```
-
-## Digital Twin Architecture
-
-Projects generated by this CLI follow the digitaltwin-core architecture:
-
-- **Collectors**: Fetch data from external sources on schedules
-- **Harvesters**: Process and transform collected data  
-- **Handlers**: Expose HTTP endpoints for real-time operations
-- **Assets Managers**: Manage file uploads with metadata
-- **Engine**: Orchestrates all components with Redis queues
-
-## Environment Configuration
-
-Generated projects include comprehensive environment validation:
-
-```typescript
-// Automatic validation of required environment variables
-const env = Env.validate({
-  PORT: Env.schema.number({ optional: true }),
-  DB_HOST: Env.schema.string(),
-  STORAGE_PATH: Env.schema.string({ optional: true }),
-  // ... more validations based on your choices
-})
-```
-
-## TypeScript Support
-
-This CLI is built with TypeScript and generates fully-typed projects:
-
-- **Strict typing** for all configuration objects
-- **Interface definitions** for sensor data and processing results  
-- **Type-safe** environment variable validation
-- **IDE support** with full IntelliSense
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure TypeScript compilation passes
-5. Submit a pull request
-
-## Related Projects
-
-- [digitaltwin-core](https://github.com/CePseudoBE/digital-twin-core) - Core framework
-- [digitaltwin-cli](https://github.com/CePseudoBE/digitaltwin-cli) - Component generation CLI
-- [Digital Twin Examples](https://github.com/CePseudoBE/digital-twin-examples) - Sample implementations
+The tests generate projects in `tests/generated/` and type-check them against the workspace packages.
 
 ## License
 

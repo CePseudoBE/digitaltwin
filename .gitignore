@@ -88,3 +88,4 @@ Desktop.ini
 
 # Handlers rendered by the CLI template tests
 digitaltwin-cli/tests/generated/
+create-digitaltwin/tests/generated/
