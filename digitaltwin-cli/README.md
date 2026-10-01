@@ -61,7 +61,7 @@ Total: 3 component(s)
 ### `doctor`
 
 Check project health and configuration. Validates:
-- `package.json` exists and includes `digitaltwin-core`
+- `package.json` exists and includes `@cepseudo/engine`
 - `tsconfig.json` has correct module settings
 - `node_modules` are installed
 - Components directory structure
@@ -75,7 +75,7 @@ node dt doctor
 ```
 Running project diagnostics...
 
-package.json: Found digitaltwin-core@^1.0.0
+package.json: Found @cepseudo/engine@^2.0.0
 tsconfig.json: Configuration looks good
 node_modules: Dependencies installed
 components: Found 3 component(s)
@@ -248,8 +248,8 @@ npm test
 
 ## Related Projects
 
-- [digitaltwin-core](https://github.com/CePseudoBE/digital-twin-core) - Core framework
-- [create-digitaltwin](https://github.com/CePseudoBE/create-digitaltwin) - Project generator
+- [@cepseudo/engine](https://github.com/CePseudoBE/digitaltwin/tree/main/packages/engine) - Framework engine
+- [create-digitaltwin](https://github.com/CePseudoBE/digitaltwin/tree/main/create-digitaltwin) - Project generator
 
 ## License
 

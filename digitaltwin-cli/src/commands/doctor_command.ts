@@ -1,5 +1,6 @@
 import { BaseCommand } from './base_command.js'
-import fs from 'fs-extra'
+import { existsSync } from 'node:fs'
+import fs from 'node:fs/promises'
 import path from 'path'
 
 interface CheckResult {
@@ -60,7 +61,7 @@ export class DoctorCommand extends BaseCommand {
   private async checkPackageJson(cwd: string): Promise<CheckResult> {
     const packageJsonPath = path.join(cwd, 'package.json')
 
-    if (!(await fs.pathExists(packageJsonPath))) {
+    if (!existsSync(packageJsonPath)) {
       return {
         name: 'package.json',
         success: false,
@@ -70,22 +71,24 @@ export class DoctorCommand extends BaseCommand {
     }
 
     try {
-      const packageJson = await fs.readJson(packageJsonPath)
+      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'))
       const deps = { ...packageJson.dependencies, ...packageJson.devDependencies }
 
-      if (!deps['digitaltwin-core']) {
+      if (!deps['@cepseudo/engine']) {
         return {
           name: 'package.json',
           success: false,
-          message: 'digitaltwin-core dependency not found',
-          suggestion: 'Run: npm install digitaltwin-core',
+          message: '@cepseudo/engine dependency not found',
+          suggestion: deps['digitaltwin-core']
+            ? 'This is a 1.x project on digitaltwin-core: move to the @cepseudo/* packages'
+            : 'Run: npm install @cepseudo/engine',
         }
       }
 
       return {
         name: 'package.json',
         success: true,
-        message: `Found digitaltwin-core@${deps['digitaltwin-core']}`,
+        message: `Found @cepseudo/engine@${deps['@cepseudo/engine']}`,
       }
     } catch {
       return {
@@ -100,7 +103,7 @@ export class DoctorCommand extends BaseCommand {
   private async checkTsConfig(cwd: string): Promise<CheckResult> {
     const tsconfigPath = path.join(cwd, 'tsconfig.json')
 
-    if (!(await fs.pathExists(tsconfigPath))) {
+    if (!existsSync(tsconfigPath)) {
       return {
         name: 'tsconfig.json',
         success: false,
@@ -110,7 +113,7 @@ export class DoctorCommand extends BaseCommand {
     }
 
     try {
-      const tsconfig = await fs.readJson(tsconfigPath)
+      const tsconfig = JSON.parse(await fs.readFile(tsconfigPath, 'utf8'))
 
       // Check for common required settings
       const compilerOptions = tsconfig.compilerOptions || {}
@@ -142,7 +145,7 @@ export class DoctorCommand extends BaseCommand {
   private async checkNodeModules(cwd: string): Promise<CheckResult> {
     const nodeModulesPath = path.join(cwd, 'node_modules')
 
-    if (!(await fs.pathExists(nodeModulesPath))) {
+    if (!existsSync(nodeModulesPath)) {
       return {
         name: 'node_modules',
         success: false,
@@ -151,13 +154,12 @@ export class DoctorCommand extends BaseCommand {
       }
     }
 
-    // Check if digitaltwin-core is installed
-    const corePath = path.join(nodeModulesPath, 'digitaltwin-core')
-    if (!(await fs.pathExists(corePath))) {
+    const enginePath = path.join(nodeModulesPath, '@cepseudo', 'engine')
+    if (!existsSync(enginePath)) {
       return {
         name: 'node_modules',
         success: false,
-        message: 'digitaltwin-core not installed',
+        message: '@cepseudo/engine not installed',
         suggestion: 'Run: npm install',
       }
     }
@@ -170,10 +172,10 @@ export class DoctorCommand extends BaseCommand {
   }
 
   private async checkComponentsDir(cwd: string): Promise<CheckResult> {
-    const srcDir = (await fs.pathExists(path.join(cwd, 'src'))) ? 'src' : '.'
+    const srcDir = existsSync(path.join(cwd, 'src')) ? 'src' : '.'
     const componentsDir = path.join(cwd, srcDir, 'components')
 
-    if (!(await fs.pathExists(componentsDir))) {
+    if (!existsSync(componentsDir)) {
       return {
         name: 'components',
         success: true, // Not an error, just no components yet
@@ -203,8 +205,8 @@ export class DoctorCommand extends BaseCommand {
     const envPath = path.join(cwd, '.env')
     const envExamplePath = path.join(cwd, '.env.example')
 
-    if (!(await fs.pathExists(envPath))) {
-      if (await fs.pathExists(envExamplePath)) {
+    if (!existsSync(envPath)) {
+      if (existsSync(envExamplePath)) {
         return {
           name: '.env',
           success: false,

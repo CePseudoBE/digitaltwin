@@ -1,5 +1,6 @@
 import { BaseCommand } from './base_command.js'
-import fs from 'fs-extra'
+import { existsSync } from 'node:fs'
+import fs from 'node:fs/promises'
 import path from 'path'
 
 /**
@@ -21,7 +22,7 @@ export class ListCommand extends BaseCommand {
 
       const componentsDir = path.join(process.cwd(), projectInfo.srcDir, 'components')
 
-      if (!(await fs.pathExists(componentsDir))) {
+      if (!existsSync(componentsDir)) {
         this.info('No components directory found.')
         this.info('Create components with: dt make:collector MyCollector')
         return

@@ -7,8 +7,9 @@ import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import Fastify from 'fastify'
 import { exposeEndpoints, registerOpenApi } from '@cepseudo/engine'
-import type { Handler } from 'digitaltwin-core'
+import type { Handler } from '@cepseudo/components'
 import { StubGenerator } from '../src/generators/stub_generator.js'
+import type { TemplateData, TemplateName } from '../src/generators/templates.js'
 
 const run = promisify(execFile)
 const tsc = createRequire(import.meta.url).resolve('typescript/bin/tsc')
@@ -35,20 +36,44 @@ async function generateHandler(): Promise<string> {
   return file
 }
 
-test.group('make:handler template', group => {
+// A quote and a comment terminator in user input must not break the generated code
+const description = "Reads the city's sensors */ every hour"
+
+const templates: Array<[TemplateName, TemplateData]> = [
+  ['collector', { name: 'AirQualityCollector', endpoint: 'air-quality', description, tags: ['air', "o'clock"], schedule: '0 * * * * *' }],
+  ['harvester', { name: 'DailyAverage', endpoint: 'daily-average', description, tags: [], sourceCollector: 'air-quality' }],
+  ['handler', { name: 'AirQualityHandler', endpoint: 'air-quality', description, tags: [], method: 'post', schemaKey: 'body', inputField: 'body' }],
+  ['assets_manager', { name: 'Models', endpoint: 'models', description, tags: [], contentType: 'model/gltf-binary' }],
+  ['tileset_manager', { name: 'Buildings', endpoint: 'buildings', description }],
+  ['map_manager', { name: 'CityMaps', endpoint: 'city-maps', description }]
+]
+
+test.group('make:* templates', group => {
   group.teardown(() => fs.rm(outDir, { recursive: true, force: true }))
 
-  test('the generated handler type-checks against digitaltwin-core', async ({ assert }) => {
-    const file = await generateHandler()
+  test('every generated component type-checks against the @cepseudo packages', async ({ assert }) => {
+    const generator = new StubGenerator()
+    await fs.mkdir(outDir, { recursive: true })
+    const files = await Promise.all(
+      templates.map(async ([name, data]) => {
+        const file = path.join(outDir, `generated_${name}.ts`)
+        await fs.writeFile(file, await generator.generate(name, data))
+        return file
+      })
+    )
     // Flags rather than a tsconfig in outDir: tsx would pick that file up for the import in the next test
     const flags = ['--noEmit', '--strict', '--experimentalDecorators', '--esModuleInterop', '--skipLibCheck', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022', '--types', 'node']
 
-    const { stdout } = await run(process.execPath, [tsc, ...flags, file]).catch(error => {
+    const { stdout } = await run(process.execPath, [tsc, ...flags, ...files]).catch(error => {
       assert.fail(`tsc failed:\n${(error as { stdout?: string }).stdout ?? String(error)}`)
       return { stdout: '' }
     })
     assert.equal(stdout.trim(), '')
   }).timeout(60000)
+})
+
+test.group('make:handler template', group => {
+  group.teardown(() => fs.rm(outDir, { recursive: true, force: true }))
 
   test('the generated handler appears in the OpenAPI document and its schema is enforced', async ({ assert }) => {
     const file = await generateHandler()
