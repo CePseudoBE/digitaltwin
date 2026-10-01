@@ -156,17 +156,6 @@ export type BatchUploadRequest = TypedRequest<Record<string, never>, BatchUpload
 
 // ========== Custom table request types ==========
 
-/** Request for custom table list with pagination */
-export interface CustomTableListQuery {
-    page?: string
-    limit?: string
-    sort?: string
-    order?: 'asc' | 'desc'
-    [key: string]: string | string[] | undefined
-}
-
-export type CustomTableListRequest = TypedRequest<Record<string, never>, unknown, CustomTableListQuery>
-
 /** Request for custom table record by ID */
 export type CustomTableGetRequest = TypedRequest<{ id: string }>
 
