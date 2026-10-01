@@ -1,741 +1,406 @@
-import fs from 'fs-extra'
-import path from 'path'
-import chalk from 'chalk'
-import {fileURLToPath} from 'url'
-import type {PackageJsonConfig, PackageJsonDependencies, ProjectAnswers,} from '../types'
+import { randomBytes } from 'node:crypto'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import type { ProjectAnswers } from '../types/project-config.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+/** Range of the @cepseudo/* packages and digitaltwin-cli in generated projects; bumped with each framework major */
+export const FRAMEWORK_VERSION = '^2.0.0'
+
+const POSTGRES = { user: 'digitaltwin', password: 'digitaltwin' }
+const MINIO = { user: 'digitaltwin', password: 'digitaltwin-secret', bucket: 'digitaltwin' }
+const MOCK_OIDC = { issuer: 'http://localhost:8080/default', audience: 'digitaltwin' }
 
 /**
- * Generates a complete Digital Twin project based on user answers.
- * Creates all necessary files including package.json, TypeScript config,
- * application code, configuration files, and optional features.
+ * Writes a new project into `answers.projectPath`.
  *
- * @param answers - User configuration choices from prompts
- *
- * @example
- * ```typescript
- * await generateProject({
- *   projectName: 'my-app',
- *   projectPath: '/path/to/my-app',
- *   database: 'sqlite',
- *   storage: 'local',
- *   useRedis: true,
- *   includeDocker: false,
- *   includeExamples: true
- * })
- * ```
+ * @throws Error when the directory exists and is not empty, so nothing of the user's is overwritten
  */
 export async function generateProject(answers: ProjectAnswers): Promise<void> {
-    const {projectPath} = answers
-
-    console.log(chalk.blue(`Creating project at: ${projectPath}`))
-
-    // Create project directory
-    await fs.ensureDir(projectPath)
-
-    // Generate package.json
-    await generatePackageJson(projectPath, answers)
-
-    // Generate main app files
-    await generateAppFiles(projectPath, answers)
-
-    // Generate configuration files
-    await generateConfigFiles(projectPath, answers)
-
-    // Generate example components if requested
-    if (answers.includeExamples) {
-        await generateExampleComponents(projectPath, answers)
-    }
-
-    // Generate Docker files if requested
-    if (answers.includeDocker) {
-        await generateDockerFiles(projectPath, answers)
-    }
-
-    // Generate README
-    await generateReadme(projectPath, answers)
-
-    // Generate dt.js CLI wrapper
-    await generateDtCli(projectPath)
+  const existing = await fs.readdir(answers.projectPath).catch(() => [])
+  if (existing.length > 0) {
+    throw new Error(`${answers.projectPath} already exists and is not empty`)
+  }
+  const files = projectFiles(answers, randomBytes(32).toString('hex'))
+  for (const [file, content] of Object.entries(files)) {
+    const target = path.join(answers.projectPath, file)
+    await fs.mkdir(path.dirname(target), { recursive: true })
+    await fs.writeFile(target, content)
+  }
 }
 
 /**
- * Gets the latest version of digitaltwin-core from npm registry
- * @returns Promise resolving to the version string
- * @private
- */
-async function getLatestDigitalTwinCoreVersion(): Promise<string> {
-    try {
-        const response = await fetch('https://registry.npmjs.org/digitaltwin-core/latest')
-        const data = await response.json()
-        return data.version
-    } catch (error) {
-        console.warn('Warning: Could not fetch digitaltwin-core version from npm, falling back to default')
-        return '0.10.0' // fallback version
-    }
-}
-
-/**
- * Gets the latest version of digitaltwin-cli from npm registry
- * @returns Promise resolving to the version string
- * @private
- */
-async function getLatestDigitalTwinCliVersion(): Promise<string> {
-    try {
-        const response = await fetch('https://registry.npmjs.org/digitaltwin-cli/latest')
-        const data = await response.json()
-        return data.version
-    } catch (error) {
-        console.warn('Warning: Could not fetch digitaltwin-cli version from npm, falling back to default')
-        return '0.3.0' // fallback version
-    }
-}
-
-/**
- * Generates package.json with appropriate dependencies based on user choices.
- * Includes database-specific packages, Redis support, and storage adapters.
+ * Every file of the project, by path relative to its root.
  *
- * @param projectPath - Target directory for the project
- * @param answers - User configuration choices
- * @private
+ * @param secret - `AUTH_HEADER_SECRET` written to `.env` (`.env.example` gets a placeholder)
  */
-async function generatePackageJson(projectPath: string, answers: ProjectAnswers): Promise<void> {
-    const {projectName, database, storage, useRedis} = answers
-
-    const digitalTwinVersion = await getLatestDigitalTwinCoreVersion()
-    const digitalTwinCliVersion = await getLatestDigitalTwinCliVersion()
-
-    const dependencies: PackageJsonDependencies = {
-        'digitaltwin-core': `^${digitalTwinVersion}`,
-        'kysely': '^0.28.0',
-        'dotenv' : '^17.2.1'
-    }
-
-
-    const devDependencies: PackageJsonDependencies = {
-        '@types/node': '^24.0.10',
-        'typescript': '^5.0.0',
-        'tsx': '^4.19.2',
-        'digitaltwin-cli': `^${digitalTwinCliVersion}`
-    }
-
-    // Add database-specific dependencies
-    if (database === 'postgresql') {
-        dependencies.pg = '^8.11.0'
-        devDependencies['@types/pg'] = '^8.10.0'
-    } else {
-        dependencies['better-sqlite3'] = '^12.2.0'
-    }
-
-    // Add Redis if requested
-    if (useRedis) {
-        dependencies.ioredis = '^5.6.1'
-    }
-
-    // Add AWS SDK if using S3 storage
-    if (storage === 's3') {
-        dependencies['@aws-sdk/client-s3'] = '^3.842.0'
-    }
-
-    const packageJson: PackageJsonConfig = {
-        name: projectName,
-        version: '1.0.0',
-        description: 'Digital Twin application built with digitaltwin-core',
-        main: 'dist/index.js',
-        type: 'module',
-        scripts: {
-            build: 'tsc',
-            dev: 'tsx watch src/index.ts',
-            start: 'node dist/index.js',
-        },
-        bin: {},
-        dependencies,
-        devDependencies
-    }
-
-    await fs.writeJson(path.join(projectPath, 'package.json'), packageJson, {spaces: 2})
+export function projectFiles(answers: ProjectAnswers, secret: string): Record<string, string> {
+  const files: Record<string, string> = {
+    'package.json': packageJson(answers),
+    'tsconfig.json': tsconfig(),
+    'src/index.ts': indexFile(answers),
+    '.env': envFile(answers, secret),
+    '.env.example': envFile(answers, 'change-me'),
+    '.gitignore': gitignore(),
+    'README.md': readme(answers),
+    'dt.js': "#!/usr/bin/env node\nimport 'digitaltwin-cli/bin/dt.js'\n",
+  }
+  if (answers.includeExamples) {
+    files['src/components/jsonplaceholder_collector.ts'] = exampleCollector()
+    files['src/components/index.ts'] = "export { JSONPlaceholderCollector } from './jsonplaceholder_collector.js'\n"
+  }
+  if (answers.includeDocker) {
+    files['docker-compose.yml'] = dockerCompose(answers)
+  }
+  return files
 }
 
-/**
- * Generates main application files including index.ts, and TypeScript config.
- * Creates the core structure for a Digital Twin application.
- *
- * @param projectPath - Target directory for the project
- * @param answers - User configuration choices
- * @private
- */
-async function generateAppFiles(projectPath: string, answers: ProjectAnswers): Promise<void> {
-    const srcDir = path.join(projectPath, 'src')
-    await fs.ensureDir(srcDir)
-
-    // Generate main index.ts
-    const indexContent = generateIndexFile(answers)
-    await fs.writeFile(path.join(srcDir, 'index.ts'), indexContent)
-
-    // Generate TypeScript config
-    const tsconfigContent = generateTsConfig()
-    await fs.writeFile(path.join(projectPath, 'tsconfig.json'), tsconfigContent)
+function json(value: unknown): string {
+  return `${JSON.stringify(value, null, 2)}\n`
 }
 
-/**
- * Generates the main index.ts file with environment validation and engine setup.
- * Includes database configuration, storage setup, and example components if requested.
- *
- * @param answers - User configuration choices
- * @returns Generated TypeScript code as string
- * @private
- */
-function generateIndexFile(answers: ProjectAnswers): string {
-    const {projectName, database, storage, useRedis, includeExamples, localStoragePath} = answers
-
-    const dotenvImport = `import 'dotenv/config'`
-
-    const storageClass = storage === 'local' ? 'LocalStorageService' : 'S3StorageService'
-    const exampleImports = includeExamples
-        ? "import { JSONPlaceholderCollector } from './components/index.js'"
-        : ''
-
-    const dbConfigSection = database === 'postgresql'
-        ? `
-    // PostgreSQL configuration
-    DB_HOST: Env.schema.string(),
-    DB_PORT: Env.schema.number({ optional: true }),
-    DB_USER: Env.schema.string(),
-    DB_PASSWORD: Env.schema.string(),
-    DB_NAME: Env.schema.string(),`
-        : `
-    // SQLite configuration
-    DB_PATH: Env.schema.string({ optional: true }),`
-
-    const storageConfigSection = storage === 'local'
-        ? `
-    // Local storage configuration
-    STORAGE_PATH: Env.schema.string({ optional: true }),`
-        : `
-    // S3-compatible object storage configuration
-    S3_ENDPOINT: Env.schema.string({ format: 'url' }),
-    S3_REGION: Env.schema.string({ optional: true }),
-    S3_BUCKET: Env.schema.string(),
-    S3_ACCESS_KEY_ID: Env.schema.string(),
-    S3_SECRET_ACCESS_KEY: Env.schema.string(),
-    S3_FORCE_PATH_STYLE: Env.schema.boolean({ optional: true }),
-    S3_PUBLIC_URL: Env.schema.string({ optional: true }),`
-
-    const redisConfigSection = useRedis ? `
-    // Redis configuration  
-    REDIS_HOST: Env.schema.string({ optional: true }),
-    REDIS_PORT: Env.schema.number({ optional: true }),` : ''
-
-    const storageInit = storage === 'local'
-        ? `env.STORAGE_PATH || '${localStoragePath || './uploads'}'`
-        : `{
-    accessKey: env.S3_ACCESS_KEY_ID,
-    secretKey: env.S3_SECRET_ACCESS_KEY,
-    endpoint: env.S3_ENDPOINT,
-    region: env.S3_REGION,
-    bucket: env.S3_BUCKET,
-    pathStyle: env.S3_FORCE_PATH_STYLE,
-    publicUrl: env.S3_PUBLIC_URL
-  }`
-
-    const dbConfig = database === 'postgresql'
-        ? `{
-    host: env.DB_HOST,
-    port: env.DB_PORT || 5432,
-    user: env.DB_USER,
-    password: env.DB_PASSWORD,
-    database: env.DB_NAME
-  }`
-        : `{
-    filename: env.DB_PATH || './data/${projectName}.db'
-  }`
-
-    const exampleComponents = includeExamples
-        ? `collectors: [new JSONPlaceholderCollector()],`
-        : ''
-
-    const storageDisplay = storage === 'local'
-        ? `Local filesystem (\${env.STORAGE_PATH || '${localStoragePath || './uploads'}'})`
-        : 'S3 object storage'
-
-    const queueDisplay = useRedis ? 'Redis enabled' : 'In-memory mode'
-    const dbDisplay = database === 'postgresql' ? 'PostgreSQL' : 'SQLite'
-
-    return `${dotenvImport}
-import { DigitalTwinEngine, KyselyDatabaseAdapter, Env, setupGracefulShutdown } from 'digitaltwin-core'
-import { ${storageClass} } from 'digitaltwin-core'
-${exampleImports}
-
-async function main(): Promise<void> {
-  // Validate environment variables
-  const env = Env.validate({
-    PORT: Env.schema.number({ optional: true }),${dbConfigSection}${storageConfigSection}${redisConfigSection}
-  })
-
-  // Initialize storage service first
-  const storage = new ${storageClass}(${storageInit})
-
-  // Database configuration
-  const dbConfig = ${dbConfig}
-
-  // Initialize database adapter
-  const database = await KyselyDatabaseAdapter.${database === 'postgresql' ? 'forPostgreSQL' : 'forSQLite'}(dbConfig, (url) => storage.retrieve(url))
-
-  // Create Digital Twin Engine
-  const engine = new DigitalTwinEngine({
-    database,
-    storage,
-    redis: {
-      host: env.REDIS_HOST || 'localhost',
-      port: env.REDIS_PORT || 6379
+function packageJson({ projectName, database, ngsiLd }: ProjectAnswers): string {
+  const framework = ['engine', 'database', 'storage', 'shared', 'components', 'assets', ...(ngsiLd ? ['ngsi-ld'] : [])]
+  return json({
+    name: projectName,
+    version: '0.1.0',
+    private: true,
+    type: 'module',
+    scripts: {
+      build: 'tsc',
+      dev: 'tsx watch src/index.ts',
+      start: 'node dist/index.js',
     },
-    ${exampleComponents}
+    dependencies: {
+      ...Object.fromEntries(framework.map(name => [`@cepseudo/${name}`, FRAMEWORK_VERSION])),
+      // Declared optional by @cepseudo/storage and @cepseudo/database, yet both load them at import time
+      '@aws-sdk/client-s3': '^3.1002.0',
+      '@aws-sdk/s3-request-presigner': '^3.1002.0',
+      kysely: '^0.29.5',
+      ...(database === 'postgresql' ? { pg: '^8.20.0' } : { 'better-sqlite3': '^12.6.0' }),
+      dotenv: '^17.2.1',
+    },
+    devDependencies: {
+      '@types/node': '^24.1.0',
+      'digitaltwin-cli': FRAMEWORK_VERSION,
+      tsx: '^4.20.3',
+      typescript: '^5.8.3',
+    },
   })
-
-  // Setup graceful shutdown (handles SIGINT, SIGTERM)
-  setupGracefulShutdown(engine)
-
-  // Start the engine
-  await engine.start()
-  const port = engine.getPort() || env.PORT || 3000
-  console.log(\`[DigitalTwin] Server running on port \${port} | DB: ${dbDisplay} | Storage: ${storage === 'local' ? 'Local' : 'S3'}\`)
 }
 
-main().catch((error: Error) => {
-  console.error('[DigitalTwin] Failed to start:', error)
-  process.exit(1)
+function tsconfig(): string {
+  return json({
+    compilerOptions: {
+      target: 'ES2022',
+      module: 'NodeNext',
+      moduleResolution: 'NodeNext',
+      outDir: 'dist',
+      rootDir: 'src',
+      strict: true,
+      skipLibCheck: true,
+      experimentalDecorators: true,
+      useDefineForClassFields: false,
+    },
+    include: ['src'],
+  })
+}
+
+function indexFile({ database, storage, includeExamples }: ProjectAnswers): string {
+  const storageClass = storage === 's3' ? 'S3StorageService' : 'LocalStorageService'
+
+  const databaseEnv =
+    database === 'postgresql'
+      ? `  DB_HOST: Env.schema.string(),
+  DB_PORT: Env.schema.number({ optional: true }),
+  DB_USER: Env.schema.string(),
+  DB_PASSWORD: Env.schema.string(),
+  DB_NAME: Env.schema.string(),`
+      : `  DB_PATH: Env.schema.string(),`
+
+  const storageEnv =
+    storage === 's3'
+      ? `  S3_ENDPOINT: Env.schema.string({ format: 'url' }),
+  S3_REGION: Env.schema.string({ optional: true }),
+  S3_BUCKET: Env.schema.string(),
+  S3_ACCESS_KEY_ID: Env.schema.string(),
+  S3_SECRET_ACCESS_KEY: Env.schema.string(),
+  S3_FORCE_PATH_STYLE: Env.schema.boolean({ optional: true }),
+  S3_PUBLIC_URL: Env.schema.string({ optional: true }),`
+      : `  LOCAL_STORAGE_DIR: Env.schema.string(),`
+
+  const storageInit =
+    storage === 's3'
+      ? `new S3StorageService({
+  endpoint: env.S3_ENDPOINT,
+  region: env.S3_REGION,
+  bucket: env.S3_BUCKET,
+  accessKey: env.S3_ACCESS_KEY_ID,
+  secretKey: env.S3_SECRET_ACCESS_KEY,
+  pathStyle: env.S3_FORCE_PATH_STYLE,
+  publicUrl: env.S3_PUBLIC_URL,
+})`
+      : `new LocalStorageService(env.LOCAL_STORAGE_DIR)`
+
+  const databaseInit =
+    database === 'postgresql'
+      ? `KyselyDatabaseAdapter.forPostgreSQL(
+  { host: env.DB_HOST, port: env.DB_PORT, user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME },
+  url => storage.retrieve(url)
+)`
+      : `KyselyDatabaseAdapter.forSQLite({ filename: env.DB_PATH }, url => storage.retrieve(url))`
+
+  return `import 'dotenv/config'
+import { DigitalTwinEngine, setupGracefulShutdown } from '@cepseudo/engine'
+import { KyselyDatabaseAdapter } from '@cepseudo/database'
+import { ${storageClass} } from '@cepseudo/storage'
+import { Env } from '@cepseudo/shared'
+${includeExamples ? "import { JSONPlaceholderCollector } from './components/index.js'\n" : ''}
+// AUTH_MODE and the other authentication variables are read by the engine itself
+const env = Env.validate({
+  PORT: Env.schema.number({ optional: true }),
+${databaseEnv}
+${storageEnv}
+  REDIS_HOST: Env.schema.string(),
+  REDIS_PORT: Env.schema.number(),
 })
+
+const storage = ${storageInit}
+
+const database = await ${databaseInit}
+
+const engine = new DigitalTwinEngine({
+  database,
+  storage,
+  redis: { host: env.REDIS_HOST, port: env.REDIS_PORT },
+  server: { port: env.PORT ?? 3000 },
+  collectors: [${includeExamples ? 'new JSONPlaceholderCollector()' : ''}],
+})
+
+setupGracefulShutdown(engine)
+await engine.start()
 `
 }
 
-/**
- * Generates TypeScript configuration file (tsconfig.json) with ES2022 target.
- * Configured for ESNext modules with strict type checking enabled.
- *
- * @returns JSON string for tsconfig.json
- * @private
- */
-function generateTsConfig(): string {
-    const config = {
-        compilerOptions: {
-            target: 'ES2022',
-            module: 'ESNext',
-            moduleResolution: 'node',
-            allowSyntheticDefaultImports: true,
-            esModuleInterop: true,
-            allowJs: true,
-            outDir: './dist',
-            rootDir: './src',
-            strict: true,
-            declaration: true,
-            skipLibCheck: true,
-            forceConsistentCasingInFileNames: true,
-            experimentalDecorators: true,
-            useDefineForClassFields: false
-        },
-        include: ['src/**/*'],
-        exclude: ['node_modules', 'dist']
-    }
+function envFile({ projectName, database, storage, auth, ngsiLd, includeDocker }: ProjectAnswers, secret: string): string {
+  const sections = ['NODE_ENV=development\nPORT=3000']
 
-    return JSON.stringify(config, null, 2)
-}
-
-/**
- * Generates configuration files including ..env and .gitignore.
- * Creates environment variable templates and Git ignore rules.
- *
- * @param projectPath - Target directory for the project
- * @param answers - User configuration choices
- * @private
- */
-async function generateConfigFiles(projectPath: string, answers: ProjectAnswers): Promise<void> {
-    // Generate .env.example file (documentation)
-    const envExampleContent = generateEnvFile(answers)
-    await fs.writeFile(path.join(projectPath, '.env.example'), envExampleContent)
-
-    // Generate .env file (ready to use for development)
-    const envContent = generateDevEnvFile(answers)
-    await fs.writeFile(path.join(projectPath, '.env'), envContent)
-
-    // Generate .gitignore
-    const gitignoreContent = `node_modules/
-dist/
-.env
-*.log
-uploads/
-data/
-.DS_Store
-`
-    await fs.writeFile(path.join(projectPath, '.gitignore'), gitignoreContent)
-}
-
-/**
- * Generates a ready-to-use .env file for development
- * @private
- */
-function generateDevEnvFile(answers: ProjectAnswers): string {
-    const {projectName, database, storage, useRedis, localStoragePath} = answers
-
-    let content = `# Development environment - Ready to use
-NODE_ENV=development
-PORT=3000
-
-`
-
-    if (database === 'postgresql') {
-        content += `# PostgreSQL
-DB_HOST=localhost
+  sections.push(
+    database === 'postgresql'
+      ? `DB_HOST=localhost
 DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_NAME=${projectName}
-`
-    } else {
-        content += `# SQLite
-DB_PATH=./data/${projectName}.db
-`
-    }
+DB_USER=${POSTGRES.user}
+DB_PASSWORD=${POSTGRES.password}
+DB_NAME=${projectName}`
+      : `DB_PATH=./${projectName}.db`
+  )
 
-    content += `
-# Storage
-`
-    if (storage === 'local') {
-        content += `STORAGE_PATH=${localStoragePath || './uploads'}
-`
-    } else {
-        content += `S3_ENDPOINT=https://s3.example.com
+  sections.push(
+    storage === 's3'
+      ? `S3_ENDPOINT=http://localhost:9000
 S3_REGION=us-east-1
-S3_BUCKET=${projectName}
-S3_ACCESS_KEY_ID=
-S3_SECRET_ACCESS_KEY=
-# S3_FORCE_PATH_STYLE=true
-# S3_PUBLIC_URL=
-`
-    }
+S3_BUCKET=${MINIO.bucket}
+S3_ACCESS_KEY_ID=${MINIO.user}
+S3_SECRET_ACCESS_KEY=${MINIO.password}
+# Bucket in the path rather than the host name, as MinIO needs
+S3_FORCE_PATH_STYLE=true
+# Base URL of public links, e.g. a CDN
+# S3_PUBLIC_URL=`
+      : 'LOCAL_STORAGE_DIR=./uploads'
+  )
 
-    if (useRedis) {
-        content += `
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-`
-    }
+  sections.push('REDIS_HOST=localhost\nREDIS_PORT=6379')
 
-    return content
+  const authLines = [
+    '# Authentication: none, oidc or trusted-headers (see the @cepseudo/auth README)',
+    `AUTH_MODE=${auth}`,
+    '# Role that makes a caller admin',
+    '# AUTH_ADMIN_ROLE=admin',
+  ]
+  if (auth === 'oidc') {
+    authLines.push(
+      includeDocker
+        ? '# The mock issuer of docker-compose.yml; use your identity provider in production'
+        : '# Issuer of your identity provider and the audience its tokens carry',
+      `OIDC_ISSUER=${MOCK_OIDC.issuer}`,
+      `OIDC_AUDIENCE=${MOCK_OIDC.audience}`,
+      '# OIDC_ROLES_CLAIM=roles'
+    )
+  }
+  if (auth === 'trusted-headers') {
+    authLines.push(
+      '# The gateway sends it in x-auth-secret; requests without it are refused',
+      `AUTH_HEADER_SECRET=${secret}`,
+      '# AUTH_HEADER_SUBJECT=x-user-id',
+      '# AUTH_HEADER_ROLES=x-user-roles'
+    )
+  }
+  sections.push(authLines.join('\n'))
+
+  if (ngsiLd) {
+    sections.push('# NGSI-LD GET endpoints answer without a token unless this is false\n# NGSI_LD_PUBLIC_READ=true')
+  }
+
+  return `${sections.join('\n\n')}\n`
 }
 
-/**
- * Generates ..env file with environment variables based on selected configuration.
- * Includes database settings, storage paths, Redis config, and development options.
- *
- * @param answers - User configuration choices
- * @returns Environment file content as string
- * @private
- */
-function generateEnvFile(answers: ProjectAnswers): string {
-    const {projectName, database, storage, useRedis, localStoragePath} = answers
-
-    let envContent = `# ${projectName} Digital Twin Configuration
-# This file contains environment variables for your Digital Twin application
-# Copy this to .env and update the values as needed
-
-# Application Configuration
-PORT=3000
-
-# Database Configuration
-`
-
-    if (database === 'postgresql') {
-        envContent += `# PostgreSQL Database (Required for production)
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=password
-DB_NAME=${projectName}
-`
-    } else {
-        envContent += `# SQLite Database (Good for development)
-DB_PATH=./data/${projectName}.db
-`
-    }
-
-    envContent += `
-# Storage Configuration
-`
-
-    if (storage === 'local') {
-        envContent += `# Local File Storage
-STORAGE_PATH=${localStoragePath || './uploads'}
-`
-    } else {
-        envContent += `# S3-compatible object storage (AWS S3, MinIO, Scaleway, ...)
-S3_ENDPOINT=https://s3.example.com
-S3_REGION=us-east-1
-S3_BUCKET=${projectName}-storage
-S3_ACCESS_KEY_ID=your_access_key_here
-S3_SECRET_ACCESS_KEY=your_secret_key_here
-# Bucket in the path instead of the host (MinIO)
-# S3_FORCE_PATH_STYLE=true
-# Base URL for public links (CDN or custom domain)
-# S3_PUBLIC_URL=https://cdn.example.com
-`
-    }
-
-    if (useRedis) {
-        envContent += `
-# Redis Configuration (Queue Management)
-REDIS_HOST=localhost
-REDIS_PORT=6379
-`
-    }
-
-    envContent += `
-# Development Configuration
-NODE_ENV=development
-
-# Logging
-LOG_LEVEL=info
-`
-
-    return envContent
+function gitignore(): string {
+  return ['node_modules/', 'dist/', '.env', 'uploads/', '*.db', '*.db-shm', '*.db-wal', ''].join('\n')
 }
 
-/**
- * Generates example components including JSONPlaceholder collector.
- * Creates a complete working example that demonstrates data collection from external APIs.
- *
- * @param projectPath - Target directory for the project
- * @param answers - User configuration choices
- * @private
- */
-async function generateExampleComponents(projectPath: string, answers: ProjectAnswers): Promise<void> {
-    const componentsDir = path.join(projectPath, 'src', 'components')
-    await fs.ensureDir(componentsDir)
-
-    // Simple example collector
-    const collectorContent = `import { Collector } from 'digitaltwin-core'
+function exampleCollector(): string {
+  return `import { Collector } from '@cepseudo/components'
 
 /**
- * Example collector that fetches posts from JSONPlaceholder API
- * Use this as a template for your own collectors
+ * Fetches five posts from the JSONPlaceholder API every five minutes; a starting point for your own collectors
  */
 export class JSONPlaceholderCollector extends Collector {
   getConfiguration() {
     return {
       name: 'jsonplaceholder',
-      description: 'Fetches posts from JSONPlaceholder API',
+      description: 'Posts from the JSONPlaceholder API',
       contentType: 'application/json',
-      endpoint: 'api/posts'
+      endpoint: 'posts'
     }
   }
 
   async collect(): Promise<Buffer> {
     const response = await fetch('https://jsonplaceholder.typicode.com/posts?_limit=5')
-    if (!response.ok) throw new Error(\`API error: \${response.status}\`)
-    const posts = await response.json()
-    return Buffer.from(JSON.stringify({ timestamp: new Date(), posts }))
+    if (!response.ok) throw new Error(\`JSONPlaceholder answered \${response.status}\`)
+    return Buffer.from(JSON.stringify(await response.json()))
   }
 
   getSchedule(): string {
-    return '0 */5 * * * *' // Every 5 minutes
+    return '0 */5 * * * *'
   }
 }
 `
-
-    // Index file for components
-    const indexContent = `export { JSONPlaceholderCollector } from './jsonplaceholder_collector.js'
-`
-
-    await fs.writeFile(path.join(componentsDir, 'jsonplaceholder_collector.ts'), collectorContent)
-    await fs.writeFile(path.join(componentsDir, 'index.ts'), indexContent)
 }
 
-/**
- * Generates Docker configuration files including Dockerfile and docker-compose.yml.
- * Sets up containerized environment with appropriate services based on user choices.
- *
- * @param projectPath - Target directory for the project
- * @param answers - User configuration choices
- * @private
- */
-async function generateDockerFiles(projectPath: string, answers: ProjectAnswers): Promise<void> {
-    const {database, useRedis, projectName} = answers
-
-    // Dockerfile
-    const dockerfileContent = `FROM node:24-alpine
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY dist/ ./dist/
-COPY .env ./
-
-EXPOSE 3000
-
-# Start with increased header size for large file uploads
-CMD ["node", "--max-http-header-size=65536", "dist/index.js"]
-`
-
-    // docker-compose.yml
-    let dockerComposeContent = `version: '3.8'
-
-services:
-  app:
-    build: .
+function dockerCompose({ projectName, database, storage, auth }: ProjectAnswers): string {
+  const services = [
+    `  redis:
+    image: redis:7-alpine
     ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-    depends_on:${database === 'postgresql' ? `
-      - postgres` : ''}${useRedis ? `
-      - redis` : ''}
-    volumes:
-      - ./data:/app/data
-      - ./uploads:/app/uploads
-`
+      - "6379:6379"`,
+  ]
+  const volumes: string[] = []
 
-    if (database === 'postgresql') {
-        dockerComposeContent += `
-  postgres:
-    image: postgres:15-alpine
+  if (database === 'postgresql') {
+    services.push(`  postgres:
+    image: postgres:16-alpine
     environment:
+      POSTGRES_USER: ${POSTGRES.user}
+      POSTGRES_PASSWORD: ${POSTGRES.password}
       POSTGRES_DB: ${projectName}
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-`
-    }
+      - postgres-data:/var/lib/postgresql/data`)
+    volumes.push('  postgres-data:')
+  }
 
-    if (useRedis) {
-        dockerComposeContent += `
-  redis:
-    image: redis:7-alpine
+  if (storage === 's3') {
+    services.push(`  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO.user}
+      MINIO_ROOT_PASSWORD: ${MINIO.password}
     ports:
-      - "6379:6379"
-`
-    }
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data`)
+    services.push(`  minio-bucket:
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
+    depends_on:
+      - minio
+    entrypoint:
+      - sh
+      - -c
+      - until mc alias set local http://minio:9000 ${MINIO.user} ${MINIO.password}; do sleep 1; done && mc mb --ignore-existing local/${MINIO.bucket}`)
+    volumes.push('  minio-data:')
+  }
 
-    if (database === 'postgresql') {
-        dockerComposeContent += `
-volumes:
-  postgres_data:
-`
-    }
+  if (auth === 'oidc') {
+    services.push(`  # Development issuer: any client id and secret get a token, see the README
+  oidc:
+    image: ghcr.io/navikt/mock-oauth2-server:6.0.4
+    ports:
+      - "8080:8080"`)
+  }
 
-    await fs.writeFile(path.join(projectPath, 'Dockerfile'), dockerfileContent)
-    await fs.writeFile(path.join(projectPath, 'docker-compose.yml'), dockerComposeContent)
+  const compose = `services:\n${services.join('\n\n')}\n`
+  return volumes.length > 0 ? `${compose}\nvolumes:\n${volumes.join('\n')}\n` : compose
 }
 
-/**
- * Generates comprehensive README.md with project-specific setup instructions.
- * Includes features overview, configuration details, and getting started guide.
- *
- * @param projectPath - Target directory for the project
- * @param answers - User configuration choices
- * @private
- */
-async function generateReadme(projectPath: string, answers: ProjectAnswers): Promise<void> {
-    const {projectName, database, storage, useRedis, includeDocker, includeExamples, localStoragePath} = answers
+function readme({ projectName, database, storage, auth, ngsiLd, includeDocker }: ProjectAnswers): string {
+  const services = [
+    'Redis',
+    ...(database === 'postgresql' ? ['PostgreSQL'] : []),
+    ...(storage === 's3' ? ['MinIO'] : []),
+    ...(auth === 'oidc' ? ['a mock OIDC issuer'] : []),
+  ]
 
-    const dbLabel = database === 'postgresql' ? 'PostgreSQL with production-ready configuration' : 'SQLite for easy development'
-    const storageLabel = storage === 'local'
-        ? `Local file system storage (${localStoragePath || './uploads'})`
-        : 'S3-compatible object storage'
-    const queueLabel = useRedis ? 'Redis-powered background jobs' : 'In-memory job processing'
-    const exampleFeature = includeExamples ? '- **Example Collector** - JSONPlaceholder API collector included as template' : ''
+  const start = includeDocker
+    ? `\`\`\`bash
+docker compose up -d   # ${services.join(', ')}
+npm install
+npm run dev
+\`\`\``
+    : `Start ${services.join(', ')} and check the addresses in \`.env\`, then:
 
-    const dbConfig = database === 'postgresql' ? 'PostgreSQL' : 'SQLite'
-    const storageConfig = storage === 'local'
-        ? `Local File System (${localStoragePath || './uploads'})`
-        : 'S3-compatible object storage'
-    const queueConfig = useRedis ? 'Redis (BullMQ)' : 'In-memory'
-    const dockerConfig = includeDocker ? 'Included' : 'Not included'
+\`\`\`bash
+npm install
+npm run dev
+\`\`\``
 
-    const readmeContent = `# ${projectName}
+  const token =
+    auth === 'oidc' && includeDocker
+      ? `
+## Calling the API with a token
 
-Digital Twin application built with [digitaltwin-core](https://github.com/CePseudoBE/digital-twin-core).
+The mock issuer gives a token to any client id and secret; the client id becomes the user's subject:
 
-## Features
+\`\`\`bash
+TOKEN=$(curl -s -X POST ${MOCK_OIDC.issuer}/token \\
+  -d grant_type=client_credentials -d client_id=dev -d client_secret=dev -d scope=${MOCK_OIDC.audience} \\
+  | node -pe "JSON.parse(require('fs').readFileSync(0)).access_token")
+\`\`\`
 
-- **Environment Validation** - Automatic validation of required configuration  
-- **Database Support** - ${dbLabel}  
-- **Storage** - ${storageLabel}  
-- **Queue Management** - ${queueLabel}  
-${exampleFeature}
-
-## Configuration
-
-- **Database**: ${dbConfig}
-- **Storage**: ${storageConfig}
-- **Queue**: ${queueConfig}
-- **Docker**: ${dockerConfig}
-
-## Getting Started
-
-1. **Install dependencies:**
-   \`\`\`bash
-   npm install
-   \`\`\`
-
-2. **Configure environment:**
-   \`\`\`bash
-   cp .env .env.local
-   # Edit .env.local with your actual configuration
-   \`\`\`
-
-${database === 'postgresql' ? `3. **Set up PostgreSQL:**
-   \`\`\`bash
-   # Make sure PostgreSQL is running and create database
-   createdb ${projectName}
-   \`\`\`
-` : ''}${useRedis ? `${database === 'postgresql' ? '4' : '3'}. **Set up Redis:**
-   \`\`\`bash
-   # Make sure Redis is running
-   redis-server
-   \`\`\`
-` : ''}
-
-${database === 'postgresql' || useRedis ? `${(database === 'postgresql' && useRedis) ? '5' : '4'}. **Start development server:**` : '3. **Start development server:**'}
-   \`\`\`bash
-   npm run dev
-   \`\`\`
-
-## Available Scripts
-
-- \`npm run dev\` - Start development server with hot reload
-- \`npm run build\` - Build TypeScript to JavaScript
-- \`npm start\` - Start production server
-- \`node dt test\` - Run dry-run validation (no database changes)
-- \`node dt dev\` - Start server via CLI
-
-## Learn More
-
-- [digitaltwin-core Documentation](https://github.com/CePseudoBE/digital-twin-core)
-- [Digital Twin Concepts](https://en.wikipedia.org/wiki/Digital_twin)
-- [Environment Configuration Best Practices](https://12factor.net/config)
+Send it as \`Authorization: Bearer $TOKEN\` to the endpoints that need a user, such as uploads.
 `
+      : ''
 
-    await fs.writeFile(path.join(projectPath, 'README.md'), readmeContent)
-}
+  return `# ${projectName}
 
-/**
- * Generates dt.js CLI wrapper that calls digitaltwin-cli
- *
- * @param projectPath - Target directory for the project
- * @private
- */
-async function generateDtCli(projectPath: string): Promise<void> {
-    const dtCliContent = `#!/usr/bin/env node
+A Digital Twin application on the [\`@cepseudo/*\` packages](https://github.com/CePseudoBE/digitaltwin).
 
-import 'digitaltwin-cli/bin/dt.js'
+- Database: ${database === 'postgresql' ? 'PostgreSQL' : 'SQLite'}
+- File storage: ${storage === 's3' ? 'S3-compatible object storage' : 'local directory'}
+- Authentication: \`AUTH_MODE=${auth}\`${ngsiLd ? '\n- NGSI-LD API: `@cepseudo/ngsi-ld`' : ''}
+
+## Getting started
+
+${start}
+
+\`.env\` holds the development settings and \`.env.example\` documents them. The server listens on http://localhost:3000; \`/api/health\` reports the state of each service.
+${token}
+## Adding components
+
+\`\`\`bash
+node dt make:collector Weather --description "Weather data"
+node dt make:harvester DailyAverage --source weather
+node dt make:handler Status --method get
+node dt make:assets-manager Models --content-type model/gltf-binary
+\`\`\`
+
+Then register the new class in \`src/index.ts\`.
+
+## Scripts
+
+- \`npm run dev\`: start with reload on change
+- \`npm run build\`: compile to \`dist/\`
+- \`npm start\`: run the compiled app
 `
-
-    await fs.writeFile(path.join(projectPath, 'dt.js'), dtCliContent)
 }

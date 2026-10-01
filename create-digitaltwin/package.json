@@ -16,10 +16,9 @@
   ],
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/cli.ts",
+    "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
-    "test": "node --import tsx bin/test.ts",
-    "prepare": "npm run build"
+    "test": "node --import tsx bin/test.ts"
   },
   "keywords": [
     "digital-twin",
@@ -38,18 +37,22 @@
   },
   "homepage": "https://github.com/CePseudoBE/digitaltwin/tree/main/create-digitaltwin#readme",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.12.0"
   },
   "dependencies": {
-    "prompts": "^2.4.2",
-    "chalk": "^5.4.1",
-    "fs-extra": "^11.3.0",
+    "@clack/prompts": "^1.8.1",
     "commander": "^12.1.0"
   },
   "devDependencies": {
-    "@types/prompts": "^2.4.9",
-    "@japa/runner": "^4.3.0",
+    "@cepseudo/assets": "workspace:*",
+    "@cepseudo/components": "workspace:*",
+    "@cepseudo/database": "workspace:*",
+    "@cepseudo/engine": "workspace:*",
+    "@cepseudo/ngsi-ld": "workspace:*",
+    "@cepseudo/shared": "workspace:*",
+    "@cepseudo/storage": "workspace:*",
     "@japa/assert": "^4.1.0",
-    "@types/fs-extra": "^11.0.4"
+    "@japa/runner": "^4.3.0",
+    "dotenv": "^17.4.2"
   }
 }
