@@ -263,23 +263,6 @@ export abstract class Harvester
     }
 
     /**
-     * Allows subclasses to define a custom schedule.
-     *
-     * Override this method to provide a custom cron expression
-     * that differs from the default every-minute schedule.
-     *
-     * @returns Custom cron expression string
-     *
-     * @example
-     * ```typescript
-     * getCustomSchedule() {
-     *   return '0 0 *\/6 * * *'; // Every 6 hours
-     * }
-     * ```
-     */
-    getCustomSchedule?(): string
-
-    /**
      * Processes source data and returns harvested results.
      *
      * This is the main data processing method that implementations must provide.
