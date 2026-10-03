@@ -44,7 +44,6 @@
     "@fastify/type-provider-typebox": "^6.1.0",
     "bullmq": "^5.56.5",
     "fastify": "^5.12.5",
-    "ioredis": "^5.6.1",
     "typebox": "^1.3.32"
   },
   "devDependencies": {
@@ -52,6 +51,7 @@
     "@japa/runner": "^4.3.0",
     "@seriousme/openapi-schema-validator": "^2.10.0",
     "@testcontainers/redis": "^11.3.1",
+    "ioredis": "^5.6.1",
     "testcontainers": "^11.3.1",
     "yaml": "^2.8.2"
   },
