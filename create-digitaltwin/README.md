@@ -69,6 +69,13 @@ pnpm --filter create-digitaltwin dev my-app
 
 The tests generate projects in `tests/generated/` and type-check them against the workspace packages.
 
+CI also runs `scripts/smoke-test.sh`, which generates a project, installs it from the workspace packages packed as npm would publish them, starts its `docker-compose.yml` and the app, and checks `/api/health` (Docker required):
+
+```bash
+pnpm build
+bash create-digitaltwin/scripts/smoke-test.sh my-app --database postgresql --storage s3 --auth oidc --ngsi-ld
+```
+
 ## License
 
 MIT © Hoffmann Axel
