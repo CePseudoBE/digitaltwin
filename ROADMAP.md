@@ -16,7 +16,7 @@ The roadmap is tracked in **GitHub Issues and Milestones**, not in this file:
 | 2 | Auth 2.0 (OIDC) | Async `AuthProvider`, `OidcAuthProvider` with JWKS discovery, generic opt-in trusted-headers mode, fail-closed defaults, `keycloak_id` → `subject`. |
 | 3 | Provider-neutral naming | `OvhStorageService` → `S3StorageService`, `S3_*` env vars, no APISIX / OVH / Keycloak / ULB assumptions anywhere. |
 | 4 | Remove legacy | `digitaltwin-core` shim, Knex adapter, hand-rolled YAML and other dead code deleted. |
-| 5 | Onboarding experience | `docker-compose.dev.yml` with a demo Keycloak realm, `examples/smart-city`, README and CONTRIBUTING rewritten for strangers, scaffolder generating 2.0 projects, e2e OIDC test, development mode without Redis. |
+| 5 | Onboarding experience | `docker-compose.dev.yml` with a mock OIDC issuer, `examples/smart-city`, README and CONTRIBUTING rewritten for strangers, scaffolder generating 2.0 projects, e2e OIDC test, development mode without Redis. |
 | 6 | Release 2.0 | Migration guide, changelog, working publish pipeline, `2.0.0` on npm. |
 | — | Backlog | Real bugs and improvements that do not block the 2.0 line. |
 
