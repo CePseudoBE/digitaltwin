@@ -18,7 +18,8 @@
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
-    "test": "node --import tsx bin/test.ts"
+    "test": "node --import tsx bin/test.ts",
+    "lint": "eslint src tests --no-error-on-unmatched-pattern"
   },
   "keywords": [
     "digital-twin",
