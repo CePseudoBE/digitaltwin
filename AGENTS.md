@@ -4,7 +4,7 @@ Instructions for AI coding agents (Claude Code, Codex, Cursor, Copilot, ...) wor
 
 ## Roadmap 2.0
 
-The package split (phases 1–4 of the original migration) is done: all implementation lives in `packages/*`, `digitaltwin-core` is a re-export shim scheduled for removal.
+The package split (phases 1–4 of the original migration) is done: all implementation lives in `packages/*`. The `digitaltwin-core` shim is removed; projects import from `@cepseudo/engine`, `@cepseudo/components`, etc.
 
 Current work is the **2.0 roadmap**, tracked in GitHub Issues + Milestones (see `ROADMAP.md`):
 
@@ -111,10 +111,6 @@ Collector writes data → EventBus emits "data:written"
 - EventBus event names/payloads are defined in `@cepseudo/shared`, not in ngsi-ld
 - If ngsi-ld needs a new event type, the event type goes in shared, the listener goes in ngsi-ld
 - The database migrations for ngsi-ld tables (subscriptions) run only when the package is present
-
-### Legacy shim
-
-`digitaltwin-core/` only re-exports from `packages/*`. Do not add code there. It is removed in roadmap milestone 3; new projects import from `@cepseudo/engine`, `@cepseudo/components`, etc.
 
 ---
 
@@ -420,7 +416,7 @@ Packages are published to npm **only via the main branch pipeline**. Never publi
 
 - **Format**: Conventional Commits — `type(scope): description`
 - **Types**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `style`
-- **Scopes**: `shared`, `core`, `cli`, `create`, `engine`, `collector`, `harvester`, `handler`, `assets`, `auth`, `storage`, `queue`, `db`, `ngsi-ld`, `subscriptions`
+- **Scopes**: `shared`, `cli`, `create`, `engine`, `collector`, `harvester`, `handler`, `assets`, `auth`, `storage`, `queue`, `db`, `ngsi-ld`, `subscriptions`
 - Atomic commits (one logical change per commit)
 - Messages in English
 

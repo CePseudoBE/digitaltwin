@@ -85,7 +85,6 @@ type(scope): description
 
 | Scope | Package |
 |-------|---------|
-| `core` | digitaltwin-core |
 | `cli` | digitaltwin-cli |
 | `create` | create-digitaltwin |
 | `engine` | DigitalTwinEngine |

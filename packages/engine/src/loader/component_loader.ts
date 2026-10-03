@@ -283,7 +283,7 @@ function toPascalCase(str: string): string {
  *
  * @example
  * ```typescript
- * import { loadComponents, DigitalTwinEngine } from 'digitaltwin-core'
+ * import { loadComponents, DigitalTwinEngine } from '@cepseudo/engine'
  *
  * // Basic usage - scan compiled components
  * const result = await loadComponents('./dist/components')
