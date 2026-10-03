@@ -155,7 +155,8 @@ test.group('Harvester - run', group => {
     let storage: LocalStorageService
 
     async function insert(name: string, date: Date, content: object): Promise<void> {
-        const url = await storage.save(Buffer.from(JSON.stringify(content)), name, 'json')
+        // One folder per record: storage keys only differ by millisecond, so saves in a row overwrite each other (#180)
+        const url = await storage.save(Buffer.from(JSON.stringify(content)), `${name}/${date.getTime()}`, 'json')
         await db.save({ name, type: 'application/json', url, date })
     }
 
