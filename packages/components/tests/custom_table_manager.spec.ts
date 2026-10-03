@@ -2,8 +2,9 @@ import { test } from '@japa/runner'
 import Database from 'better-sqlite3'
 import { KyselyDatabaseAdapter } from '@cepseudo/database'
 import { AuthMiddleware, GatewayAuthProvider, UserService } from '@cepseudo/auth'
-import type { AuthenticatedUser, StoreConfiguration, UserRecord, UserRepository } from '@cepseudo/shared'
+import type { AuthenticatedUser, DataResponse, StoreConfiguration, UserRecord, UserRepository } from '@cepseudo/shared'
 import { CustomTableManager } from '../src/custom_table_manager.js'
+import type { CustomTableRecord } from '../src/custom_table_manager.js'
 
 /** In-memory UserRepository: ids are assigned in order of first appearance. */
 function createMockUserRepository(): UserRepository {
@@ -37,11 +38,30 @@ class SensorsManager extends CustomTableManager {
     }
 }
 
+class CountedSensorsManager extends SensorsManager {
+    override getConfiguration(): StoreConfiguration {
+        return { ...super.getConfiguration(), endpoints: [{ path: '/count', method: 'get', handler: 'countSensors' }] }
+    }
+
+    async countSensors(): Promise<DataResponse> {
+        return { status: 200, content: JSON.stringify({ count: (await this.findAll()).length }) }
+    }
+}
+
 const asUser = (id: string, body?: unknown, params?: Record<string, string>) => ({
     headers: { 'x-user-id': id, 'x-user-roles': 'user' },
     body,
     params,
 })
+
+async function attachDatabase(manager: CustomTableManager): Promise<KyselyDatabaseAdapter> {
+    const db = KyselyDatabaseAdapter.fromSQLiteDatabase(new Database(':memory:'), async () => Buffer.alloc(0), { enableForeignKeys: false })
+    manager.setDependencies(db, new AuthMiddleware(new GatewayAuthProvider(), new UserService(createMockUserRepository())))
+    await manager.initializeTable()
+    return db
+}
+
+const labelsAndValues = (rows: CustomTableRecord[]) => rows.map(({ label, value }) => ({ label, value }))
 
 test.group('CustomTableManager - request body sanitisation', group => {
     let db: KyselyDatabaseAdapter
@@ -49,10 +69,8 @@ test.group('CustomTableManager - request body sanitisation', group => {
 
     group.setup(async () => {
         process.env.AUTH_MODE = 'gateway'
-        db = KyselyDatabaseAdapter.fromSQLiteDatabase(new Database(':memory:'), async () => Buffer.alloc(0), { enableForeignKeys: false })
         manager = new SensorsManager()
-        manager.setDependencies(db, new AuthMiddleware(new GatewayAuthProvider(), new UserService(createMockUserRepository())))
-        await manager.initializeTable()
+        db = await attachDatabase(manager)
     })
 
     group.teardown(async () => {
@@ -113,5 +131,144 @@ test.group('CustomTableManager - request body sanitisation', group => {
         const res = await manager.handleUpdate(asUser('alice', { ...record, value: 2 }, { id: String(id) }))
         assert.equal(res.status, 200)
         assert.equal((await manager.findById(id))?.value, 2)
+    })
+})
+
+test.group('CustomTableManager - queries', group => {
+    let db: KyselyDatabaseAdapter
+    let manager: SensorsManager
+
+    group.each.setup(async () => {
+        manager = new SensorsManager()
+        db = await attachDatabase(manager)
+        await manager.create({ label: 'north', value: 1 })
+        await manager.create({ label: 'north', value: 2 })
+        await manager.create({ label: 'south', value: 1 })
+        await manager.create({ label: '', value: 9 })
+    })
+
+    group.each.teardown(async () => {
+        await db.close()
+    })
+
+    test('findByColumn returns the rows matching one column', async ({ assert }) => {
+        const rows = await manager.findByColumn('label', 'north')
+
+        assert.sameDeepMembers(labelsAndValues(rows), [
+            { label: 'north', value: 1 },
+            { label: 'north', value: 2 },
+        ])
+    })
+
+    test('findByColumn rejects an empty value for a required column', async ({ assert }) => {
+        await assert.rejects(() => manager.findByColumn('label', ''), /is required and cannot be empty/)
+    })
+
+    test('findByColumn matches an empty value when the column is not required', async ({ assert }) => {
+        const rows = await manager.findByColumn('label', '', false)
+
+        assert.deepEqual(labelsAndValues(rows), [{ label: '', value: 9 }])
+    })
+
+    test('findByColumns returns only the rows matching every condition', async ({ assert }) => {
+        const rows = await manager.findByColumns({ label: 'north', value: 2 })
+
+        assert.deepEqual(labelsAndValues(rows), [{ label: 'north', value: 2 }])
+    })
+
+    test('findByColumns rejects a required field with an empty value', async ({ assert }) => {
+        await assert.rejects(
+            () => manager.findByColumns({ label: '' }, { required: ['label'] }),
+            /Field 'label' must have a non-empty value/
+        )
+    })
+
+    test('findByColumns reports a failing custom validation as "Validation failed"', async ({ assert }) => {
+        const upperCaseLabels = (conditions: Record<string, unknown>) => {
+            if (conditions.label !== String(conditions.label).toUpperCase()) throw new Error('label must be upper case')
+        }
+
+        await assert.rejects(
+            () => manager.findByColumns({ label: 'north' }, { validate: upperCaseLabels }),
+            /^Validation failed: label must be upper case$/
+        )
+    })
+
+    test('deleteByColumn deletes the matching rows and returns how many it deleted', async ({ assert }) => {
+        assert.equal(await manager.deleteByColumn('label', 'north'), 2)
+
+        assert.sameDeepMembers(labelsAndValues(await manager.findAll()), [
+            { label: 'south', value: 1 },
+            { label: '', value: 9 },
+        ])
+    })
+
+    test('deleteByCondition deletes only the rows matching every condition and returns the count', async ({ assert }) => {
+        assert.equal(await manager.deleteByCondition({ label: 'north', value: 1 }), 1)
+
+        assert.sameDeepMembers(labelsAndValues(await manager.findAll()), [
+            { label: 'north', value: 2 },
+            { label: 'south', value: 1 },
+            { label: '', value: 9 },
+        ])
+    })
+})
+
+test.group('CustomTableManager - HTTP handlers', group => {
+    let db: KyselyDatabaseAdapter
+    let manager: CountedSensorsManager
+
+    group.each.setup(async () => {
+        manager = new CountedSensorsManager()
+        db = await attachDatabase(manager)
+    })
+
+    group.each.teardown(async () => {
+        await db.close()
+    })
+
+    test('getEndpoints serves a configured endpoint under the store name, bound to the named method', async ({ assert }) => {
+        await manager.create({ label: 'a' })
+        await manager.create({ label: 'b' })
+
+        const count = manager.getEndpoints().find(ep => ep.path === '/sensors/count')
+
+        assert.equal(count?.method, 'get')
+        assert.deepEqual(await count!.handler({}), { status: 200, content: JSON.stringify({ count: 2 }) })
+    })
+
+    test('handleGetById without an id answers 422', async ({ assert }) => {
+        const res = await manager.handleGetById({ params: {} })
+
+        assert.equal(res.status, 422)
+    })
+
+    test('handleUpdate without an identity answers 401 and leaves the record unchanged', async ({ assert }) => {
+        const id = await manager.create({ label: 'a', value: 1, owner_id: 1 })
+
+        const res = await manager.handleUpdate({ headers: {}, params: { id: String(id) }, body: { value: 2 } })
+
+        assert.equal(res.status, 401)
+        assert.equal((await manager.findById(id))?.value, 1)
+    })
+
+    test('handleDelete without an identity answers 401 and keeps the record', async ({ assert }) => {
+        const id = await manager.create({ label: 'a', value: 1, owner_id: 1 })
+
+        const res = await manager.handleDelete({ headers: {}, params: { id: String(id) } })
+
+        assert.equal(res.status, 401)
+        assert.isNotNull(await manager.findById(id))
+    })
+
+    test('a record without an owner cannot be updated or deleted by an authenticated user', async ({ assert }) => {
+        const id = await manager.create({ label: 'orphan', value: 1 })
+
+        const update = await manager.handleUpdate(asUser('alice', { value: 2 }, { id: String(id) }))
+        const remove = await manager.handleDelete(asUser('alice', undefined, { id: String(id) }))
+
+        assert.equal(update.status, 403)
+        assert.equal(remove.status, 403)
+        assert.equal((await manager.findById(id))?.value, 1)
     })
 })

@@ -3,6 +3,7 @@ import Database from 'better-sqlite3'
 import fs from 'node:fs/promises'
 import { KyselyDatabaseAdapter } from '@cepseudo/database'
 import { LocalStorageService } from '@cepseudo/storage'
+import { StorageError } from '@cepseudo/shared'
 import type { DataRecord, HarvesterConfiguration } from '@cepseudo/shared'
 import { Harvester } from '../src/harvester.js'
 
@@ -111,5 +112,103 @@ test.group('Harvester - time-based windows', group => {
         assert.isTrue(await harvester.run())
         // First run opens one second before the first record: three records fall in the first hour
         assert.lengthOf(harvester.calls[0] as DataRecord[], 3)
+    })
+})
+
+class FailingAggregate extends HourlyAggregate {
+    override async harvest(): Promise<Buffer> {
+        throw new Error('aggregation overflow')
+    }
+}
+
+class SourcelessAggregate extends HourlyAggregate {
+    override getUserConfiguration(): HarvesterConfiguration {
+        return { ...super.getUserConfiguration(), source: undefined }
+    }
+}
+
+class WeatherEnrichedReadings extends Harvester {
+    async harvest(
+        sourceData: DataRecord | DataRecord[],
+        dependenciesData: Record<string, DataRecord | DataRecord[] | null>
+    ): Promise<Buffer> {
+        const reading = JSON.parse((await (sourceData as DataRecord).data()).toString())
+        const weather = JSON.parse((await (dependenciesData.weather as DataRecord).data()).toString())
+        return Buffer.from(JSON.stringify({ value: reading.value, temperature: weather.temperature }))
+    }
+
+    getUserConfiguration(): HarvesterConfiguration {
+        return {
+            name: 'enriched',
+            description: 'Source readings enriched with the weather at that time',
+            contentType: 'application/json',
+            endpoint: 'enriched',
+            source: 'src',
+            dependencies: ['weather'],
+            dependenciesLimit: [1],
+        }
+    }
+}
+
+test.group('Harvester - run', group => {
+    let db: KyselyDatabaseAdapter
+    let storage: LocalStorageService
+
+    async function insert(name: string, date: Date, content: object): Promise<void> {
+        // One folder per record: storage keys only differ by millisecond, so saves in a row overwrite each other (#180)
+        const url = await storage.save(Buffer.from(JSON.stringify(content)), `${name}/${date.getTime()}`, 'json')
+        await db.save({ name, type: 'application/json', url, date })
+    }
+
+    group.each.setup(async () => {
+        storage = new LocalStorageService(BASE_DIR)
+        db = KyselyDatabaseAdapter.fromSQLiteDatabase(new Database(':memory:'), url => storage.retrieve(url), { enableForeignKeys: false })
+        await db.getUserRepository().initializeTables()
+        for (const table of ['src', 'agg', 'weather', 'enriched']) await db.createTable(table)
+    })
+
+    group.each.teardown(async () => {
+        await db.close()
+        await fs.rm(BASE_DIR, { recursive: true, force: true })
+    })
+
+    test('run() turns an error thrown by harvest() into a StorageError naming the harvester and its source', async ({ assert }) => {
+        await insert('src', new Date(Date.now() - 5 * MINUTE), {})
+        const harvester = new FailingAggregate()
+        harvester.setDependencies(db, storage)
+
+        const error = await harvester.run().catch((e: unknown) => e)
+
+        assert.instanceOf(error, StorageError)
+        assert.equal((error as StorageError).code, 'STORAGE_ERROR')
+        assert.include((error as StorageError).message, 'aggregation overflow')
+        assert.deepEqual((error as StorageError).context, { harvesterName: 'agg', source: 'src' })
+    })
+
+    test('run() refuses a configuration without a source with a plain error', async ({ assert }) => {
+        const harvester = new SourcelessAggregate()
+        harvester.setDependencies(db, storage)
+
+        const error = await harvester.run().catch((e: unknown) => e)
+
+        assert.instanceOf(error, Error)
+        assert.notInstanceOf(error, StorageError)
+        assert.include((error as Error).message, 'must specify a source')
+    })
+
+    test('a dependency contributes its latest record before the source record, and the result is stored', async ({ assert }) => {
+        const sourceDate = new Date('2025-01-01T12:00:00Z')
+        await insert('weather', new Date(sourceDate.getTime() - 120 * MINUTE), { temperature: 18 })
+        await insert('weather', new Date(sourceDate.getTime() - 60 * MINUTE), { temperature: 20 })
+        await insert('weather', new Date(sourceDate.getTime() + 60 * MINUTE), { temperature: 30 })
+        await insert('src', sourceDate, { value: 50 })
+        const harvester = new WeatherEnrichedReadings()
+        harvester.setDependencies(db, storage)
+
+        assert.isTrue(await harvester.run())
+
+        const stored = await db.getLatestByName('enriched')
+        assert.equal(stored?.date.getTime(), sourceDate.getTime())
+        assert.deepEqual(JSON.parse((await stored!.data()).toString()), { value: 50, temperature: 20 })
     })
 })

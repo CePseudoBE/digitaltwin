@@ -39,6 +39,15 @@ test.group('Scheduler (Redis integration)', (group) => {
         await redisContainer.stop()
     })
 
+    test('multi-queue mode starts a collector, a harvester and a priority worker', async ({ assert }) => {
+        const workers = await scheduleComponents([new TestCollector('c1')], queueManager, true)
+        try {
+            assert.sameMembers(workers.map(w => w.name), ['dt-collectors', 'dt-harvesters', 'dt-priority'])
+        } finally {
+            for (const w of workers) await w.close()
+        }
+    })
+
     test('collector job is processed and data is persisted in the database', async ({ assert }) => {
         const collector = new TestCollector('c1')
         collector.setDependencies(db, storage)

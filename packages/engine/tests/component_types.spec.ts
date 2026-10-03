@@ -53,11 +53,13 @@ test.group('type guards', () => {
         assert.isTrue(isHandler(new TestHandler()))
         assert.isFalse(isHandler(new TestCollector()))
         assert.isFalse(isHandler(new TestAssetsManager()))
+        assert.isFalse(isHandler(new TestHarvester()))
     })
 
     test('isAssetsManager only matches AssetsManager instances', ({ assert }) => {
         assert.isTrue(isAssetsManager(new TestAssetsManager()))
         assert.isFalse(isAssetsManager(new TestHandler()))
+        assert.isFalse(isAssetsManager(new TestCollector()))
     })
 
     test('isCustomTableManager only matches CustomTableManager instances', ({ assert }) => {

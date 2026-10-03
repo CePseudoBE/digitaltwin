@@ -1,3 +1,6 @@
+import { once } from 'node:events'
+import { createServer } from 'node:net'
+import type { AddressInfo } from 'node:net'
 import { test } from '@japa/runner'
 import { RedisContainer } from '@testcontainers/redis'
 import type { StartedRedisContainer } from '@testcontainers/redis'
@@ -8,6 +11,7 @@ import { LogLevel, servableEndpoint } from '@cepseudo/shared'
 import type { CollectorConfiguration, ComponentConfiguration, DataResponse, HarvesterConfiguration, TypedRequest } from '@cepseudo/shared'
 import type { EngineOptions } from '../src/digital_twin_engine.js'
 import { DigitalTwinEngine } from '../src/digital_twin_engine.js'
+import { GlobalAssetsHandler } from '../src/global_assets_handler.js'
 import { TestAssetsManager, TestCustomTableManager, TestHandler } from './fixtures/mock_components.js'
 import { MockDatabaseAdapter } from './fixtures/mock_database.js'
 import { MockStorageService } from './fixtures/mock_storage.js'
@@ -30,6 +34,15 @@ async function withEngine(options: Partial<EngineOptions>, run: (engine: Digital
     } finally {
         await engine.stop()
     }
+}
+
+async function freePort(): Promise<number> {
+    const probe = createServer().listen(0)
+    await once(probe, 'listening')
+    const { port } = probe.address() as AddressInfo
+    probe.close()
+    await once(probe, 'close')
+    return port
 }
 
 test.group('Engine HTTP server', () => {
@@ -87,6 +100,20 @@ test.group('Engine HTTP server', () => {
         await engine.stop()
         assert.isUndefined(engine.getPort())
         await assert.rejects(() => fetch(`http://127.0.0.1:${port}/api/health/live`))
+    })
+
+    test('listens on the configured port', async ({ assert }) => {
+        const port = await freePort()
+        await withEngine({ server: { port } }, async engine => {
+            assert.equal(engine.getPort(), port)
+            assert.equal((await fetch(`http://127.0.0.1:${port}/api/health/live`)).status, 200)
+        })
+    })
+
+    test('binds to the configured host', async ({ assert }) => {
+        await withEngine({ server: { port: 0, host: '127.0.0.1' } }, async engine => {
+            assert.equal((engine.getServer().server.address() as AddressInfo).address, '127.0.0.1')
+        })
     })
 
     test('plugins run before the server listens and can register routes', async ({ assert }) => {
@@ -243,6 +270,7 @@ test.group('Engine serves every endpoint kind', group => {
         }, async engine => {
             const weather = await engine.inject('/weather')
             assert.equal(weather.statusCode, 200)
+            assert.equal(weather.headers['content-type'], 'application/json')
             assert.deepEqual(weather.json(), { temp: 21 })
 
             const average = await engine.inject('/daily-average')
@@ -264,6 +292,35 @@ test.group('Engine serves every endpoint kind', group => {
             const sensors = await engine.inject('/sensors')
             assert.equal(sensors.statusCode, 200)
             assert.deepEqual(sensors.json(), [])
+        })
+    }).timeout(60_000)
+
+    test('queue stats come from the live queues once a collector needs them', async ({ assert }) => {
+        await withEngine({
+            collectors: [new WeatherCollector()],
+            redis: { host: redis.getHost(), port: redis.getMappedPort(6379) }
+        }, async engine => {
+            const stats = await engine.inject('/api/queues/stats')
+            assert.equal(stats.statusCode, 200)
+            const { collectors } = stats.json() as { collectors: Record<string, number> }
+            assert.sameMembers(Object.keys(collectors), ['waiting', 'active', 'completed', 'failed'])
+        })
+    }).timeout(60_000)
+
+    test('start() hands its assets managers to a registered GlobalAssetsHandler', async ({ assert }) => {
+        const models = new TestAssetsManager('models')
+        await withEngine({
+            handlers: [new GlobalAssetsHandler()],
+            assetsManagers: [models],
+            redis: { host: redis.getHost(), port: redis.getMappedPort(6379) }
+        }, async engine => {
+            await models.uploadAsset({ description: 'Tower', source: 'https://example.com/tower', owner_id: null, filename: 'tower.png', file: Buffer.from('png') })
+
+            const res = await engine.inject('/assets/all')
+            assert.equal(res.statusCode, 200)
+            const body = res.json() as { total: number; assets: Array<{ component: string; filename: string }> }
+            assert.equal(body.total, 1)
+            assert.deepInclude(body.assets[0], { component: 'models', filename: 'tower.png' })
         })
     }).timeout(60_000)
 

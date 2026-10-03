@@ -33,6 +33,11 @@ export const sqliteAdapterFactory: AdapterFactory = async () => {
     return { db, cleanup: () => db.close() }
 }
 
+export const sqliteForeignKeysAdapterFactory: AdapterFactory = async () => {
+    const db = KyselyDatabaseAdapter.fromSQLiteDatabase(new Database(':memory:'), dataResolver)
+    return { db, cleanup: () => db.close() }
+}
+
 export const postgresAdapterFactory: AdapterFactory = async () => {
     const db = await KyselyDatabaseAdapter.forPostgreSQL(pgConfig(), dataResolver)
     await db.getUserRepository().initializeTables()

@@ -120,6 +120,30 @@ test.group('Engine.registerComponents()', () => {
         const v = await engine.validateConfiguration()
         assert.equal(v.summary.total, 2)
     })
+
+    test('registers every component kind it is given', async ({ assert }) => {
+        const engine = createEngine()
+
+        engine.registerComponents({
+            collectors: [new TestCollector('c')],
+            harvesters: [new TestHarvester('h')],
+            handlers: [new TestHandler('ha')],
+            assetsManagers: [new TestAssetsManager('am')],
+            customTableManagers: [new TestCustomTableManager('ct')]
+        })
+
+        const v = await engine.validateConfiguration()
+        assert.sameDeepMembers(
+            v.components.map(c => ({ name: c.name, type: c.type })),
+            [
+                { name: 'c', type: 'collector' },
+                { name: 'h', type: 'harvester' },
+                { name: 'ha', type: 'handler' },
+                { name: 'am', type: 'assets_manager' },
+                { name: 'ct', type: 'custom_table_manager' }
+            ]
+        )
+    })
 })
 
 test.group('Constructor + dynamic registration', () => {
@@ -136,5 +160,19 @@ test.group('Constructor + dynamic registration', () => {
         assert.equal(v.summary.total, 2)
         assert.isNotNull(v.components.find(c => c.name === 'ctor'))
         assert.isNotNull(v.components.find(c => c.name === 'dyn'))
+    })
+
+    test('testComponents() tests the components added with register()', async ({ assert }) => {
+        const engine = new DigitalTwinEngine({
+            storage: new MockStorageService(),
+            database: new MockDatabaseAdapter(),
+            collectors: [new TestCollector('ctor')]
+        })
+
+        engine.register(new TestCollector('late-collector'))
+        engine.register(new TestHandler('late-handler'))
+
+        const results = await engine.testComponents()
+        assert.sameMembers(results.map(r => r.name), ['ctor', 'late-collector', 'late-handler'])
     })
 })
