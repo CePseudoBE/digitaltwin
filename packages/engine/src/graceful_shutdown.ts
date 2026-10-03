@@ -23,7 +23,7 @@ export interface ShutdownOptions {
  *
  * @example
  * ```typescript
- * import { DigitalTwinEngine, setupGracefulShutdown } from 'digitaltwin-core'
+ * import { DigitalTwinEngine, setupGracefulShutdown } from '@cepseudo/engine'
  *
  * const engine = new DigitalTwinEngine({ ... })
  *
