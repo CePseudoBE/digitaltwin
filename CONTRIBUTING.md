@@ -22,6 +22,8 @@ pnpm test
 pnpm lint
 ```
 
+PostgreSQL, Redis, MinIO and a mock OIDC issuer for local development: `pnpm dev:infra`, see [dev/README.md](./dev/README.md).
+
 ## Project Structure
 
 ```

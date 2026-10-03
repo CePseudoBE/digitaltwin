@@ -11,6 +11,7 @@
     "clean": "pnpm -r run clean",
     "test": "pnpm --filter @cepseudo/shared run test && pnpm --filter @cepseudo/database run test && pnpm --filter @cepseudo/storage run test && pnpm --filter @cepseudo/auth run test && pnpm --filter @cepseudo/components run test && pnpm --filter @cepseudo/assets run test && pnpm --filter @cepseudo/ngsi-ld run test && pnpm --filter @cepseudo/engine run test && pnpm --filter digitaltwin-cli run test && pnpm --filter create-digitaltwin run test",
     "test:e2e": "pnpm --filter @cepseudo/e2e test",
+    "dev:infra": "docker compose -f docker-compose.dev.yml up -d",
     "test:shared": "pnpm --filter @cepseudo/shared run test",
     "lint": "pnpm -r run lint",
     "lint:fix": "pnpm -r run lint:fix"
