@@ -2,7 +2,6 @@
   "files": [],
   "references": [
     { "path": "./packages/shared" },
-    { "path": "./digitaltwin-core" },
     { "path": "./digitaltwin-cli" },
     { "path": "./create-digitaltwin" }
   ]

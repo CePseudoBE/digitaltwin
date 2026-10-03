@@ -18,7 +18,6 @@ A component-based TypeScript framework for building Digital Twin applications wi
 | [@cepseudo/components](./packages/components) | Component base classes (Collector, Harvester, Handler, CustomTableManager) | 2 |
 | [@cepseudo/assets](./packages/assets) | Asset management (files, tilesets, maps, presigned uploads) | 2 |
 | [@cepseudo/engine](./packages/engine) | Engine, scheduler, queues, loader, OpenAPI | 3 |
-| [digitaltwin-core](./digitaltwin-core) | Legacy unified package (re-exports from above) | - |
 | [digitaltwin-cli](./digitaltwin-cli) | CLI tools for generating components | - |
 | [create-digitaltwin](./create-digitaltwin) | Project scaffolding tool | - |
 
