@@ -12,6 +12,15 @@ function createEngine() {
 }
 
 test.group('Engine shutdown', () => {
+    test('isShuttingDown() turns true once stop() has run', async ({ assert }) => {
+        const engine = createEngine()
+        assert.isFalse(engine.isShuttingDown())
+
+        await engine.stop()
+
+        assert.isTrue(engine.isShuttingDown())
+    })
+
     test('stop() is idempotent — second call returns immediately', async ({ assert }) => {
         const engine = createEngine()
 
@@ -84,6 +93,20 @@ test.group('setupGracefulShutdown', () => {
         } finally {
             process.exit = originalExit
         }
+    })
+
+    test('listens to SIGTERM and SIGINT by default and cleanup removes both listeners', ({ assert }) => {
+        const engine = createEngine()
+        const sigterm = process.listenerCount('SIGTERM')
+        const sigint = process.listenerCount('SIGINT')
+
+        const cleanup = setupGracefulShutdown(engine)
+        assert.equal(process.listenerCount('SIGTERM'), sigterm + 1)
+        assert.equal(process.listenerCount('SIGINT'), sigint + 1)
+
+        cleanup()
+        assert.equal(process.listenerCount('SIGTERM'), sigterm)
+        assert.equal(process.listenerCount('SIGINT'), sigint)
     })
 
     test('cleanup can be called multiple times safely', ({ assert }) => {

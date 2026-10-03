@@ -66,6 +66,26 @@ test.group('initializeComponents', () => {
         assert.isNotNull(await db.getLatestByName('beta'))
     })
 
+    test('only the missing tables are created when some already exist', async ({ assert }) => {
+        const db = new MockDatabaseAdapter()
+        await db.createTable('existing')
+
+        const created: string[] = []
+        const createTable = db.createTable.bind(db)
+        db.createTable = async name => {
+            created.push(name)
+            await createTable(name)
+        }
+
+        await initializeComponents(
+            [new TestCollector('existing'), new TestCollector('missing'), new TestHarvester('also-missing')],
+            db,
+            new MockStorageService()
+        )
+
+        assert.sameMembers(created, ['missing', 'also-missing'])
+    })
+
     test('initialization fails when the database is unreachable', async ({ assert }) => {
         const db = new MockDatabaseAdapter({ shouldThrow: { doesTableExists: true } })
         const storage = new MockStorageService()
