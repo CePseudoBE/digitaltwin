@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 import { sql } from 'kysely'
 import { KyselyDatabaseAdapter, postgresSsl } from '../src/adapters/kysely_database_adapter.js'
-import { sqliteAdapterFactory, postgresAdapterFactory } from './helpers/factories.js'
+import { sqliteAdapterFactory, sqliteForeignKeysAdapterFactory, postgresAdapterFactory } from './helpers/factories.js'
 import type { AdapterFactory } from './helpers/factories.js'
 
 const pgAvailable = !!process.env.TEST_PG_HOST
@@ -213,6 +213,23 @@ function registerAdapterTests(label: string, factory: AdapterFactory) {
         test('updateAssetMetadata throws for non-existent record', async ({ assert }) => {
             await assert.rejects(() => db.updateAssetMetadata(`${label}_assets`, 99999, { description: 'Test' }), /not found/i)
         })
+
+        test('updateAssetMetadata with a partial update leaves the other fields unchanged', async ({ assert }) => {
+            const saved = await db.save({
+                name: `${label}_assets`,
+                type: 'text/plain',
+                url: '/partial.txt',
+                date: new Date(),
+                description: 'Original',
+                source: 'https://source.example',
+                is_public: false
+            })
+            await db.updateAssetMetadata(`${label}_assets`, saved.id, { description: 'Updated' })
+            const fetched = await db.getById(String(saved.id), `${label}_assets`)
+            assert.equal(fetched!.description, 'Updated')
+            assert.equal(fetched!.source, 'https://source.example')
+            assert.isFalse(fetched!.is_public)
+        })
     })
 
     test.group(`KyselyDatabaseAdapter [${label}] - Custom Table Operations`, group => {
@@ -295,6 +312,15 @@ function registerAdapterTests(label: string, factory: AdapterFactory) {
 
         test('rejects excessively long table name', async ({ assert }) => {
             await assert.rejects(() => db.createTable('a'.repeat(64)), /Table name too long/)
+        })
+
+        test('accepts a table name with digits after the first character', async ({ assert }) => {
+            await db.createTable(`${label}_table123`)
+            assert.isTrue(await db.doesTableExists(`${label}_table123`))
+        })
+
+        test('accepts a table name of exactly 63 characters', async ({ assert }) => {
+            assert.isFalse(await db.doesTableExists('a'.repeat(63)))
         })
 
         test('accepts valid table names', async ({ assert }) => {
@@ -422,6 +448,37 @@ function registerAdapterTests(label: string, factory: AdapterFactory) {
     }
 }
 
+function registerOwnerForeignKeyTests(label: string, factory: AdapterFactory) {
+    test.group(`KyselyDatabaseAdapter [${label}] - Owner Foreign Key`, group => {
+        const table = `${label}_owned_assets`
+        let db: KyselyDatabaseAdapter
+        let cleanup: () => Promise<void>
+
+        group.setup(async () => {
+            const result = await factory()
+            db = result.db
+            cleanup = result.cleanup
+            await db.getUserRepository().initializeTables()
+            await db.createTable(table)
+        })
+        group.teardown(async () => { await cleanup() })
+
+        test('save rejects an owner_id that references no user', async ({ assert }) => {
+            await assert.rejects(
+                () => db.save({ name: table, type: 'text/plain', url: '/orphan.txt', date: new Date(), owner_id: 999999 }),
+                /foreign key/i
+            )
+        })
+
+        test('save accepts an owner_id that references an existing user', async ({ assert }) => {
+            const user = await db.getUserRepository().findOrCreateUser({ subject: `${label}-owner`, roles: [] })
+            const saved = await db.save({ name: table, type: 'text/plain', url: '/owned.txt', date: new Date(), owner_id: user.id })
+            const fetched = await db.getById(String(saved.id), table)
+            assert.equal(fetched!.owner_id, user.id)
+        })
+    })
+}
+
 test.group('postgresSsl', () => {
     test('is off without ssl', ({ assert }) => {
         assert.isFalse(postgresSsl({ ssl: false }, {}))
@@ -438,7 +495,9 @@ test.group('postgresSsl', () => {
 })
 
 registerAdapterTests('sl', sqliteAdapterFactory)
+registerOwnerForeignKeyTests('sl', sqliteForeignKeysAdapterFactory)
 
 if (pgAvailable) {
     registerAdapterTests('pg', postgresAdapterFactory)
+    registerOwnerForeignKeyTests('pg', postgresAdapterFactory)
 }
