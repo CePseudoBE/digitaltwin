@@ -1,0 +1,22 @@
+{
+  "interactiveLogin": true,
+  "httpServer": "NettyWrapper",
+  "tokenCallbacks": [
+    {
+      "issuerId": "default",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "username",
+          "match": "alice",
+          "claims": { "sub": "alice", "aud": ["digitaltwin"], "roles": ["admin", "user"] }
+        },
+        {
+          "requestParam": "username",
+          "match": "bob",
+          "claims": { "sub": "bob", "aud": ["digitaltwin"], "roles": ["user"] }
+        }
+      ]
+    }
+  ]
+}
